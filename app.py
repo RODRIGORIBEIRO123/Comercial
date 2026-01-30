@@ -26,22 +26,21 @@ def conectar_google_sheets():
         st.error(f"Erro na conexão com Google Sheets: {e}")
         st.stop()
 
-# --- CARREGAR DADOS (AGORA COM CLIENTES E COBERTURAS) ---
+# --- CARREGAR DADOS ---
 def carregar_dados():
     sh = conectar_google_sheets()
     
-    # Função auxiliar para ler aba com segurança
     def ler_aba(nome):
         try:
             return pd.DataFrame(sh.worksheet(nome).get_all_records())
         except:
-            return pd.DataFrame() # Retorna vazio se a aba não existir ainda
+            return pd.DataFrame()
 
     df_esc = ler_aba("Escopos")
     df_exc = ler_aba("Exclusoes")
     df_resp = ler_aba("Responsabilidades")
-    df_cli = ler_aba("Clientes")    # NOVA
-    df_cob = ler_aba("Coberturas")  # NOVA
+    df_cli = ler_aba("Clientes")
+    df_cob = ler_aba("Coberturas")
     
     return df_esc, df_exc, df_resp, df_cli, df_cob
 
@@ -60,7 +59,7 @@ def salvar_no_banco(aba, dados_lista):
 try:
     df_escopos, df_exclusoes, df_resp, df_clientes, df_coberturas = carregar_dados()
 except Exception as e:
-    st.error("Erro ao ler dados. Verifique se criou as abas 'Clientes' e 'Coberturas' na planilha.")
+    st.error("Erro ao ler dados. Verifique a planilha.")
     st.stop()
 
 # --- FUNÇÃO DATA PT-BR ---
@@ -74,7 +73,7 @@ def formatar_data_portugues(dt):
 # ==============================================================================
 st.header("1. Cliente e Projeto")
 
-# --- CADASTRO DE NOVO CLIENTE ---
+# Cadastro Cliente
 with st.expander("➕ Cadastrar NOVO Cliente no Banco"):
     with st.form("form_cliente"):
         c_emp = st.text_input("Nome da Empresa")
@@ -85,24 +84,17 @@ with st.expander("➕ Cadastrar NOVO Cliente no Banco"):
         
         if st.form_submit_button("💾 Salvar Cliente"):
             if c_emp:
-                # Ordem: Empresa, Nome_Contato, Telefone, Email, Cidade_Estado
                 salvar_no_banco("Clientes", [c_emp, c_cont, c_fone, c_email, c_cid])
                 st.rerun()
             else:
                 st.warning("Nome da empresa é obrigatório.")
 
-# --- SELEÇÃO DE CLIENTE ---
+# Seleção Cliente
 lista_clientes = df_clientes['Empresa'].tolist() if not df_clientes.empty else []
 cliente_selecionado = st.selectbox("Selecione um Cliente Existente:", ["Novo / Digitar Manualmente"] + lista_clientes)
 
-# Variáveis padrão (vazias)
-p_empresa = ""
-p_contato = ""
-p_fone = ""
-p_email = ""
-p_cidade = ""
+p_empresa, p_contato, p_fone, p_email, p_cidade = "", "", "", "", ""
 
-# Se selecionou alguém do banco, preenche as variáveis
 if cliente_selecionado != "Novo / Digitar Manualmente":
     dados_cli = df_clientes[df_clientes['Empresa'] == cliente_selecionado].iloc[0]
     p_empresa = dados_cli['Empresa']
@@ -111,14 +103,12 @@ if cliente_selecionado != "Novo / Digitar Manualmente":
     p_email = dados_cli['Email']
     p_cidade = dados_cli['Cidade_Estado']
 
-# CAMPOS DE TEXTO (Preenchidos automaticamente ou manual)
 c1, c2 = st.columns(2)
 hoje = date.today()
 data_txt = formatar_data_portugues(hoje)
 
 with c1:
     st.info(f"📅 {data_txt}")
-    # O valor padrão (value) vem do banco se selecionado
     nome_contato = st.text_input("Nome do Contato", value=p_contato)
     fone = st.text_input("Telefone", value=p_fone)
     email = st.text_input("Email", value=p_email)
@@ -135,7 +125,7 @@ with c2:
 st.markdown("---")
 st.header("2. Cobertura")
 
-# --- CADASTRO DE NOVA COBERTURA ---
+# Cadastro Cobertura
 with st.expander("➕ Cadastrar NOVA Cobertura Padrão"):
     with st.form("form_cob"):
         nova_cob_txt = st.text_area("Texto da Cobertura")
@@ -144,11 +134,10 @@ with st.expander("➕ Cadastrar NOVA Cobertura Padrão"):
                 salvar_no_banco("Coberturas", [nova_cob_txt])
                 st.rerun()
 
-# Seleção
+# Seleção Cobertura
 lista_cob = df_coberturas['Texto_Completo'].tolist() if not df_coberturas.empty else []
-# Adiciona uma opção padrão caso o banco esteja vazio
 if not lista_cob:
-    lista_cob = ["Os custos aqui apresentados compreendem: instalação com fornecimento de equipamentos, materiais e mão-de-obra..."]
+    lista_cob = ["Os custos aqui apresentados compreendem: instalação com fornecimento de equipamentos..."]
 
 texto_escolhido = st.selectbox("Escolha o Modelo de Texto:", lista_cob)
 texto_cob_final = st.text_area("Texto Final (Editável):", value=texto_escolhido, height=100)
@@ -157,20 +146,35 @@ tem_docs = st.checkbox("Incluir Documentos de Referência?", value=True)
 lista_docs = st.text_area("Lista de Documentos:") if tem_docs else ""
 
 # ==============================================================================
-# 3. RESPONSABILIDADES DO CLIENTE
+# 3. RESPONSABILIDADES DO CLIENTE (CORRIGIDO)
 # ==============================================================================
 st.markdown("---")
 st.header("3. Responsabilidades do Cliente")
 
+# --- CORREÇÃO: AGORA SALVA 3 CAMPOS ---
 with st.expander("➕ Cadastrar Responsabilidade"):
     with st.form("nova_resp"):
-        nr_curto = st.text_input("Título Curto")
-        nr_longo = st.text_input("Texto Completo")
+        c_cat, c_tit, c_txt = st.columns([0.3, 0.3, 0.4])
+        
+        nr_cat = c_cat.text_input("Categoria (ex: Civil)")
+        nr_curto = c_tit.text_input("Título Curto (Menu)")
+        nr_longo = c_txt.text_input("Texto Completo (Proposta)")
+        
         if st.form_submit_button("💾 Salvar"):
-            salvar_no_banco("Responsabilidades", [nr_curto, nr_longo])
-            st.rerun()
+            if nr_curto and nr_longo:
+                # Salva: Categoria, Titulo, Texto
+                salvar_no_banco("Responsabilidades", [nr_cat, nr_curto, nr_longo])
+                st.rerun()
+            else:
+                st.warning("Preencha Título e Texto.")
 
-dict_resp = dict(zip(df_resp['Titulo_Curto'], df_resp['Texto_Completo'])) if not df_resp.empty else {}
+# Lógica de seleção
+dict_resp = {}
+if not df_resp.empty:
+    # Cria dicionário Titulo_Curto -> Texto_Completo
+    # Ignora a coluna Categoria na hora de selecionar, ou usa para agrupar se quiser evoluir depois
+    dict_resp = dict(zip(df_resp['Titulo_Curto'], df_resp['Texto_Completo']))
+
 sel_resp = st.multiselect("Selecione:", list(dict_resp.keys()), default=list(dict_resp.keys()))
 resp_final = [dict_resp[k] for k in sel_resp if k in dict_resp]
 
@@ -186,12 +190,8 @@ with st.expander("➕ Cadastrar Item de Escopo"):
         cats = df_escopos['Categoria'].unique().tolist() if not df_escopos.empty else []
         c_cat, c_tit, c_txt = st.columns([0.3, 0.3, 0.4])
         
-        # Opção de Nova Categoria
         cat_sel = c_cat.selectbox("Categoria", ["Nova..."] + cats)
-        if cat_sel == "Nova...":
-            cat_final = c_cat.text_input("Nome da Nova Categoria")
-        else:
-            cat_final = cat_sel
+        cat_final = c_cat.text_input("Nome da Nova Categoria") if cat_sel == "Nova..." else cat_sel
             
         ne_tit = c_tit.text_input("Nome Equipamento")
         ne_txt = c_txt.text_input("Descrição Técnica")
