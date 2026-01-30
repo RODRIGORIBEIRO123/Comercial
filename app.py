@@ -14,9 +14,9 @@ except:
 # ==============================================================================
 # 🔗 CONFIGURAÇÃO DOS LINKS (ATUALIZE COM SEUS LINKS CSV)
 # ==============================================================================
-URL_ESCOPOS = "https://docs.google.com/spreadsheets/d/e/SEU_LINK_ESCOPOS/pub?gid=0&single=true&output=csv"
-URL_EXCLUSOES = "https://docs.google.com/spreadsheets/d/e/SEU_LINK_EXCLUSOES/pub?gid=0&single=true&output=csv"
-URL_RESPONSABILIDADES = "https://docs.google.com/spreadsheets/d/e/SEU_LINK_RESPONSABILIDADES/pub?gid=0&single=true&output=csv"
+URL_ESCOPOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9Dlv9q_qBgpCIwY6cQAfWTYY6JXO9ILRMN_NT_QNjFiWAy2N5W9QqjP51U2fAnE2mi-RCEtj5l2wG/pub?gid=221408068&single=true&output=csv"
+URL_EXCLUSOES = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9Dlv9q_qBgpCIwY6cQAfWTYY6JXO9ILRMN_NT_QNjFiWAy2N5W9QqjP51U2fAnE2mi-RCEtj5l2wG/pub?gid=1129521636&single=true&output=csv"
+URL_RESPONSABILIDADES = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9Dlv9q_qBgpCIwY6cQAfWTYY6JXO9ILRMN_NT_QNjFiWAy2N5W9QqjP51U2fAnE2mi-RCEtj5l2wG/pub?gid=1382076169&single=true&output=csv"
 # ==============================================================================
 
 st.set_page_config(page_title="Gerador Propostas SIARCON", layout="wide", page_icon="📄")
@@ -198,3 +198,4 @@ if st.button("🚀 GERAR PROPOSTA COMPLETA", type="primary"):
         
     except Exception as e:
         st.error(f"Erro ao gerar documento: {e}")
+
