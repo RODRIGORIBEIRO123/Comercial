@@ -59,7 +59,7 @@ def salvar_no_banco(aba, dados_lista):
 try:
     df_escopos, df_exclusoes, df_resp, df_clientes, df_coberturas = carregar_dados()
 except Exception as e:
-    st.error("Erro ao ler dados. Verifique a planilha.")
+    st.error("Erro ao ler dados. Verifique se as abas existem na planilha.")
     st.stop()
 
 # --- FUNÇÃO DATA PT-BR ---
@@ -138,7 +138,7 @@ tem_docs = st.checkbox("Incluir Documentos de Referência?", value=True)
 lista_docs = st.text_area("Lista de Documentos:") if tem_docs else ""
 
 # ==============================================================================
-# 3. RESPONSABILIDADES DO CLIENTE (SIMPLIFICADO)
+# 3. RESPONSABILIDADES DO CLIENTE
 # ==============================================================================
 st.markdown("---")
 st.header("3. Responsabilidades do Cliente")
@@ -149,7 +149,6 @@ with st.expander("➕ Cadastrar Responsabilidade"):
         nr_longo = st.text_input("Texto Completo (Proposta)")
         if st.form_submit_button("💾 Salvar"):
             if nr_curto and nr_longo:
-                # Agora salva apenas 2 campos (igual às outras abas)
                 salvar_no_banco("Responsabilidades", [nr_curto, nr_longo])
                 st.rerun()
 
@@ -158,56 +157,87 @@ sel_resp = st.multiselect("Selecione:", list(dict_resp.keys()), default=list(dic
 resp_final = [dict_resp[k] for k in sel_resp if k in dict_resp]
 
 # ==============================================================================
-# 4. ESCOPO TÉCNICO (SIMPLIFICADO - SEM CATEGORIA)
+# 4. ESCOPO TÉCNICO
 # ==============================================================================
 st.markdown("---")
 st.header("4. Escopo Técnico")
 intro = st.text_area("Introdução do Escopo")
 
-# --- CADASTRO SIMPLIFICADO ---
+# --- CADASTRO COM CATEGORIA ---
 with st.expander("➕ Cadastrar NOVO Item de Escopo"):
     with st.form("novo_esc"):
-        ne_tit = st.text_input("Título Curto (Para aparecer no Menu)")
-        ne_txt = st.text_input("Texto Completo (Para sair na Proposta)")
+        cats_existentes = sorted(df_escopos['Categoria'].unique().tolist()) if 'Categoria' in df_escopos.columns else []
+        
+        c_cat, c_tit, c_txt = st.columns([0.3, 0.3, 0.4])
+        
+        opcao_cat = c_cat.selectbox("Categoria", ["Nova Categoria..."] + cats_existentes)
+        cat_final = c_cat.text_input("Nome da Categoria") if opcao_cat == "Nova Categoria..." else opcao_cat
+            
+        ne_tit = c_tit.text_input("Título Curto")
+        ne_txt = c_txt.text_input("Texto Completo")
+        
         if st.form_submit_button("💾 Salvar Item"):
-            if ne_tit and ne_txt:
-                salvar_no_banco("Escopos", [ne_tit, ne_txt])
+            if cat_final and ne_tit and ne_txt:
+                salvar_no_banco("Escopos", [cat_final, ne_tit, ne_txt])
                 st.rerun()
 
-# --- SELEÇÃO DE ESCOPO ---
-dict_escopos = dict(zip(df_escopos['Titulo_Curto'], df_escopos['Texto_Completo'])) if not df_escopos.empty else {}
+# --- LÓGICA DE SELEÇÃO + QUANTIDADE + COMPLEMENTO ---
+escopo_estruturado = []
 
-itens_selecionados = st.multiselect("Selecione os Itens do Escopo:", options=list(dict_escopos.keys()))
-
-escopo_final_word = []
-
-if itens_selecionados:
-    st.markdown("### 📝 Detalhamento dos Itens")
-    st.info("Ajuste quantidades e complementos. O texto final será: 'Texto do Banco' + Complementos.")
+if 'Categoria' in df_escopos.columns:
+    categorias = sorted(df_escopos['Categoria'].unique())
     
-    for item_curto in itens_selecionados:
-        texto_longo_banco = dict_escopos[item_curto]
-        
-        st.markdown(f"**Item:** {item_curto}")
-        
-        c_qtd, c_comp = st.columns([0.2, 0.8])
-        qtd = c_qtd.number_input(f"Qtd", min_value=1, value=1, key=f"q_{item_curto}")
-        comp = c_comp.text_input(f"Complemento", placeholder="Marca, Modelo...", key=f"c_{item_curto}")
-        
-        # Montagem do texto
-        texto_para_doc = texto_longo_banco
-        
-        detalhes_extras = []
-        if qtd > 1:
-            detalhes_extras.append(f"Quantidade: {qtd}")
-        if comp:
-            detalhes_extras.append(comp)
+    for cat in categorias:
+        with st.expander(f"📁 {cat}", expanded=True):
+            df_cat = df_escopos[df_escopos['Categoria'] == cat]
+            dict_cat = dict(zip(df_cat['Titulo_Curto'], df_cat['Texto_Completo']))
             
-        if detalhes_extras:
-            texto_para_doc += f" — {', '.join(detalhes_extras)}."
+            # 1. Seleciona os itens
+            itens_selecionados = st.multiselect(f"Itens de {cat}:", options=list(dict_cat.keys()), key=f"sel_{cat}")
             
-        escopo_final_word.append(texto_para_doc)
-        st.divider()
+            lista_textos_finais = []
+            
+            # 2. Se selecionou algo, abre campos de detalhe
+            if itens_selecionados:
+                st.markdown(f"**📝 Detalhes ({cat}):**")
+                for item_curto in itens_selecionados:
+                    texto_base = dict_cat[item_curto]
+                    
+                    # Colunas para Qtd e Complemento ficarem lado a lado
+                    col_q, col_c = st.columns([0.15, 0.85])
+                    
+                    qtd = col_q.number_input(f"Qtd", min_value=1, value=1, key=f"q_{cat}_{item_curto}")
+                    comp = col_c.text_input(f"Complemento ({item_curto})", placeholder="Marca, Modelo, Obs...", key=f"c_{cat}_{item_curto}")
+                    
+                    # --- MONTAGEM DO TEXTO FINAL ---
+                    # Formato: [Texto do Banco] — Qtd: X. [Complemento]
+                    texto_final = texto_base
+                    
+                    adicionais = []
+                    if qtd > 1:
+                        adicionais.append(f"Qtd: {qtd}")
+                    
+                    # Se tiver complemento ou quantidade > 1, adiciona ao texto
+                    sulfixo = ""
+                    if adicionais or comp:
+                        partes = []
+                        if adicionais: partes.append(", ".join(adicionais))
+                        if comp: partes.append(comp)
+                        sulfixo = f" — {'. '.join(partes)}."
+                    
+                    texto_final += sulfixo
+                    lista_textos_finais.append(texto_final)
+                
+                st.markdown("---") # Divisória visual entre categorias
+                
+                # Adiciona ao grupo
+                escopo_estruturado.append({
+                    'nome': cat.upper(),
+                    'itens': lista_textos_finais
+                })
+
+else:
+    st.error("A coluna 'Categoria' não foi encontrada na aba Escopos.")
 
 # ==============================================================================
 # 5. EXCLUSÕES
@@ -251,7 +281,7 @@ if st.button("🚀 GERAR PROPOSTA (.DOCX)", type="primary"):
         'texto_cobertura': texto_cob_final,
         'tem_docs': tem_docs, 'docs_referencia': lista_docs,
         'lista_resp_cliente': resp_final,
-        'escopo_simples': escopo_final_word, 
+        'escopo_estruturado': escopo_estruturado,
         'lista_exclusoes': exc_final,
         'intro_servico': intro,
         'mes_base': mes, 'valor_total': valor,
