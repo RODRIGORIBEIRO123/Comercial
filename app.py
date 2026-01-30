@@ -8,10 +8,10 @@ from datetime import date
 # CONFIGURAÇÃO DE LINKS (SUBSTITUA AQUI PELOS SEUS LINKS DO GOOGLE SHEETS)
 # ==============================================================================
 # Cole o link CSV da aba "Escopos" dentro das aspas abaixo:
-URL_ESCOPOS = "https://docs.google.com/spreadsheets/d/e/2PACX-xxxxxx/pub?gid=0&single=true&output=csv"
+URL_ESCOPOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9Dlv9q_qBgpCIwY6cQAfWTYY6JXO9ILRMN_NT_QNjFiWAy2N5W9QqjP51U2fAnE2mi-RCEtj5l2wG/pub?gid=221408068&single=true&output=csv"
 
 # Cole o link CSV da aba "Exclusoes" dentro das aspas abaixo:
-URL_EXCLUSOES = "https://docs.google.com/spreadsheets/d/e/2PACX-xxxxxx/pub?gid=12345&single=true&output=csv"
+URL_EXCLUSOES = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9Dlv9q_qBgpCIwY6cQAfWTYY6JXO9ILRMN_NT_QNjFiWAy2N5W9QqjP51U2fAnE2mi-RCEtj5l2wG/pub?gid=1129521636&single=true&output=csv"
 # ==============================================================================
 
 # Configuração da página do site
@@ -133,3 +133,4 @@ if st.button("🚀 Gerar Proposta (.docx)", type="primary"):
             st.info("Certifique-se de que você fez o upload do arquivo Word para o repositório.")
         except Exception as e:
             st.error(f"❌ Ocorreu um erro inesperado: {e}")
+
