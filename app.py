@@ -26,21 +26,14 @@ def carregar_dados():
         df_esc = pd.read_csv(URL_ESCOPOS)
         df_exc = pd.read_csv(URL_EXCLUSOES)
         
-        # Remove espaços em branco extras dos nomes das colunas para evitar erros
+        # Limpeza básica nas colunas
         df_esc.columns = df_esc.columns.str.strip()
         df_exc.columns = df_exc.columns.str.strip()
         
         return df_esc, df_exc
     except Exception as e:
-        return None, e
-
-df_escopos, df_exclusoes = carregar_dados()
-
-# Verifica erro de conexão
-if df_escopos is None:
-    st.error("❌ Erro ao conectar com o Google Sheets!")
-    st.warning("Verifique se os links no início do código estão corretos (formato CSV).")
-    st.stop()
+        # A CORREÇÃO ESTÁ AQUI: Retornamos o TEXTO do erro (str(e)), não o objeto erro
+        return None, str(e)
 
 # --- 2. INTERFACE DE DADOS DO CLIENTE ---
 st.subheader("📝 Dados do Projeto")
@@ -157,3 +150,4 @@ if st.button("🚀 Gerar Proposta (.docx)", type="primary"):
             st.error("Erro: O arquivo 'Template_Siarcon.docx' não foi encontrado no GitHub.")
         except Exception as e:
             st.error(f"Erro inesperado: {e}")
+
