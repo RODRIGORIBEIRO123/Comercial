@@ -74,27 +74,23 @@ def formatar_data_portugues(dt):
 st.header("1. Cliente e Projeto")
 
 # Cadastro Cliente
-with st.expander("➕ Cadastrar NOVO Cliente no Banco"):
+with st.expander("➕ Cadastrar NOVO Cliente"):
     with st.form("form_cliente"):
         c_emp = st.text_input("Nome da Empresa")
         c_cont = st.text_input("Nome do Contato")
         c_fone = st.text_input("Telefone")
         c_email = st.text_input("Email")
         c_cid = st.text_input("Cidade/Estado")
-        
         if st.form_submit_button("💾 Salvar Cliente"):
             if c_emp:
                 salvar_no_banco("Clientes", [c_emp, c_cont, c_fone, c_email, c_cid])
                 st.rerun()
-            else:
-                st.warning("Nome da empresa é obrigatório.")
 
 # Seleção Cliente
 lista_clientes = df_clientes['Empresa'].tolist() if not df_clientes.empty else []
-cliente_selecionado = st.selectbox("Selecione um Cliente Existente:", ["Novo / Digitar Manualmente"] + lista_clientes)
+cliente_selecionado = st.selectbox("Selecione Cliente Existente:", ["Novo / Digitar Manualmente"] + lista_clientes)
 
 p_empresa, p_contato, p_fone, p_email, p_cidade = "", "", "", "", ""
-
 if cliente_selecionado != "Novo / Digitar Manualmente":
     dados_cli = df_clientes[df_clientes['Empresa'] == cliente_selecionado].iloc[0]
     p_empresa = dados_cli['Empresa']
@@ -116,117 +112,102 @@ with c1:
 with c2:
     nome_cliente = st.text_input("Empresa (Cliente)", value=p_empresa)
     cidade_estado = st.text_input("Cidade/Estado", value=p_cidade)
-    nome_projeto = st.text_input("Nome do Projeto (Ref.)")
+    nome_projeto = st.text_input("Nome do Projeto")
     num_prop = st.text_input("Nº Proposta", value=f"P-{hoje.year}-XXX")
 
 # ==============================================================================
-# 2. COBERTURA DO FORNECIMENTO
+# 2. COBERTURA
 # ==============================================================================
 st.markdown("---")
 st.header("2. Cobertura")
 
 # Cadastro Cobertura
-with st.expander("➕ Cadastrar NOVA Cobertura Padrão"):
+with st.expander("➕ Cadastrar NOVA Cobertura"):
     with st.form("form_cob"):
         nova_cob_txt = st.text_area("Texto da Cobertura")
-        if st.form_submit_button("💾 Salvar Cobertura"):
+        if st.form_submit_button("💾 Salvar"):
             if nova_cob_txt:
                 salvar_no_banco("Coberturas", [nova_cob_txt])
                 st.rerun()
 
-# Seleção Cobertura
-lista_cob = df_coberturas['Texto_Completo'].tolist() if not df_coberturas.empty else []
-if not lista_cob:
-    lista_cob = ["Os custos aqui apresentados compreendem: instalação com fornecimento de equipamentos..."]
-
-texto_escolhido = st.selectbox("Escolha o Modelo de Texto:", lista_cob)
-texto_cob_final = st.text_area("Texto Final (Editável):", value=texto_escolhido, height=100)
+lista_cob = df_coberturas['Texto_Completo'].tolist() if not df_coberturas.empty else ["Os custos aqui apresentados compreendem..."]
+texto_escolhido = st.selectbox("Modelo de Texto:", lista_cob)
+texto_cob_final = st.text_area("Texto Final:", value=texto_escolhido, height=100)
 
 tem_docs = st.checkbox("Incluir Documentos de Referência?", value=True)
 lista_docs = st.text_area("Lista de Documentos:") if tem_docs else ""
 
 # ==============================================================================
-# 3. RESPONSABILIDADES DO CLIENTE (CORRIGIDO)
+# 3. RESPONSABILIDADES DO CLIENTE (SIMPLIFICADO)
 # ==============================================================================
 st.markdown("---")
 st.header("3. Responsabilidades do Cliente")
 
-# --- CORREÇÃO: AGORA SALVA 3 CAMPOS ---
 with st.expander("➕ Cadastrar Responsabilidade"):
     with st.form("nova_resp"):
-        c_cat, c_tit, c_txt = st.columns([0.3, 0.3, 0.4])
-        
-        nr_cat = c_cat.text_input("Categoria (ex: Civil)")
-        nr_curto = c_tit.text_input("Título Curto (Menu)")
-        nr_longo = c_txt.text_input("Texto Completo (Proposta)")
-        
+        nr_curto = st.text_input("Título Curto (Menu)")
+        nr_longo = st.text_input("Texto Completo (Proposta)")
         if st.form_submit_button("💾 Salvar"):
             if nr_curto and nr_longo:
-                # Salva: Categoria, Titulo, Texto
-                salvar_no_banco("Responsabilidades", [nr_cat, nr_curto, nr_longo])
+                # Agora salva apenas 2 campos (igual às outras abas)
+                salvar_no_banco("Responsabilidades", [nr_curto, nr_longo])
                 st.rerun()
-            else:
-                st.warning("Preencha Título e Texto.")
 
-# Lógica de seleção
-dict_resp = {}
-if not df_resp.empty:
-    # Cria dicionário Titulo_Curto -> Texto_Completo
-    # Ignora a coluna Categoria na hora de selecionar, ou usa para agrupar se quiser evoluir depois
-    dict_resp = dict(zip(df_resp['Titulo_Curto'], df_resp['Texto_Completo']))
-
+dict_resp = dict(zip(df_resp['Titulo_Curto'], df_resp['Texto_Completo'])) if not df_resp.empty else {}
 sel_resp = st.multiselect("Selecione:", list(dict_resp.keys()), default=list(dict_resp.keys()))
 resp_final = [dict_resp[k] for k in sel_resp if k in dict_resp]
 
 # ==============================================================================
-# 4. ESCOPO TÉCNICO
+# 4. ESCOPO TÉCNICO (SIMPLIFICADO - SEM CATEGORIA)
 # ==============================================================================
 st.markdown("---")
 st.header("4. Escopo Técnico")
 intro = st.text_area("Introdução do Escopo")
 
-with st.expander("➕ Cadastrar Item de Escopo"):
+# --- CADASTRO SIMPLIFICADO ---
+with st.expander("➕ Cadastrar NOVO Item de Escopo"):
     with st.form("novo_esc"):
-        cats = df_escopos['Categoria'].unique().tolist() if not df_escopos.empty else []
-        c_cat, c_tit, c_txt = st.columns([0.3, 0.3, 0.4])
-        
-        cat_sel = c_cat.selectbox("Categoria", ["Nova..."] + cats)
-        cat_final = c_cat.text_input("Nome da Nova Categoria") if cat_sel == "Nova..." else cat_sel
-            
-        ne_tit = c_tit.text_input("Nome Equipamento")
-        ne_txt = c_txt.text_input("Descrição Técnica")
-        
-        if st.form_submit_button("💾 Salvar"):
-            if cat_final and ne_tit and ne_txt:
-                salvar_no_banco("Escopos", [cat_final, ne_tit, ne_txt])
+        ne_tit = st.text_input("Título Curto (Para aparecer no Menu)")
+        ne_txt = st.text_input("Texto Completo (Para sair na Proposta)")
+        if st.form_submit_button("💾 Salvar Item"):
+            if ne_tit and ne_txt:
+                salvar_no_banco("Escopos", [ne_tit, ne_txt])
                 st.rerun()
 
-escopo_final = []
-contador = 1
-st.subheader("Seleção por Disciplina")
+# --- SELEÇÃO DE ESCOPO ---
+dict_escopos = dict(zip(df_escopos['Titulo_Curto'], df_escopos['Texto_Completo'])) if not df_escopos.empty else {}
 
-if not df_escopos.empty:
-    for cat in df_escopos['Categoria'].unique():
-        if st.checkbox(f"📁 {cat}", key=cat):
-            df_c = df_escopos[df_escopos['Categoria'] == cat]
-            itens = st.multiselect(f"Itens de {cat}", df_c['Titulo_Curto'].tolist(), key=f"sel_{cat}")
+itens_selecionados = st.multiselect("Selecione os Itens do Escopo:", options=list(dict_escopos.keys()))
+
+escopo_final_word = []
+
+if itens_selecionados:
+    st.markdown("### 📝 Detalhamento dos Itens")
+    st.info("Ajuste quantidades e complementos. O texto final será: 'Texto do Banco' + Complementos.")
+    
+    for item_curto in itens_selecionados:
+        texto_longo_banco = dict_escopos[item_curto]
+        
+        st.markdown(f"**Item:** {item_curto}")
+        
+        c_qtd, c_comp = st.columns([0.2, 0.8])
+        qtd = c_qtd.number_input(f"Qtd", min_value=1, value=1, key=f"q_{item_curto}")
+        comp = c_comp.text_input(f"Complemento", placeholder="Marca, Modelo...", key=f"c_{item_curto}")
+        
+        # Montagem do texto
+        texto_para_doc = texto_longo_banco
+        
+        detalhes_extras = []
+        if qtd > 1:
+            detalhes_extras.append(f"Quantidade: {qtd}")
+        if comp:
+            detalhes_extras.append(comp)
             
-            lista_textos = []
-            if itens:
-                st.caption(f"Detalhamento - {cat}:")
-                for item in itens:
-                    col_q, col_c = st.columns([0.2, 0.8])
-                    qtd = col_q.number_input(f"Qtd ({item})", min_value=1, value=1, key=f"q_{cat}_{item}")
-                    comp = col_c.text_input(f"Complemento ({item})", key=f"c_{cat}_{item}")
-                    
-                    texto = f"Fornecimento de {int(qtd)} {item}"
-                    if comp: texto += f", {comp}"
-                    texto += "."
-                    lista_textos.append(texto)
-                
-                escopo_final.append({'indice': f"1.{contador}", 'nome': cat.upper(), 'itens': lista_textos})
-                contador += 1
-                st.markdown("---")
+        if detalhes_extras:
+            texto_para_doc += f" — {', '.join(detalhes_extras)}."
+            
+        escopo_final_word.append(texto_para_doc)
+        st.divider()
 
 # ==============================================================================
 # 5. EXCLUSÕES
@@ -239,8 +220,9 @@ with st.expander("➕ Cadastrar Exclusão"):
         nex_c = st.text_input("Título Curto")
         nex_l = st.text_input("Texto Completo")
         if st.form_submit_button("💾 Salvar"):
-            salvar_no_banco("Exclusoes", [nex_c, nex_l])
-            st.rerun()
+            if nex_c:
+                salvar_no_banco("Exclusoes", [nex_c, nex_l])
+                st.rerun()
 
 dict_exc = dict(zip(df_exclusoes['Titulo_Curto'], df_exclusoes['Texto_Completo'])) if not df_exclusoes.empty else {}
 sel_exc = st.multiselect("Exclusões:", list(dict_exc.keys()), default=list(dict_exc.keys()))
@@ -269,7 +251,7 @@ if st.button("🚀 GERAR PROPOSTA (.DOCX)", type="primary"):
         'texto_cobertura': texto_cob_final,
         'tem_docs': tem_docs, 'docs_referencia': lista_docs,
         'lista_resp_cliente': resp_final,
-        'escopo_estruturado': escopo_final,
+        'escopo_simples': escopo_final_word, 
         'lista_exclusoes': exc_final,
         'intro_servico': intro,
         'mes_base': mes, 'valor_total': valor,
