@@ -157,7 +157,7 @@ sel_resp = st.multiselect("Selecione:", list(dict_resp.keys()), default=list(dic
 resp_final = [dict_resp[k] for k in sel_resp if k in dict_resp]
 
 # ==============================================================================
-# 4. ESCOPO TÉCNICO (COM FLAG DE COMPLEMENTO)
+# 4. ESCOPO TÉCNICO (SIMPLIFICADO - SÓ QTD)
 # ==============================================================================
 st.markdown("---")
 st.header("4. Escopo Técnico")
@@ -191,50 +191,35 @@ if 'Categoria' in df_escopos.columns:
             df_cat = df_escopos[df_escopos['Categoria'] == cat]
             dict_cat = dict(zip(df_cat['Titulo_Curto'], df_cat['Texto_Completo']))
             
-            # 1. Seleciona os itens
+            # 1. Seleciona os itens (Multiselect)
             itens_selecionados = st.multiselect(f"Itens de {cat}:", options=list(dict_cat.keys()), key=f"sel_{cat}")
             
             lista_textos_finais = []
             
-            # 2. Se selecionou algo, abre campos de detalhe
+            # 2. Se selecionou algo, mostra APENAS a Quantidade
             if itens_selecionados:
-                st.markdown(f"**📝 Detalhes ({cat}):**")
+                # st.caption(f"Quantidades - {cat}") # Opcional: Título pequeno
+                
                 for item_curto in itens_selecionados:
                     texto_base = dict_cat[item_curto]
                     
-                    # Layout: Quantidade (Pequeno) | Checkbox (Pequeno) | Texto (Grande)
-                    c_qtd, c_check, c_txt = st.columns([0.15, 0.15, 0.70])
+                    # Layout super simples: Coluna pequena para Qtd, resto texto fixo do nome
+                    col_q, col_nome = st.columns([0.15, 0.85])
                     
-                    # 1. Quantidade digitável
-                    qtd = c_qtd.number_input(f"Qtd ({item_curto})", min_value=1, value=1, key=f"q_{cat}_{item_curto}")
+                    # Input de Quantidade
+                    qtd = col_q.number_input(f"Qtd", min_value=1, value=1, key=f"q_{cat}_{item_curto}", label_visibility="visible")
                     
-                    # 2. Flag para abrir complemento
-                    tem_complemento = c_check.checkbox("Add Obs?", key=f"chk_{cat}_{item_curto}")
-                    
-                    comp = ""
-                    if tem_complemento:
-                        # 3. Caixa de texto só aparece se a flag estiver marcada
-                        comp = c_txt.text_input(f"Obs para {item_curto}", placeholder="Ex: Marca, Modelo...", key=f"c_{cat}_{item_curto}", label_visibility="collapsed")
+                    # Nome do item apenas para identificar visualmente a linha
+                    col_nome.write(f"**{item_curto}**")
                     
                     # --- MONTAGEM DO TEXTO FINAL ---
-                    # Formato: [Texto do Banco] — Qtd: X. [Complemento]
+                    # Formato: [Texto do Banco] — Qtd: X.
                     texto_final = texto_base
                     
-                    adicionais = []
                     if qtd > 1:
-                        adicionais.append(f"Qtd: {qtd}")
+                        texto_final += f" — Qtd: {qtd}."
                     
-                    if comp:
-                         adicionais.append(comp)
-                    
-                    sulfixo = ""
-                    if adicionais:
-                        sulfixo = f" — {'. '.join(adicionais)}."
-                    
-                    texto_final += sulfixo
                     lista_textos_finais.append(texto_final)
-                
-                st.markdown("---") 
                 
                 # Adiciona ao grupo
                 escopo_estruturado.append({
