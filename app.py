@@ -5,44 +5,45 @@ import io
 from datetime import date
 
 # ==============================================================================
-# CONFIGURAÇÃO DE LINKS (SUBSTITUA AQUI PELOS SEUS LINKS DO GOOGLE SHEETS)
+# 🔗 CONFIGURAÇÃO DOS LINKS DO GOOGLE SHEETS
 # ==============================================================================
-# Cole o link CSV da aba "Escopos" dentro das aspas abaixo:
-URL_ESCOPOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9Dlv9q_qBgpCIwY6cQAfWTYY6JXO9ILRMN_NT_QNjFiWAy2N5W9QqjP51U2fAnE2mi-RCEtj5l2wG/pub?gid=221408068&single=true&output=csv"
-
-# Cole o link CSV da aba "Exclusoes" dentro das aspas abaixo:
-URL_EXCLUSOES = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9Dlv9q_qBgpCIwY6cQAfWTYY6JXO9ILRMN_NT_QNjFiWAy2N5W9QqjP51U2fAnE2mi-RCEtj5l2wG/pub?gid=1129521636&single=true&output=csv"
+# Passo importante: Substitua os links abaixo pelos seus links CSV "Publicados na Web"
+URL_ESCOPOS = "https://docs.google.com/spreadsheets/d/e/SUBSTITUA_PELO_SEU_LINK_ESCOPOS/pub?gid=0&single=true&output=csv"
+URL_EXCLUSOES = "https://docs.google.com/spreadsheets/d/e/SUBSTITUA_PELO_SEU_LINK_EXCLUSOES/pub?gid=0&single=true&output=csv"
 # ==============================================================================
 
-# Configuração da página do site
-st.set_page_config(page_title="Gerador de Propostas SIARCON", layout="wide", page_icon="📄")
+# Configuração da página
+st.set_page_config(page_title="Gerador Propostas SIARCON", layout="wide", page_icon="📄")
 
 st.title("📄 Gerador de Propostas - SIARCON")
 st.markdown("---")
 
-# --- FUNÇÃO PARA CARREGAR DADOS DO GOOGLE SHEETS ---
-@st.cache_data(ttl=60) # Atualiza os dados a cada 60 segundos para não ficar lento
+# --- 1. CARREGAR DADOS (CACHE) ---
+@st.cache_data(ttl=60)
 def carregar_dados():
     try:
-        # Lê os dados direto dos links CSV
+        # Lê direto do Google Sheets
         df_esc = pd.read_csv(URL_ESCOPOS)
         df_exc = pd.read_csv(URL_EXCLUSOES)
+        
+        # Remove espaços em branco extras dos nomes das colunas para evitar erros
+        df_esc.columns = df_esc.columns.str.strip()
+        df_exc.columns = df_exc.columns.str.strip()
+        
         return df_esc, df_exc
     except Exception as e:
         return None, e
 
-# Carrega os dados
 df_escopos, df_exclusoes = carregar_dados()
 
-# Verifica se deu erro ao carregar
+# Verifica erro de conexão
 if df_escopos is None:
-    st.error(f"❌ Erro ao conectar com o Google Sheets!")
-    st.warning("Verifique se os links 'URL_ESCOPOS' e 'URL_EXCLUSOES' no código estão corretos e publicados como CSV.")
+    st.error("❌ Erro ao conectar com o Google Sheets!")
+    st.warning("Verifique se os links no início do código estão corretos (formato CSV).")
     st.stop()
 
-# --- FORMULÁRIO DE ENTRADA ---
-st.info("Preencha os dados abaixo para gerar o documento Word automaticamente.")
-
+# --- 2. INTERFACE DE DADOS DO CLIENTE ---
+st.subheader("📝 Dados do Projeto")
 col1, col2, col3 = st.columns(3)
 with col1:
     cliente = st.text_input("Nome do Cliente", placeholder="Ex: Farmacêutica XYZ")
@@ -51,33 +52,33 @@ with col2:
 with col3:
     prazo = st.text_input("Prazo de Execução", placeholder="Ex: 45 dias")
 
-# --- SELEÇÃO DE ESCOPOS TÉCNICOS ---
-st.markdown("### 🛠️ Escopo Técnico")
+# --- 3. SELEÇÃO DE ESCOPO TÉCNICO ---
+st.markdown("---")
+st.subheader("🛠️ Escopo Técnico")
 
-# Pega todas as categorias únicas (ex: Dutos, Água Gelada, VRF)
-categorias = df_escopos['Categoria'].unique()
-itens_selecionados_texto = []
+# Lista para guardar TÍTULOS de tudo que foi selecionado
+# Usamos session_state ou apenas uma lista acumuladora simples aqui
+itens_selecionados_titulos = []
 
-# Cria uma caixinha expansível para cada categoria
-for cat in categorias:
+# Pega as categorias na ordem original do Excel (para manter Água Gelada antes de Elétrica, etc)
+categorias_ordenadas = df_escopos['Categoria'].unique()
+
+for cat in categorias_ordenadas:
     with st.expander(f"Categoria: {cat}"):
-        # Filtra os itens daquela categoria
-        itens_da_categoria = df_escopos[df_escopos['Categoria'] == cat]
+        # Filtra itens dessa categoria
+        df_cat = df_escopos[df_escopos['Categoria'] == cat]
         
-        # Cria o menu de seleção
-        selecionados = st.multiselect(
+        # Cria o checkbox
+        selecao = st.multiselect(
             f"Selecione os itens de {cat}:",
-            options=itens_da_categoria['Titulo'].tolist(),
+            options=df_cat['Titulo'].tolist(),
             key=cat
         )
-        
-        # Pega o Texto Completo dos itens que foram selecionados
-        textos = itens_da_categoria[itens_da_categoria['Titulo'].isin(selecionados)]['Texto_Completo'].tolist()
-        itens_selecionados_texto.extend(textos)
+        itens_selecionados_titulos.extend(selecao)
 
-# --- SELEÇÃO DE EXCLUSÕES ---
-st.markdown("### 🚫 Exclusões")
-# Por padrão, já deixamos todas as exclusões marcadas para não esquecer nada
+# --- 4. SELEÇÃO DE EXCLUSÕES ---
+st.markdown("---")
+st.subheader("🚫 Exclusões")
 todas_exclusoes = df_exclusoes['Titulo'].tolist()
 exclusoes_selecionadas = st.multiselect(
     "Itens não inclusos no fornecimento:",
@@ -85,52 +86,74 @@ exclusoes_selecionadas = st.multiselect(
     default=todas_exclusoes
 )
 
-# --- BOTÃO DE GERAR ---
+# --- 5. BOTÃO E LÓGICA DE GERAÇÃO ---
 st.markdown("---")
 if st.button("🚀 Gerar Proposta (.docx)", type="primary"):
     
-    # 1. Validação básica
     if not cliente or not numero_prop:
-        st.warning("⚠️ Por favor, preencha o Nome do Cliente e o Número da Proposta.")
+        st.warning("⚠️ Preencha o Cliente e o Número da Proposta.")
     else:
         try:
-            # 2. Prepara os dados para o Template
-            # Recupera os textos completos das exclusões selecionadas
-            textos_exclusao_final = df_exclusoes[df_exclusoes['Titulo'].isin(exclusoes_selecionadas)]['Texto_Completo'].tolist()
+            # === A MÁGICA DO AGRUPAMENTO ===
+            # O objetivo é criar a estrutura: 1.1 Categoria -> Lista de Itens
             
+            escopo_estruturado = []
+            contador_categoria = 1
+            
+            # Varre as categorias na ordem do Excel novamente
+            for cat in categorias_ordenadas:
+                # Descobre quais itens DESSA categoria o usuário marcou
+                # Filtra o Excel: Categoria É IGUAL a atual E o Título ESTÁ na lista de selecionados
+                df_itens_selecionados = df_escopos[
+                    (df_escopos['Categoria'] == cat) & 
+                    (df_escopos['Titulo'].isin(itens_selecionados_titulos))
+                ]
+                
+                # Se tiver pelo menos um item selecionado, cria o grupo
+                if not df_itens_selecionados.empty:
+                    grupo = {
+                        'indice': f"1.{contador_categoria}",  # Gera 1.1, 1.2, 1.3...
+                        'nome_categoria': cat.upper(),        # Ex: SISTEMA DE ÁGUA GELADA
+                        'lista_itens': df_itens_selecionados['Texto_Completo'].tolist()
+                    }
+                    escopo_estruturado.append(grupo)
+                    contador_categoria += 1
+            
+            # Prepara as exclusões (apenas lista de textos)
+            lista_exclusoes_texto = df_exclusoes[
+                df_exclusoes['Titulo'].isin(exclusoes_selecionadas)
+            ]['Texto_Completo'].tolist()
+
+            # Dicionário final para o Word
             contexto = {
                 'nome_cliente': cliente,
                 'numero_proposta': numero_prop,
                 'data_hoje': date.today().strftime("%d/%m/%Y"),
                 'prazo_entrega': prazo,
-                'lista_escopos': itens_selecionados_texto,
-                'lista_exclusoes': textos_exclusao_final,
+                'escopo_estruturado': escopo_estruturado, # <--- Lista de Grupos
+                'lista_exclusoes': lista_exclusoes_texto,
                 'revisao': "R-00"
             }
 
-            # 3. Abre o Template Word e preenche
-            # O arquivo Template_Siarcon.docx DEVE estar junto no GitHub
+            # Carrega Template e Renderiza
             doc = DocxTemplate("Template_Siarcon.docx")
             doc.render(contexto)
 
-            # 4. Salva o arquivo na memória (Buffer) para baixar
-            buffer_arquivo = io.BytesIO()
-            doc.save(buffer_arquivo)
-            buffer_arquivo.seek(0)
+            # Salva na memória
+            buffer = io.BytesIO()
+            doc.save(buffer)
+            buffer.seek(0)
 
-            # 5. Mostra mensagem de sucesso e botão de download
-            st.success(f"✅ Proposta para {cliente} gerada com sucesso!")
+            st.success(f"✅ Proposta gerada! Baixe abaixo:")
             
             st.download_button(
-                label="📥 Clique para Baixar o Word",
-                data=buffer_arquivo,
+                label="📥 Baixar Documento Word",
+                data=buffer,
                 file_name=f"Proposta_{numero_prop}_{cliente.replace(' ', '_')}.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
-            
-        except FileNotFoundError:
-            st.error("❌ Erro: O arquivo 'Template_Siarcon.docx' não foi encontrado no GitHub.")
-            st.info("Certifique-se de que você fez o upload do arquivo Word para o repositório.")
-        except Exception as e:
-            st.error(f"❌ Ocorreu um erro inesperado: {e}")
 
+        except FileNotFoundError:
+            st.error("Erro: O arquivo 'Template_Siarcon.docx' não foi encontrado no GitHub.")
+        except Exception as e:
+            st.error(f"Erro inesperado: {e}")
