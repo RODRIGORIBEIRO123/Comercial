@@ -261,4 +261,130 @@ else:
                 unidade = str(row[col_un]).strip() if col_un < len(row) else ""
                 quantidade = row[col_qtd] if col_qtd < len(row) else pd.NA
                 
-                if pd.isna(descricao) or descricao == "" or descricao.upper() in ["NAN", "DESCRIÇÃO DOS MATERIAIS", "DESCR
+                if pd.isna(descricao) or descricao == "" or descricao.upper() in ["NAN", "DESCRIÇÃO DOS MATERIAIS", "DESCRICAO DOS MATERIAIS", "DESCRIÇÃO", "ITEM"]:
+                    continue
+                    
+                # É CATEGORIA / TÍTULO DA EAP? (Apenas se tiver número na Coluna ITEM)
+                is_header = False
+                if col_b and col_b.lower() != 'nan' and col_b != '-':
+                    if col_b[0].isdigit():
+                        is_header = True
+                        
+                if is_header:
+                    # Salva a categoria anterior
+                    if categoria_atual_nome != "ESCOPO GERAL" or len(itens_detalhados) > 0:
+                        escopo_estruturado.append({'nome': f"{categoria_atual_indice} - {categoria_atual_nome}".strip(' -'), 'itens': itens_detalhados})
+                        eap_estruturada.append({'indice': categoria_atual_indice, 'categoria': categoria_atual_nome.upper(), 'itens': itens_eap})
+                    
+                    categoria_atual_indice = col_b
+                    categoria_atual_nome = descricao
+                    itens_detalhados = []
+                    itens_eap = []
+                    contador_item = 1
+                    
+                # É ITEM OU COMPLEMENTO DE ITEM
+                else:
+                    has_qty = not pd.isna(quantidade) and str(quantidade).strip() not in ["", "nan", "-"]
+                    
+                    # Tem quantidade = Item Novo
+                    if has_qty:
+                        try: qtd_fmt = int(float(quantidade)) if float(quantidade).is_integer() else float(quantidade)
+                        except: qtd_fmt = quantidade
+                        
+                        uni_fmt = f" {unidade}" if unidade.lower() not in ["nan", "", "-"] else ""
+                        
+                        # Resumo Inteligente (Corta no "|")
+                        nome_resumido = descricao.split('|')[0].strip()
+                        if len(nome_resumido) > 80: nome_resumido = nome_resumido[:80] + "..."
+                        
+                        indice_item = f"{categoria_atual_indice}.{contador_item}" if categoria_atual_indice else str(contador_item)
+                        itens_eap.append({'indice': indice_item, 'nome': nome_resumido})
+                        
+                        # Item Detalhado
+                        texto_item = f"Fornecimento / Instalação de {qtd_fmt}{uni_fmt} - {descricao}."
+                        itens_detalhados.append(texto_item)
+                        
+                        contador_item += 1
+                        
+                    # Não tem quantidade = Complemento do item de cima (ex: Pintura, Automação...)
+                    else:
+                        if len(itens_detalhados) > 0:
+                            itens_detalhados[-1] += f" {descricao}"
+            
+            # Adiciona o último bloco de categorias lido
+            if categoria_atual_nome != "ESCOPO GERAL" or len(itens_detalhados) > 0:
+                escopo_estruturado.append({'nome': f"{categoria_atual_indice} - {categoria_atual_nome}".strip(' -'), 'itens': itens_detalhados})
+                eap_estruturada.append({'indice': categoria_atual_indice, 'categoria': categoria_atual_nome.upper(), 'itens': itens_eap})
+                
+            if len(escopo_estruturado) > 0:
+                st.success(f"✅ Planilha processada com sucesso! Estrutura EAP e valor total importados da Coluna J.")
+            else:
+                st.warning(f"⚠️ A aba '{nome_aba}' foi lida, mas não encontrei itens válidos na Coluna B.")
+                
+        except Exception as e:
+            st.error(f"Erro ao processar a planilha: {e}")
+
+# ==============================================================================
+# 5. EXCLUSÕES
+# ==============================================================================
+st.markdown("---")
+st.header("5. Exclusões")
+
+with st.expander("➕ Cadastrar Exclusão"):
+    with st.form("nova_exc"):
+        nex_c, nex_l = st.text_input("Título Curto"), st.text_input("Texto Completo")
+        if st.form_submit_button("💾 Salvar") and nex_c and nex_l:
+            salvar_no_banco("Exclusoes", [nex_c, nex_l])
+            st.rerun()
+
+dict_exc = dict(zip(df_exclusoes['Titulo_Curto'], df_exclusoes['Texto_Completo'])) if not df_exclusoes.empty else {}
+sel_exc = st.multiselect("Exclusões:", list(dict_exc.keys()), default=list(dict_exc.keys()))
+exc_final = [dict_exc[k] for k in sel_exc if k in dict_exc]
+
+# ==============================================================================
+# 6. COMERCIAL
+# ==============================================================================
+st.markdown("---")
+st.header("6. Comercial")
+
+valor_formatado_sugerido = f"R$ {valor_total_calculado:_.2f}".replace('.', ',').replace('_', '.')
+
+c_v, c_m = st.columns(2)
+valor = c_v.text_input("Valor Total (R$):", value=valor_formatado_sugerido if valor_total_calculado > 0 else "")
+mes = c_m.text_input("Mês/Ano Base", value=f"{hoje.month}/{hoje.year}")
+
+# ==============================================================================
+# BOTÃO GERAR
+# ==============================================================================
+st.markdown("---")
+if st.button("🚀 GERAR PROPOSTA (.DOCX)", type="primary"):
+    
+    if len(escopo_estruturado) == 0:
+        st.warning("⚠️ O escopo técnico está vazio.")
+    
+    contexto = {
+        'data_formatada': data_txt,
+        'nome_contato': nome_contato, 'fone': fone, 'email': email,
+        'nome_cliente': nome_cliente, 'nome_projeto': nome_projeto, 'cidade_estado': cidade_estado,
+        'numero_proposta': num_prop,
+        'texto_cobertura': texto_cob_final,
+        'tem_docs': tem_docs, 'docs_referencia': lista_docs,
+        'lista_resp_cliente': resp_final,
+        'eap_estruturada': eap_estruturada, 
+        'escopo_estruturado': escopo_estruturado, 
+        'lista_exclusoes': exc_final,
+        'intro_servico': intro,
+        'mes_base': mes, 'valor_total': valor,
+        'revisao': "R-00"
+    }
+
+    try:
+        doc = DocxTemplate("Template_Siarcon.docx") 
+        doc.render(contexto)
+        bio = io.BytesIO()
+        doc.save(bio)
+        bio.seek(0)
+        st.success("✅ Proposta Gerada!")
+        st.download_button("📥 Baixar Arquivo Word", bio, f"Proposta_{num_prop}.docx")
+    except Exception as e:
+        st.error(f"Erro ao gerar o Word: {e}")
