@@ -324,4 +324,64 @@ else:
 # ==============================================================================
 # 5. EXCLUSÕES
 # ==============================================================================
-st.markdown("
+st.markdown("---")
+st.header("5. Exclusões")
+
+with st.expander("➕ Cadastrar Exclusão"):
+    with st.form("nova_exc"):
+        nex_c, nex_l = st.text_input("Título Curto"), st.text_input("Texto Completo")
+        if st.form_submit_button("💾 Salvar") and nex_c and nex_l:
+            salvar_no_banco("Exclusoes", [nex_c, nex_l])
+            st.rerun()
+
+dict_exc = dict(zip(df_exclusoes['Titulo_Curto'], df_exclusoes['Texto_Completo'])) if not df_exclusoes.empty else {}
+sel_exc = st.multiselect("Exclusões:", list(dict_exc.keys()), default=list(dict_exc.keys()))
+exc_final = [dict_exc[k] for k in sel_exc if k in dict_exc]
+
+# ==============================================================================
+# 6. COMERCIAL
+# ==============================================================================
+st.markdown("---")
+st.header("6. Comercial")
+
+valor_formatado_sugerido = f"R$ {valor_total_calculado:_.2f}".replace('.', ',').replace('_', '.')
+
+c_v, c_m = st.columns(2)
+valor = c_v.text_input("Valor Total (R$):", value=valor_formatado_sugerido if valor_total_calculado > 0 else "")
+mes = c_m.text_input("Mês/Ano Base", value=f"{hoje.month}/{hoje.year}")
+
+# ==============================================================================
+# BOTÃO GERAR
+# ==============================================================================
+st.markdown("---")
+if st.button("🚀 GERAR PROPOSTA (.DOCX)", type="primary"):
+    
+    if len(escopo_estruturado) == 0:
+        st.warning("⚠️ O escopo técnico está vazio.")
+    
+    contexto = {
+        'data_formatada': data_txt,
+        'nome_contato': nome_contato, 'fone': fone, 'email': email,
+        'nome_cliente': nome_cliente, 'nome_projeto': nome_projeto, 'cidade_estado': cidade_estado,
+        'numero_proposta': num_prop,
+        'texto_cobertura': texto_cob_final,
+        'tem_docs': tem_docs, 'docs_referencia': lista_docs,
+        'lista_resp_cliente': resp_final,
+        'eap_estruturada': eap_estruturada, 
+        'escopo_estruturado': escopo_estruturado, 
+        'lista_exclusoes': exc_final,
+        'intro_servico': intro,
+        'mes_base': mes, 'valor_total': valor,
+        'revisao': "R-00"
+    }
+
+    try:
+        doc = DocxTemplate("Template_Siarcon.docx") 
+        doc.render(contexto)
+        bio = io.BytesIO()
+        doc.save(bio)
+        bio.seek(0)
+        st.success("✅ Proposta Gerada!")
+        st.download_button("📥 Baixar Arquivo Word", bio, f"Proposta_{num_prop}.docx")
+    except Exception as e:
+        st.error(f"Erro ao gerar o Word: {e}")
