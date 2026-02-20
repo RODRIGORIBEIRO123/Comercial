@@ -8,7 +8,16 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Gerador Propostas SIARCON", layout="wide", page_icon="📄")
-st.title("📄 Gerador de Propostas Automático - SIARCON")
+
+# === MENU LATERAL (COMO SE FOSSEM 2 PÁGINAS) ===
+st.sidebar.image("https://via.placeholder.com/150x50.png?text=SIARCON", use_container_width=True) # Pode trocar pela URL do seu logo depois
+st.sidebar.title("Navegação")
+modo_preenchimento = st.sidebar.radio(
+    "Como deseja preencher o Escopo Técnico?",
+    ["📋 Preenchimento Manual", "📊 Automático (Excel)"]
+)
+
+st.title("📄 Gerador de Propostas - SIARCON")
 
 # === NOME EXATO DA PLANILHA DO BANCO DE DADOS ===
 PLANILHA_NOME = "DB_Propostas_Siarcon" 
@@ -33,7 +42,7 @@ def carregar_dados():
         try: return pd.DataFrame(sh.worksheet(nome).get_all_records())
         except: return pd.DataFrame()
 
-    return ler_aba("Exclusoes"), ler_aba("Responsabilidades"), ler_aba("Clientes"), ler_aba("Coberturas")
+    return ler_aba("Escopos"), ler_aba("Exclusoes"), ler_aba("Responsabilidades"), ler_aba("Clientes"), ler_aba("Coberturas")
 
 def salvar_no_banco(aba, dados_lista):
     try:
@@ -46,7 +55,7 @@ def salvar_no_banco(aba, dados_lista):
 
 # Carrega Banco de Dados
 try:
-    df_exclusoes, df_resp, df_clientes, df_coberturas = carregar_dados()
+    df_escopos, df_exclusoes, df_resp, df_clientes, df_coberturas = carregar_dados()
 except Exception as e:
     st.error("Erro ao ler banco de dados. Verifique a planilha.")
     st.stop()
@@ -129,97 +138,145 @@ sel_resp = st.multiselect("Selecione:", list(dict_resp.keys()), default=list(dic
 resp_final = [dict_resp[k] for k in sel_resp if k in dict_resp]
 
 # ==============================================================================
-# 4. ESCOPO TÉCNICO (AUTOMATIZADO VIA EXCEL)
+# 4. ESCOPO TÉCNICO (MUTA DE ACORDO COM O MENU LATERAL)
 # ==============================================================================
 st.markdown("---")
-st.header("4. Escopo Técnico (Upload da Planilha)")
-
 intro = st.text_area("Introdução do Escopo", value="Trata-se do fornecimento de materiais e mão de obra conforme itens abaixo:")
 
-arquivo_excel = st.file_uploader("📂 Faça o upload da Planilha Orçamentária (.xlsx)", type=["xlsx"])
-
-escopo_estruturado = []
+escopo_estruturado = [] # Lista com os textos detalhados
+eap_estruturada = []    # Lista com os textos curtos (Índice/EAP)
 valor_total_calculado = 0.0
 
-if arquivo_excel is not None:
-    try:
-        # 1. Lê o arquivo para descobrir os nomes das abas
-        xls = pd.ExcelFile(arquivo_excel)
-        
-        # 2. Deixa o usuário escolher a aba correta
-        nome_aba = st.selectbox("Selecione a Aba (Planilha) onde está o Orçamento:", xls.sheet_names)
-        
-        # 3. Lê apenas a aba selecionada
-        df_orc = pd.read_excel(xls, sheet_name=nome_aba, header=None)
-        
-        # 4. BLINDAGEM: Garante que o DataFrame tem pelo menos 14 colunas (A até N)
-        # Se o Excel parar na coluna F, o código cria colunas em branco até a N.
-        colunas_atuais = df_orc.shape[1]
-        if colunas_atuais < 14:
-            df_orc = df_orc.reindex(columns=list(range(14)))
-        
-        categoria_atual = "ESCOPO GERAL"
-        itens_da_categoria = []
+# ---------------------------------------------------------
+# MODO 1: PREENCHIMENTO MANUAL
+# ---------------------------------------------------------
+if modo_preenchimento == "📋 Preenchimento Manual":
+    st.header("4. Escopo Técnico (Modo Manual)")
+    
+    with st.expander("➕ Cadastrar NOVO Item de Escopo no Banco"):
+        with st.form("novo_esc"):
+            cats_existentes = sorted(df_escopos['Categoria'].unique().tolist()) if 'Categoria' in df_escopos.columns else []
+            c_cat, c_tit, c_txt = st.columns([0.3, 0.3, 0.4])
+            opcao_cat = c_cat.selectbox("Categoria", ["Nova Categoria..."] + cats_existentes)
+            cat_final = c_cat.text_input("Nome da Categoria") if opcao_cat == "Nova Categoria..." else opcao_cat
+            ne_tit, ne_txt = c_tit.text_input("Título Curto"), c_txt.text_input("Texto Completo")
+            if st.form_submit_button("💾 Salvar Item") and cat_final and ne_tit and ne_txt:
+                salvar_no_banco("Escopos", [cat_final, ne_tit, ne_txt])
+                st.rerun()
+
+    if 'Categoria' in df_escopos.columns:
+        categorias = sorted(df_escopos['Categoria'].unique())
         contador_cat = 1
         
-        # Percorre linha por linha
-        for index, row in df_orc.iterrows():
-            
-            # Pega as colunas exatas (2=C, 3=D, 4=E, 12=M, 13=N)
-            descricao = str(row[2]).strip()
-            unidade = str(row[3]).strip()
-            quantidade = row[4]
-            v_mat = row[12]
-            v_mao = row[13]
-            
-            # Pula linhas vazias, cabeçalhos, ou a palavra DESCRIÇÃO
-            if pd.isna(descricao) or descricao == "" or descricao.lower() in ["nan", "descrição dos materiais", "descrição"]:
-                continue
+        for cat in categorias:
+            with st.expander(f"📁 {cat}", expanded=True):
+                df_cat = df_escopos[df_escopos['Categoria'] == cat]
+                dict_cat = dict(zip(df_cat['Titulo_Curto'], df_cat['Texto_Completo']))
                 
-            # LÓGICA DE DETECÇÃO: Se a Quantidade estiver vazia, é um Título/Categoria
-            if pd.isna(quantidade) or str(quantidade).strip() in ["", "nan", "-"]:
-                if len(itens_da_categoria) > 0:
-                    escopo_estruturado.append({
-                        'indice': f"1.{contador_cat}",
-                        'nome': categoria_atual.upper(),
-                        'itens': itens_da_categoria
-                    })
+                itens_selecionados = st.multiselect(f"Itens de {cat}:", options=list(dict_cat.keys()), key=f"sel_{cat}")
+                
+                lista_detalhada = []
+                lista_eap = []
+                contador_item = 1
+                
+                if itens_selecionados:
+                    for item_curto in itens_selecionados:
+                        texto_base = dict_cat[item_curto]
+                        
+                        col_q, col_nome = st.columns([0.15, 0.85])
+                        qtd = col_q.number_input(f"Qtd", min_value=1, value=1, key=f"q_{cat}_{item_curto}", label_visibility="visible")
+                        col_nome.write(f"**{item_curto}**")
+                        
+                        # Monta EAP (Texto Curto)
+                        lista_eap.append({'indice': f"{contador_cat}.{contador_item}", 'nome': item_curto})
+                        
+                        # Monta Escopo Detalhado (Texto Longo)
+                        texto_final = texto_base
+                        if qtd > 1: texto_final += f" — Qtd: {qtd}."
+                        lista_detalhada.append(texto_final)
+                        
+                        contador_item += 1
+                    
+                    # Salva nas listas principais
+                    eap_estruturada.append({'indice': str(contador_cat), 'categoria': cat.upper(), 'itens': lista_eap})
+                    escopo_estruturado.append({'nome': cat.upper(), 'itens': lista_detalhada})
                     contador_cat += 1
-                    itens_da_categoria = [] 
+
+# ---------------------------------------------------------
+# MODO 2: PREENCHIMENTO AUTOMÁTICO (EXCEL)
+# ---------------------------------------------------------
+else:
+    st.header("4. Escopo Técnico (Upload da Planilha)")
+    arquivo_excel = st.file_uploader("📂 Faça o upload da Planilha Orçamentária (.xlsx)", type=["xlsx"])
+
+    if arquivo_excel is not None:
+        try:
+            xls = pd.ExcelFile(arquivo_excel)
+            nome_aba = st.selectbox("Selecione a Aba (Planilha) onde está o Orçamento:", xls.sheet_names)
+            df_orc = pd.read_excel(xls, sheet_name=nome_aba, header=None)
+            
+            if df_orc.shape[1] < 14:
+                df_orc = df_orc.reindex(columns=list(range(14)))
+            
+            categoria_atual = "ESCOPO GERAL"
+            itens_detalhados = []
+            itens_eap = []
+            contador_cat = 1
+            contador_item = 1
+            
+            for index, row in df_orc.iterrows():
+                descricao = str(row[2]).strip()
+                unidade = str(row[3]).strip()
+                quantidade = row[4]
+                v_mat, v_mao = row[12], row[13]
                 
-                categoria_atual = descricao
+                if pd.isna(descricao) or descricao == "" or descricao.lower() in ["nan", "descrição dos materiais", "descrição"]:
+                    continue
+                    
+                # É Categoria (Sem Quantidade)
+                if pd.isna(quantidade) or str(quantidade).strip() in ["", "nan", "-"]:
+                    if len(itens_detalhados) > 0:
+                        escopo_estruturado.append({'nome': categoria_atual.upper(), 'itens': itens_detalhados})
+                        eap_estruturada.append({'indice': str(contador_cat), 'categoria': categoria_atual.upper(), 'itens': itens_eap})
+                        contador_cat += 1
+                        itens_detalhados, itens_eap = [], []
+                        contador_item = 1
+                    
+                    categoria_atual = descricao
+                    
+                # É Item de Escopo (Com Quantidade)
+                else:
+                    try: qtd_fmt = int(float(quantidade)) if float(quantidade).is_integer() else float(quantidade)
+                    except: qtd_fmt = quantidade
+                    
+                    uni_fmt = f" {unidade}" if unidade.lower() not in ["nan", "", "-"] else ""
+                    
+                    # Para a EAP (Nome Curto)
+                    itens_eap.append({'indice': f"{contador_cat}.{contador_item}", 'nome': descricao})
+                    
+                    # Para o Escopo Detalhado
+                    texto_item = f"Fornecimento / Instalação de {qtd_fmt}{uni_fmt} - {descricao}."
+                    itens_detalhados.append(texto_item)
+                    
+                    try: valor_total_calculado += float(v_mat) if not pd.isna(v_mat) else 0.0
+                    except: pass
+                    try: valor_total_calculado += float(v_mao) if not pd.isna(v_mao) else 0.0
+                    except: pass
+                    
+                    contador_item += 1
+            
+            # Adiciona o último bloco
+            if len(itens_detalhados) > 0:
+                escopo_estruturado.append({'nome': categoria_atual.upper(), 'itens': itens_detalhados})
+                eap_estruturada.append({'indice': str(contador_cat), 'categoria': categoria_atual.upper(), 'itens': itens_eap})
                 
-            # Se a Quantidade NÃO está vazia, é um Item de Escopo
+            if len(escopo_estruturado) > 0:
+                st.success(f"✅ Planilha processada com sucesso! Encontrados {len(escopo_estruturado)} grupos de itens.")
             else:
-                try: qtd_fmt = int(float(quantidade)) if float(quantidade).is_integer() else float(quantidade)
-                except: qtd_fmt = quantidade
+                st.warning(f"⚠️ A aba '{nome_aba}' foi lida, mas não encontrei itens válidos.")
                 
-                uni_fmt = f" {unidade}" if unidade.lower() not in ["nan", "", "-"] else ""
-                
-                texto_item = f"Fornecimento / Instalação de {qtd_fmt}{uni_fmt} - {descricao}."
-                itens_da_categoria.append(texto_item)
-                
-                # Soma os valores para o total automático
-                try: valor_total_calculado += float(v_mat) if not pd.isna(v_mat) else 0.0
-                except: pass
-                try: valor_total_calculado += float(v_mao) if not pd.isna(v_mao) else 0.0
-                except: pass
-        
-        # Adiciona a última categoria do loop
-        if len(itens_da_categoria) > 0:
-            escopo_estruturado.append({
-                'indice': f"1.{contador_cat}",
-                'nome': categoria_atual.upper(),
-                'itens': itens_da_categoria
-            })
-            
-        if len(escopo_estruturado) > 0:
-            st.success(f"✅ Planilha processada com sucesso! Encontrados {len(escopo_estruturado)} grupos de itens.")
-        else:
-            st.warning(f"⚠️ A aba '{nome_aba}' foi lida, mas não encontrei nenhum item com Quantidade. Tem certeza que é esta aba?")
-            
-    except Exception as e:
-        st.error(f"Erro ao processar a planilha: {e}")
+        except Exception as e:
+            st.error(f"Erro ao processar a planilha: {e}")
 
 # ==============================================================================
 # 5. EXCLUSÕES
@@ -247,7 +304,8 @@ st.header("6. Comercial")
 valor_formatado_sugerido = f"R$ {valor_total_calculado:_.2f}".replace('.', ',').replace('_', '.')
 
 c_v, c_m = st.columns(2)
-valor = c_v.text_input("Valor Total (R$) - Somado do Excel:", value=valor_formatado_sugerido if valor_total_calculado > 0 else "")
+# Se preencheu manual, vem vazio. Se foi Excel, vem preenchido.
+valor = c_v.text_input("Valor Total (R$):", value=valor_formatado_sugerido if valor_total_calculado > 0 else "")
 mes = c_m.text_input("Mês/Ano Base", value=f"{hoje.month}/{hoje.year}")
 
 # ==============================================================================
@@ -257,7 +315,7 @@ st.markdown("---")
 if st.button("🚀 GERAR PROPOSTA (.DOCX)", type="primary"):
     
     if len(escopo_estruturado) == 0:
-        st.warning("⚠️ Você não fez o upload da planilha ou ela não foi lida corretamente. O escopo sairá vazio.")
+        st.warning("⚠️ O escopo técnico está vazio.")
     
     contexto = {
         'data_formatada': data_txt,
@@ -267,7 +325,11 @@ if st.button("🚀 GERAR PROPOSTA (.DOCX)", type="primary"):
         'texto_cobertura': texto_cob_final,
         'tem_docs': tem_docs, 'docs_referencia': lista_docs,
         'lista_resp_cliente': resp_final,
+        
+        # NOVAS VARIÁVEIS PARA O WORD
+        'eap_estruturada': eap_estruturada, 
         'escopo_estruturado': escopo_estruturado, 
+        
         'lista_exclusoes': exc_final,
         'intro_servico': intro,
         'mes_base': mes, 'valor_total': valor,
@@ -275,7 +337,8 @@ if st.button("🚀 GERAR PROPOSTA (.DOCX)", type="primary"):
     }
 
     try:
-        doc = DocxTemplate("Template_Siarcon_Auto.docx")
+        # ATENÇÃO: Confirme se o nome do seu template atual é este abaixo
+        doc = DocxTemplate("Template_Siarcon_Auto.docx") 
         doc.render(contexto)
         bio = io.BytesIO()
         doc.save(bio)
@@ -283,5 +346,4 @@ if st.button("🚀 GERAR PROPOSTA (.DOCX)", type="primary"):
         st.success("✅ Proposta Gerada!")
         st.download_button("📥 Baixar Arquivo Word", bio, f"Proposta_{num_prop}.docx")
     except Exception as e:
-        st.error(f"Erro ao gerar: {e}")
-
+        st.error(f"Erro ao gerar o Word: {e}")
