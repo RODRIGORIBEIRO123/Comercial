@@ -143,70 +143,70 @@ valor_total_calculado = 0.0
 
 if arquivo_excel is not None:
     try:
-        # Lê apenas as colunas: C (Descrição), D (Unidade), E (Qtd), M (Venda Mat), N (Venda MO)
-        # No pandas, A=0, B=1, C=2, D=3, E=4... M=12, N=13. 
-        # usecols="C:E, M:N" funciona perfeitamente.
-        df_orc = pd.read_excel(arquivo_excel, usecols="C:E, M:N", header=None)
+        # Lê a planilha inteira sem forçar colunas específicas para não dar erro "out-of-bounds"
+        df_orc = pd.read_excel(arquivo_excel, header=None)
         
         categoria_atual = "ESCOPO GERAL"
         itens_da_categoria = []
         contador_cat = 1
         
-        # Percorre linha por linha do Excel
-        for index, row in df_orc.iterrows():
-            descricao = str(row[0]).strip() # Coluna C
-            unidade = str(row[1]).strip()   # Coluna D
-            quantidade = row[2]             # Coluna E
-            v_mat = row[3]                  # Coluna M
-            v_mao = row[4]                  # Coluna N
+        # Garante que a planilha tem pelo menos até a coluna C (índice 2)
+        if df_orc.shape[1] > 2:
+            for index, row in df_orc.iterrows():
+                
+                # Acesso seguro às colunas: só puxa o dado se a coluna existir na planilha enviada
+                descricao = str(row[2]).strip() if 2 in df_orc.columns else ""
+                unidade = str(row[3]).strip() if 3 in df_orc.columns else ""
+                quantidade = row[4] if 4 in df_orc.columns else pd.NA
+                v_mat = row[12] if 12 in df_orc.columns else 0.0
+                v_mao = row[13] if 13 in df_orc.columns else 0.0
+                
+                # Pula linhas vazias ou cabeçalhos
+                if pd.isna(descricao) or descricao == "" or descricao.lower() in ["nan", "descrição dos materiais"]:
+                    continue
+                    
+                # LÓGICA DE DETECÇÃO: Se a Quantidade estiver vazia, é um Título/Categoria
+                if pd.isna(quantidade) or str(quantidade).strip() in ["", "nan", "-"]:
+                    # Salva a categoria anterior antes de criar a nova
+                    if len(itens_da_categoria) > 0:
+                        escopo_estruturado.append({
+                            'indice': f"1.{contador_cat}",
+                            'nome': categoria_atual.upper(),
+                            'itens': itens_da_categoria
+                        })
+                        contador_cat += 1
+                        itens_da_categoria = [] 
+                    
+                    categoria_atual = descricao
+                    
+                # Se a Quantidade NÃO está vazia, é um Item de Escopo
+                else:
+                    try: qtd_fmt = int(float(quantidade)) if float(quantidade).is_integer() else float(quantidade)
+                    except: qtd_fmt = quantidade
+                    
+                    uni_fmt = f" {unidade}" if unidade.lower() not in ["nan", "", "-"] else ""
+                    
+                    texto_item = f"Fornecimento / Instalação de {qtd_fmt}{uni_fmt} - {descricao}."
+                    itens_da_categoria.append(texto_item)
+                    
+                    # Soma os valores para o total
+                    try: valor_total_calculado += float(v_mat)
+                    except: pass
+                    try: valor_total_calculado += float(v_mao)
+                    except: pass
             
-            # Pula linhas vazias ou cabeçalhos do Excel
-            if pd.isna(descricao) or descricao == "" or descricao.lower() in ["nan", "descrição dos materiais"]:
-                continue
+            # Adiciona a última categoria que ficou no loop
+            if len(itens_da_categoria) > 0:
+                escopo_estruturado.append({
+                    'indice': f"1.{contador_cat}",
+                    'nome': categoria_atual.upper(),
+                    'itens': itens_da_categoria
+                })
                 
-            # LÓGICA DE DETECÇÃO: Se a Quantidade estiver vazia, é um Título/Categoria
-            if pd.isna(quantidade) or str(quantidade).strip() in ["", "nan", "-"]:
-                # Salva a categoria anterior antes de criar a nova
-                if len(itens_da_categoria) > 0:
-                    escopo_estruturado.append({
-                        'indice': f"1.{contador_cat}",
-                        'nome': categoria_atual.upper(),
-                        'itens': itens_da_categoria
-                    })
-                    contador_cat += 1
-                    itens_da_categoria = [] # Zera a lista para a próxima
-                
-                categoria_atual = descricao
-                
-            # Se a Quantidade NÃO está vazia, é um Item de Material/Equipamento
-            else:
-                # Formata a quantidade para tirar o .0 se for número inteiro
-                try: qtd_fmt = int(float(quantidade)) if float(quantidade).is_integer() else float(quantidade)
-                except: qtd_fmt = quantidade
-                
-                # Formata a unidade (ex: remove se for 'un' ou deixa bonitinho)
-                uni_fmt = f" {unidade}" if unidade.lower() not in ["nan", "", "-"] else ""
-                
-                # Monta a frase: Ex: Fornecimento de 2 un de Chiller...
-                texto_item = f"Fornecimento / Instalação de {qtd_fmt}{uni_fmt} - {descricao}."
-                itens_da_categoria.append(texto_item)
-                
-                # Soma os valores para o total automático
-                try: valor_total_calculado += float(v_mat)
-                except: pass
-                try: valor_total_calculado += float(v_mao)
-                except: pass
-        
-        # Adiciona a última categoria que ficou no loop
-        if len(itens_da_categoria) > 0:
-            escopo_estruturado.append({
-                'indice': f"1.{contador_cat}",
-                'nome': categoria_atual.upper(),
-                'itens': itens_da_categoria
-            })
+            st.success(f"✅ Planilha lida com sucesso! Encontrados {len(escopo_estruturado)} grupos de itens.")
+        else:
+            st.error("⚠️ A planilha enviada parece estar vazia ou não tem colunas suficientes.")
             
-        st.success(f"✅ Planilha lida com sucesso! Foram encontrados {len(escopo_estruturado)} grupos de itens.")
-        
     except Exception as e:
         st.error(f"Erro ao ler a planilha: {e}")
 
@@ -233,11 +233,9 @@ exc_final = [dict_exc[k] for k in sel_exc if k in dict_exc]
 st.markdown("---")
 st.header("6. Comercial")
 
-# Formata o valor calculado do Excel para Reais (Ex: 150000.5 -> 150.000,50)
 valor_formatado_sugerido = f"R$ {valor_total_calculado:_.2f}".replace('.', ',').replace('_', '.')
 
 c_v, c_m = st.columns(2)
-# O campo de valor já vem preenchido com a soma do Excel!
 valor = c_v.text_input("Valor Total (R$) - Somado do Excel:", value=valor_formatado_sugerido if valor_total_calculado > 0 else "")
 mes = c_m.text_input("Mês/Ano Base", value=f"{hoje.month}/{hoje.year}")
 
@@ -258,7 +256,7 @@ if st.button("🚀 GERAR PROPOSTA (.DOCX)", type="primary"):
         'texto_cobertura': texto_cob_final,
         'tem_docs': tem_docs, 'docs_referencia': lista_docs,
         'lista_resp_cliente': resp_final,
-        'escopo_estruturado': escopo_estruturado, # Envia a estrutura lida do Excel
+        'escopo_estruturado': escopo_estruturado, 
         'lista_exclusoes': exc_final,
         'intro_servico': intro,
         'mes_base': mes, 'valor_total': valor,
