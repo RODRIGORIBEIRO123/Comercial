@@ -213,18 +213,36 @@ else:
             
             if df_orc.shape[1] < 14:
                 df_orc = df_orc.reindex(columns=list(range(14)))
+
+            # COLUNAS PADRÃO (A=0, B=1, C=2, D=3, E=4)
+            col_item = 1
+            col_desc = 2
+            col_un = 3
+            col_qtd = 4
             
-            # 1º PASSO: Procurar o "Preço Venda" e extrair o valor da Coluna J (Índice 9)
+            # --- PRÉ-VARREDURA: Achar Valor e Colunas Dinâmicas ---
             for idx, row in df_orc.iterrows():
-                linha_texto_completo = " ".join(str(val).lower() for val in row.values)
-                if "preço venda" in linha_texto_completo or "preco venda" in linha_texto_completo:
+                linha_texto = " ".join(str(val).upper().strip() for val in row.values)
+                
+                # Procura Preço de Venda e pega a coluna J (índice 9)
+                if "PREÇO VENDA" in linha_texto or "PRECO VENDA" in linha_texto:
                     try:
-                        valor_total_calculado = float(row[9]) # A=0, B=1 ... J=9
+                        val_str = str(row[9]).upper().replace("R$", "").strip()
+                        val_str = val_str.replace(".", "").replace(",", ".")
+                        valor_total_calculado = float(val_str)
                     except:
                         pass
-                    break
+                
+                # Procura Cabeçalho para mapear as colunas corretamente
+                if "DESCRIÇÃO DOS MATERIAIS" in linha_texto or "DESCRICAO DOS MATERIAIS" in linha_texto:
+                    for c_idx, val in enumerate(row.values):
+                        v_up = str(val).upper().strip()
+                        if v_up == "ITEM": col_item = c_idx
+                        elif "DESCRIÇÃO" in v_up or "DESCRICAO" in v_up: col_desc = c_idx
+                        elif v_up in ["UN.", "UN"]: col_un = c_idx
+                        elif "QTDE" in v_up or "QTD" in v_up: col_qtd = c_idx
 
-            # 2º PASSO: Montar o Escopo Técnico
+            # --- LEITURA PRINCIPAL DO ESCOPO ---
             categoria_atual_nome = "ESCOPO GERAL"
             categoria_atual_indice = ""
             itens_detalhados = []
@@ -232,131 +250,15 @@ else:
             contador_item = 1
             
             for index, row in df_orc.iterrows():
-                # Coluna B=1, C=2, D=3, E=4
-                col_b = str(row[1]).strip()
-                descricao = str(row[2]).strip()
-                unidade = str(row[3]).strip()
-                quantidade = row[4]
+                linha_texto_completo = " ".join(str(val).upper().strip() for val in row.values)
                 
-                # CONDIÇÃO DE PARADA: "CUSTO INDIRETO"
-                if "CUSTO INDIRETO" in descricao.upper():
-                    break # Para de ler a planilha imediatamente e ignora o que está abaixo
+                # CONDIÇÃO DE PARADA BLINDADA: "CUSTO INDIRETO" em qualquer lugar da linha
+                if "CUSTO INDIRETO" in linha_texto_completo or "CUSTOS INDIRETOS" in linha_texto_completo:
+                    break 
                 
-                if pd.isna(descricao) or descricao == "" or descricao.lower() in ["nan", "descrição dos materiais", "descrição", "item"]:
-                    continue
-                    
-                # É CATEGORIA / TÍTULO DA EAP? (Checa se a Coluna B tem um número como "1.0", "1.1")
-                is_header = False
-                if col_b and col_b.lower() != 'nan' and col_b != '-' and col_b[0].isdigit():
-                    is_header = True
-                    
-                if is_header:
-                    # Salva a categoria anterior
-                    if categoria_atual_nome != "ESCOPO GERAL" or len(itens_detalhados) > 0:
-                        escopo_estruturado.append({'nome': f"{categoria_atual_indice} - {categoria_atual_nome}".strip(' -'), 'itens': itens_detalhados})
-                        eap_estruturada.append({'indice': categoria_atual_indice, 'categoria': categoria_atual_nome.upper(), 'itens': itens_eap})
-                    
-                    categoria_atual_indice = col_b
-                    categoria_atual_nome = descricao
-                    itens_detalhados = []
-                    itens_eap = []
-                    contador_item = 1
-                    
-                # É ITEM DE ESCOPO
-                else:
-                    if not pd.isna(quantidade) and str(quantidade).strip() not in ["", "nan", "-"]:
-                        try: qtd_fmt = int(float(quantidade)) if float(quantidade).is_integer() else float(quantidade)
-                        except: qtd_fmt = quantidade
-                        
-                        uni_fmt = f" {unidade}" if unidade.lower() not in ["nan", "", "-"] else ""
-                        
-                        # RESUMO PARA EAP (Corta tudo que estiver depois de um '|')
-                        nome_resumido = descricao.split('|')[0].strip()
-                        if len(nome_resumido) > 80: nome_resumido = nome_resumido[:80] + "..."
-                        
-                        indice_item = f"{categoria_atual_indice}.{contador_item}" if categoria_atual_indice else str(contador_item)
-                        itens_eap.append({'indice': indice_item, 'nome': nome_resumido})
-                        
-                        # TEXTO COMPLETO PARA ESCOPO DETALHADO
-                        texto_item = f"Fornecimento / Instalação de {qtd_fmt}{uni_fmt} - {descricao}."
-                        itens_detalhados.append(texto_item)
-                        
-                        contador_item += 1
-            
-            # Adiciona o último bloco de categorias lido
-            if categoria_atual_nome != "ESCOPO GERAL" or len(itens_detalhados) > 0:
-                escopo_estruturado.append({'nome': f"{categoria_atual_indice} - {categoria_atual_nome}".strip(' -'), 'itens': itens_detalhados})
-                eap_estruturada.append({'indice': categoria_atual_indice, 'categoria': categoria_atual_nome.upper(), 'itens': itens_eap})
+                col_b = str(row[col_item]).strip() if col_item < len(row) else ""
+                descricao = str(row[col_desc]).strip() if col_desc < len(row) else ""
+                unidade = str(row[col_un]).strip() if col_un < len(row) else ""
+                quantidade = row[col_qtd] if col_qtd < len(row) else pd.NA
                 
-            if len(escopo_estruturado) > 0:
-                st.success(f"✅ Planilha processada com sucesso! Estrutura EAP e valor total importados da Coluna J.")
-            else:
-                st.warning(f"⚠️ A aba '{nome_aba}' foi lida, mas não encontrei itens válidos na Coluna B.")
-                
-        except Exception as e:
-            st.error(f"Erro ao processar a planilha: {e}")
-
-# ==============================================================================
-# 5. EXCLUSÕES
-# ==============================================================================
-st.markdown("---")
-st.header("5. Exclusões")
-
-with st.expander("➕ Cadastrar Exclusão"):
-    with st.form("nova_exc"):
-        nex_c, nex_l = st.text_input("Título Curto"), st.text_input("Texto Completo")
-        if st.form_submit_button("💾 Salvar") and nex_c and nex_l:
-            salvar_no_banco("Exclusoes", [nex_c, nex_l])
-            st.rerun()
-
-dict_exc = dict(zip(df_exclusoes['Titulo_Curto'], df_exclusoes['Texto_Completo'])) if not df_exclusoes.empty else {}
-sel_exc = st.multiselect("Exclusões:", list(dict_exc.keys()), default=list(dict_exc.keys()))
-exc_final = [dict_exc[k] for k in sel_exc if k in dict_exc]
-
-# ==============================================================================
-# 6. COMERCIAL
-# ==============================================================================
-st.markdown("---")
-st.header("6. Comercial")
-
-valor_formatado_sugerido = f"R$ {valor_total_calculado:_.2f}".replace('.', ',').replace('_', '.')
-
-c_v, c_m = st.columns(2)
-valor = c_v.text_input("Valor Total (R$):", value=valor_formatado_sugerido if valor_total_calculado > 0 else "")
-mes = c_m.text_input("Mês/Ano Base", value=f"{hoje.month}/{hoje.year}")
-
-# ==============================================================================
-# BOTÃO GERAR
-# ==============================================================================
-st.markdown("---")
-if st.button("🚀 GERAR PROPOSTA (.DOCX)", type="primary"):
-    
-    if len(escopo_estruturado) == 0:
-        st.warning("⚠️ O escopo técnico está vazio.")
-    
-    contexto = {
-        'data_formatada': data_txt,
-        'nome_contato': nome_contato, 'fone': fone, 'email': email,
-        'nome_cliente': nome_cliente, 'nome_projeto': nome_projeto, 'cidade_estado': cidade_estado,
-        'numero_proposta': num_prop,
-        'texto_cobertura': texto_cob_final,
-        'tem_docs': tem_docs, 'docs_referencia': lista_docs,
-        'lista_resp_cliente': resp_final,
-        'eap_estruturada': eap_estruturada, 
-        'escopo_estruturado': escopo_estruturado, 
-        'lista_exclusoes': exc_final,
-        'intro_servico': intro,
-        'mes_base': mes, 'valor_total': valor,
-        'revisao': "R-00"
-    }
-
-    try:
-        doc = DocxTemplate("Template_Siarcon.docx") 
-        doc.render(contexto)
-        bio = io.BytesIO()
-        doc.save(bio)
-        bio.seek(0)
-        st.success("✅ Proposta Gerada!")
-        st.download_button("📥 Baixar Arquivo Word", bio, f"Proposta_{num_prop}.docx")
-    except Exception as e:
-        st.error(f"Erro ao gerar o Word: {e}")
+                if pd.isna(descricao) or descricao == "" or descricao.upper() in ["NAN", "DESCRIÇÃO DOS MATERIAIS", "DESCR
