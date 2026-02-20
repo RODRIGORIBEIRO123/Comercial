@@ -186,14 +186,15 @@ if modo_preenchimento == "📋 Preenchimento Manual":
                         qtd = col_q.number_input(f"Qtd", min_value=1, value=1, key=f"q_{cat}_{item_curto}", label_visibility="visible")
                         col_nome.write(f"**{item_curto}**")
                         
-                        lista_eap.append({'indice': f"{contador_cat}.{contador_item}", 'nome': item_curto})
+                        # NOVA REGRA EAP: Filtra a palavra "Amortecedor"
+                        if "AMORTECEDOR" not in item_curto.upper():
+                            lista_eap.append({'indice': f"{contador_cat}.{contador_item}", 'nome': item_curto})
+                            contador_item += 1 # Só sobe a numeração se entrar na EAP
                         
                         texto_final = texto_base
                         if qtd > 1: texto_final += f" — Qtd: {qtd}."
                         lista_detalhada.append(texto_final)
                         
-                        contador_item += 1
-                    
                     eap_estruturada.append({'indice': str(contador_cat), 'categoria': cat.upper(), 'itens': lista_eap})
                     escopo_estruturado.append({'nome': f"{contador_cat}. {cat.upper()}", 'itens': lista_detalhada})
                     contador_cat += 1
@@ -222,7 +223,6 @@ else:
                 if "PREÇO VENDA" in texto_col_e or "PRECO VENDA" in texto_col_e or "PREÇO VENDA" in texto_col_c or "PRECO VENDA" in texto_col_c:
                     val_bruto = row[9] # Coluna J
                     if pd.notna(val_bruto):
-                        # BLINDAGEM: Se o Excel mandar como float, a gente usa direto sem manipular string!
                         if isinstance(val_bruto, (int, float)):
                             valor_total_calculado = float(val_bruto)
                         else:
@@ -230,7 +230,7 @@ else:
                             val_str = val_str.replace(".", "").replace(",", ".")
                             try: valor_total_calculado = float(val_str)
                             except: pass
-                    break # Para de procurar o preço
+                    break
 
             # --- LEITURA PRINCIPAL DO ESCOPO ---
             categoria_atual_nome = "ESCOPO GERAL"
@@ -243,7 +243,6 @@ else:
                 
                 descricao = str(row[2]).strip() if 2 < len(row) else ""
                 
-                # PARADA ABSOLUTA: Se achar CUSTO INDIRETO na descrição, quebra o loop inteiro.
                 if "CUSTO INDIRETO" in descricao.upper() or "CUSTOS INDIRETOS" in descricao.upper():
                     break 
                 
@@ -254,14 +253,13 @@ else:
                 if pd.isna(descricao) or descricao == "" or descricao.upper() in ["NAN", "DESCRIÇÃO DOS MATERIAIS", "DESCRICAO DOS MATERIAIS", "DESCRIÇÃO", "ITEM"]:
                     continue
                     
-                # É CATEGORIA / TÍTULO DA EAP? (Apenas se tiver número na Coluna ITEM)
+                # É CATEGORIA / TÍTULO DA EAP?
                 is_header = False
                 if col_b and col_b.lower() != 'nan' and col_b != '-':
                     if col_b[0].isdigit():
                         is_header = True
                         
                 if is_header:
-                    # Salva a categoria anterior
                     if categoria_atual_nome != "ESCOPO GERAL" and len(itens_detalhados) > 0:
                         escopo_estruturado.append({'nome': f"{categoria_atual_indice} - {categoria_atual_nome}".strip(' -'), 'itens': itens_detalhados})
                         eap_estruturada.append({'indice': categoria_atual_indice, 'categoria': categoria_atual_nome.upper(), 'itens': itens_eap})
@@ -276,9 +274,8 @@ else:
                 else:
                     has_qty = not pd.isna(quantidade) and str(quantidade).strip() not in ["", "nan", "-"]
                     
-                    # Tem quantidade = Item Novo
+                    # Tem quantidade = Item Novo (•)
                     if has_qty:
-                        # BLINDAGEM DE QUANTIDADE: Para não sair "205.894" como quantidade (quando pega sujeira do cabeçalho)
                         if isinstance(quantidade, (int, float)):
                             qtd_fmt = int(quantidade) if float(quantidade).is_integer() else round(float(quantidade), 2)
                         else:
@@ -290,23 +287,24 @@ else:
                                 
                         uni_fmt = f" {unidade}" if unidade.lower() not in ["nan", "", "-"] else ""
                         
-                        # Resumo Inteligente (Corta no "|")
                         nome_resumido = descricao.split('|')[0].strip()
                         if len(nome_resumido) > 80: nome_resumido = nome_resumido[:80] + "..."
                         
-                        indice_item = f"{categoria_atual_indice}.{contador_item}" if categoria_atual_indice else str(contador_item)
-                        itens_eap.append({'indice': indice_item, 'nome': nome_resumido})
+                        # --- NOVA REGRA EAP ---
+                        # Se não tiver a palavra Amortecedor, entra na EAP e soma 1 no contador.
+                        if "AMORTECEDOR" not in descricao.upper():
+                            indice_item = f"{categoria_atual_indice}.{contador_item}" if categoria_atual_indice else str(contador_item)
+                            itens_eap.append({'indice': indice_item, 'nome': nome_resumido})
+                            contador_item += 1 
                         
-                        # Item Detalhado
                         texto_item = f"Fornecimento / Instalação de {qtd_fmt}{uni_fmt} - {descricao}."
                         itens_detalhados.append(texto_item)
                         
-                        contador_item += 1
-                        
-                    # Não tem quantidade = Complemento do item de cima (ex: Pintura, Automação...)
+                    # Não tem quantidade = Complemento (*)
                     else:
                         if len(itens_detalhados) > 0:
-                            itens_detalhados[-1] += f" {descricao}"
+                            # Adiciona quebra dupla de linha (Enter) antes do complemento para espaçar
+                            itens_detalhados[-1] += f"\n\n{descricao}"
             
             # Adiciona o último bloco de categorias lido
             if categoria_atual_nome != "ESCOPO GERAL" and len(itens_detalhados) > 0:
@@ -314,7 +312,7 @@ else:
                 eap_estruturada.append({'indice': categoria_atual_indice, 'categoria': categoria_atual_nome.upper(), 'itens': itens_eap})
                 
             if len(escopo_estruturado) > 0:
-                st.success(f"✅ Planilha processada com sucesso! Estrutura EAP e valor total importados.")
+                st.success(f"✅ Planilha processada! EAP sem amortecedores e linhas espaçadas geradas com sucesso.")
             else:
                 st.warning(f"⚠️ A aba '{nome_aba}' foi lida, mas não encontrei itens válidos na Coluna B.")
                 
