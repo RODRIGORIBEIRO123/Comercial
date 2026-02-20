@@ -3,3 +3,4 @@ pandas
 docxtpl
 gspread
 oauth2client
+openpyxl
