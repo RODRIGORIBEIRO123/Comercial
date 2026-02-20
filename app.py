@@ -338,7 +338,7 @@ if st.button("🚀 GERAR PROPOSTA (.DOCX)", type="primary"):
 
     try:
         # ATENÇÃO: Confirme se o nome do seu template atual é este abaixo
-        doc = DocxTemplate("Template_Siarcon_Auto.docx") 
+        doc = DocxTemplate("Template_Siarcon.docx") 
         doc.render(contexto)
         bio = io.BytesIO()
         doc.save(bio)
@@ -347,3 +347,4 @@ if st.button("🚀 GERAR PROPOSTA (.DOCX)", type="primary"):
         st.download_button("📥 Baixar Arquivo Word", bio, f"Proposta_{num_prop}.docx")
     except Exception as e:
         st.error(f"Erro ao gerar o Word: {e}")
+
