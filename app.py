@@ -383,32 +383,56 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     def carregar_dados_custos():
         import os
         
-        # Pega o caminho absoluto do servidor para não ter erro de pasta
+        # Pega o caminho absoluto do servidor
         diretorio_atual = os.getcwd()
         pasta_dados = os.path.join(diretorio_atual, "dados")
-        
-        # Lê exatamente os arquivos que o servidor está enxergando lá dentro
         arquivos_na_pasta = os.listdir(pasta_dados)
         
-        # Busca dinamicamente ignorando letras maiúsculas/minúsculas ou espaços escondidos
+        # Localiza os arquivos
         nome_cag = next((f for f in arquivos_na_pasta if "CAG" in f.upper()), "CAG.csv")
         nome_ahu = next((f for f in arquivos_na_pasta if "AHU" in f.upper()), "AHU01.csv")
         nome_infra = next((f for f in arquivos_na_pasta if "INFRA" in f.upper()), "Infra.csv")
         
-        # Monta o caminho blindado
         cag_path = os.path.join(pasta_dados, nome_cag)
         ahu_path = os.path.join(pasta_dados, nome_ahu)
         infra_path = os.path.join(pasta_dados, nome_infra)
 
-        # Faz a leitura
-        cag_df = pd.read_csv(cag_path, skiprows=3) 
-        ahu_df = pd.read_csv(ahu_path, skiprows=3)
-        infra_df = pd.read_csv(infra_path, skiprows=4)
+        # --- NOVA FUNÇÃO INTELIGENTE DE LEITURA ---
+        def ler_csv_inteligente(caminho, palavra_chave):
+            # 1. Tenta ler com vírgula ou ponto-e-vírgula (padrão Brasil/Portugal)
+            df = pd.read_csv(caminho, sep=',', header=None)
+            if len(df.columns) == 1:
+                df = pd.read_csv(caminho, sep=';', header=None)
+                
+            # 2. Varre as linhas para achar onde está o cabeçalho real
+            header_idx = 0
+            for i, row in df.iterrows():
+                linha_texto = " ".join([str(x).upper() for x in row.values])
+                if palavra_chave in linha_texto:
+                    header_idx = i
+                    break
+                    
+            # 3. Define a linha correta como cabeçalho e corta o "lixo" acima
+            df.columns = df.iloc[header_idx]
+            df = df.iloc[header_idx+1:].reset_index(drop=True)
+            
+            # 4. Remove espaços em branco perdidos nos nomes das colunas
+            df.columns = [str(col).strip().upper() for col in df.columns]
+            
+            return df
+
+        # Lê os ficheiros usando o modo inteligente
+        cag_df = ler_csv_inteligente(cag_path, "ITEM")
+        ahu_df = ler_csv_inteligente(ahu_path, "ITEM")
+        infra_df = ler_csv_inteligente(infra_path, "INSTRUMENTAÇÃO")
         
-        # Limpeza
+        # Limpa linhas vazias baseadas na coluna ITEM
         cag_df = cag_df.dropna(subset=['ITEM'])
         ahu_df = ahu_df.dropna(subset=['ITEM'])
-        infra_df = infra_df.dropna(subset=[infra_df.columns[0]])
+        
+        # Na infraestrutura, limpa baseado na primeira coluna
+        col_infra = infra_df.columns[0]
+        infra_df = infra_df.dropna(subset=[col_infra])
         
         return cag_df, ahu_df, infra_df
 
