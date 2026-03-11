@@ -379,16 +379,25 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     taxa_mo = st.sidebar.number_input("Custo Mão de Obra (MO)", value=74.02, step=1.0)
     taxa_cabo_infra = st.sidebar.number_input("Custo Cabo + Infra", value=164.50, step=1.0)
 
+    # FUNÇÃO SEGURA PARA CONVERTER VALORES FINANCEIROS
+    def converter_valor(val):
+        try:
+            v = str(val).upper().replace('R$', '').strip()
+            if v in ['NAN', 'NONE', '', '-']: return 0.0
+            if ',' in v:
+                v = v.replace('.', '').replace(',', '.')
+            return float(v)
+        except:
+            return 0.0
+
     @st.cache_data
     def carregar_dados_custos():
         import os
         
-        # Pega o caminho absoluto do servidor
         diretorio_atual = os.getcwd()
         pasta_dados = os.path.join(diretorio_atual, "dados")
-        arquivos_na_pasta = os.listdir(pasta_dados)
+        arquivos_na_pasta = os.listdir(pasta_dados) if os.path.exists(pasta_dados) else []
         
-        # Localiza os arquivos
         nome_cag = next((f for f in arquivos_na_pasta if "CAG" in f.upper()), "CAG.csv")
         nome_ahu = next((f for f in arquivos_na_pasta if "AHU" in f.upper()), "AHU01.csv")
         nome_infra = next((f for f in arquivos_na_pasta if "INFRA" in f.upper()), "Infra.csv")
@@ -397,14 +406,16 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         ahu_path = os.path.join(pasta_dados, nome_ahu)
         infra_path = os.path.join(pasta_dados, nome_infra)
 
-        # --- NOVA FUNÇÃO INTELIGENTE DE LEITURA ---
-        def ler_csv_inteligente(caminho, palavra_chave):
-            # 1. Tenta ler com vírgula ou ponto-e-vírgula (padrão Brasil/Portugal)
-            df = pd.read_csv(caminho, sep=',', header=None)
-            if len(df.columns) == 1:
-                df = pd.read_csv(caminho, sep=';', header=None)
+        # --- NOVA FUNÇÃO DE LEITURA BLINDADA ---
+        def ler_csv_blindado(caminho, palavra_chave):
+            try:
+                # Tenta ler como texto puro para evitar formatações escondidas do Pandas
+                df = pd.read_csv(caminho, sep=',', header=None, dtype=str)
+                if len(df.columns) <= 2:
+                    df = pd.read_csv(caminho, sep=';', header=None, dtype=str)
+            except Exception:
+                df = pd.read_csv(caminho, sep=';', header=None, dtype=str)
                 
-            # 2. Varre as linhas para achar onde está o cabeçalho real
             header_idx = 0
             for i, row in df.iterrows():
                 linha_texto = " ".join([str(x).upper() for x in row.values])
@@ -412,27 +423,39 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                     header_idx = i
                     break
                     
-            # 3. Define a linha correta como cabeçalho e corta o "lixo" acima
-            df.columns = df.iloc[header_idx]
+            raw_cols = df.iloc[header_idx].astype(str).tolist()
+            
+            clean_cols = []
+            for j, col in enumerate(raw_cols):
+                c = col.strip().upper()
+                if c in ['NAN', '', 'NONE', 'UNNAMED']:
+                    clean_cols.append(f"VAZIA_{j}")
+                elif c in clean_cols:
+                    # Trata colunas repetidas (ex: CABO e CABO de novo)
+                    clean_cols.append(f"{c}_{j}")
+                else:
+                    clean_cols.append(c)
+                    
+            df.columns = clean_cols
             df = df.iloc[header_idx+1:].reset_index(drop=True)
-            
-            # 4. Remove espaços em branco perdidos nos nomes das colunas
-            df.columns = [str(col).strip().upper() for col in df.columns]
-            
             return df
 
-        # Lê os ficheiros usando o modo inteligente
-        cag_df = ler_csv_inteligente(cag_path, "ITEM")
-        ahu_df = ler_csv_inteligente(ahu_path, "ITEM")
-        infra_df = ler_csv_inteligente(infra_path, "INSTRUMENTAÇÃO")
+        cag_df = ler_csv_blindado(cag_path, "ITEM")
+        ahu_df = ler_csv_blindado(ahu_path, "ITEM")
+        infra_df = ler_csv_blindado(infra_path, "INSTRUMENTAÇÃO")
         
-        # Limpa linhas vazias baseadas na coluna ITEM
-        cag_df = cag_df.dropna(subset=['ITEM'])
-        ahu_df = ahu_df.dropna(subset=['ITEM'])
-        
-        # Na infraestrutura, limpa baseado na primeira coluna
-        col_infra = infra_df.columns[0]
-        infra_df = infra_df.dropna(subset=[col_infra])
+        # Limpeza robusta - Elimina as linhas em branco de forma segura
+        if 'ITEM' in cag_df.columns:
+            cag_df = cag_df.dropna(subset=['ITEM'])
+            cag_df = cag_df[cag_df['ITEM'].astype(str).str.strip() != 'NAN']
+            
+        if 'ITEM' in ahu_df.columns:
+            ahu_df = ahu_df.dropna(subset=['ITEM'])
+            ahu_df = ahu_df[ahu_df['ITEM'].astype(str).str.strip() != 'NAN']
+            
+        if 'INSTRUMENTAÇÃO' in infra_df.columns:
+            infra_df = infra_df.dropna(subset=['INSTRUMENTAÇÃO'])
+            infra_df = infra_df[infra_df['INSTRUMENTAÇÃO'].astype(str).str.strip() != 'NAN']
         
         return cag_df, ahu_df, infra_df
 
@@ -449,8 +472,8 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 st.subheader("CAG")
                 for index, row in cag_df.iterrows():
                     c1, c2 = st.columns([3, 1])
-                    item_nome = row['ITEM']
-                    valor_unit = float(row['VALOR UNITÁRIO']) if pd.notna(row['VALOR UNITÁRIO']) else 0.0
+                    item_nome = str(row.get('ITEM', 'Item Desconhecido'))
+                    valor_unit = converter_valor(row.get('VALOR UNITÁRIO', 0))
                     
                     c1.write(f"{item_nome} (R$ {valor_unit:.2f})")
                     qtd = c2.number_input(f"Qtd", min_value=0, value=0, key=f"cag_{index}")
@@ -468,8 +491,8 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 st.subheader("AHU01")
                 for index, row in ahu_df.iterrows():
                     c1, c2 = st.columns([3, 1])
-                    item_nome = row['ITEM']
-                    valor_unit = float(row['VALOR UNITÁRIO']) if pd.notna(row['VALOR UNITÁRIO']) else 0.0
+                    item_nome = str(row.get('ITEM', 'Item Desconhecido'))
+                    valor_unit = converter_valor(row.get('VALOR UNITÁRIO', 0))
                     
                     c1.write(f"{item_nome} (R$ {valor_unit:.2f})")
                     qtd = c2.number_input(f"Qtd", min_value=0, value=0, key=f"ahu_{index}")
@@ -487,35 +510,38 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             st.header("Cálculo de Infraestrutura")
             st.markdown("Insira a distância média para calcular cabos e eletrocalhas/tubulações.")
             
-            for index, row in infra_df.iterrows():
-                tipo_inst = str(row.iloc[0]) 
-                custo_cabo = float(row.iloc[5]) if pd.notna(row.iloc[5]) else 0.0 
-                custo_infra = float(row.iloc[6]) if pd.notna(row.iloc[6]) else 0.0 
-                
-                if tipo_inst.strip() in ["", "nan", "-", "Equipamentos", "Total Equipamentos"]:
-                    continue
+            if 'INSTRUMENTAÇÃO' in infra_df.columns:
+                for index, row in infra_df.iterrows():
+                    tipo_inst = str(row['INSTRUMENTAÇÃO']).strip()
+                    
+                    # Pega o valor da coluna "CABO_6" (a segunda vez que CABO aparece na sua planilha) e da coluna "INFRA"
+                    custo_cabo = converter_valor(row.iloc[6]) if len(row) > 6 else 0.0
+                    custo_infra = converter_valor(row.get('INFRA', 0))
+                    
+                    if tipo_inst in ["", "NAN", "NONE", "-", "EQUIPAMENTOS", "TOTAL EQUIPAMENTOS"]:
+                        continue
 
-                st.write(f"**{tipo_inst}** (Cabo: R${custo_cabo:.2f}/m | Infra: R${custo_infra:.2f}/m)")
-                c1, c2 = st.columns(2)
-                qtd_inst = c1.number_input("Qtd. de Instrumentos", min_value=0, value=0, key=f"infra_qtd_{index}")
-                dist_media = c2.number_input("Distância Média (m)", min_value=0.0, value=0.0, step=1.0, key=f"infra_dist_{index}")
-                
-                if qtd_inst > 0 and dist_media > 0:
-                    metragem = qtd_inst * dist_media
-                    st.session_state.orcamento.append({
-                        "Categoria": "Infraestrutura",
-                        "Item": f"Cabo para {tipo_inst} ({metragem}m)",
-                        "Quantidade": metragem,
-                        "Valor_Unitario": custo_cabo,
-                        "Custo_Total": metragem * custo_cabo
-                    })
-                    st.session_state.orcamento.append({
-                        "Categoria": "Infraestrutura",
-                        "Item": f"Infra Física para {tipo_inst} ({metragem}m)",
-                        "Quantidade": metragem,
-                        "Valor_Unitario": custo_infra,
-                        "Custo_Total": metragem * custo_infra
-                    })
+                    st.write(f"**{tipo_inst}** (Cabo: R${custo_cabo:.2f}/m | Infra: R${custo_infra:.2f}/m)")
+                    c1, c2 = st.columns(2)
+                    qtd_inst = c1.number_input("Qtd. de Instrumentos", min_value=0, value=0, key=f"infra_qtd_{index}")
+                    dist_media = c2.number_input("Distância Média (m)", min_value=0.0, value=0.0, step=1.0, key=f"infra_dist_{index}")
+                    
+                    if qtd_inst > 0 and dist_media > 0:
+                        metragem = qtd_inst * dist_media
+                        st.session_state.orcamento.append({
+                            "Categoria": "Infraestrutura",
+                            "Item": f"Cabo para {tipo_inst} ({metragem}m)",
+                            "Quantidade": metragem,
+                            "Valor_Unitario": custo_cabo,
+                            "Custo_Total": metragem * custo_cabo
+                        })
+                        st.session_state.orcamento.append({
+                            "Categoria": "Infraestrutura",
+                            "Item": f"Infra Física para {tipo_inst} ({metragem}m)",
+                            "Quantidade": metragem,
+                            "Valor_Unitario": custo_infra,
+                            "Custo_Total": metragem * custo_infra
+                        })
 
         with aba_resumo:
             st.header("Resumo do Orçamento")
@@ -545,17 +571,4 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         st.session_state.orcamento = []
         
     except Exception as e:
-        # Rastreador de erros melhorado
         st.error(f"⚠️ Erro ao processar as planilhas: {e}")
-        st.warning("Diagnóstico do Servidor Streamlit:")
-        st.code(f"Diretório atual de execução: {os.getcwd()}")
-        
-        arquivos_raiz = os.listdir(os.getcwd())
-        st.code(f"Conteúdo da pasta principal: {arquivos_raiz}")
-        
-        if "dados" in arquivos_raiz:
-            st.success("✅ A pasta 'dados' FOI ENCONTRADA!")
-            arquivos_dados = os.listdir(os.path.join(os.getcwd(), "dados"))
-            st.code(f"Arquivos dentro da pasta 'dados': {arquivos_dados}")
-        else:
-            st.error("❌ A pasta 'dados' NÃO FOI ENCONTRADA.")
