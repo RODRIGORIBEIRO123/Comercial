@@ -365,210 +365,349 @@ if menu_selecionado == "📄 Gerador de Propostas":
 
 
 # ==============================================================================
-# MÓDULO 2: ESTIMATIVA DE CUSTOS (NOVO)
+# MÓDULO 2: ESTIMATIVA DE CUSTOS (NOVO & INTELIGENTE)
 # ==============================================================================
 elif menu_selecionado == "💰 Estimativa de Custos":
     
-    st.title("💰 Estimativa de Custos - Automação e Infra")
-    st.markdown("Selecione os equipamentos e infraestrutura para gerar a estimativa final.")
+    st.title("💰 Engenharia e Custos - Automação e Infra")
 
+    # Inicializa estados na memória
     if 'orcamento' not in st.session_state:
         st.session_state.orcamento = []
+    if 'paineis_auto' not in st.session_state:
+        st.session_state.paineis_auto = []
 
-    st.sidebar.header("⚙️ Regras e Taxas")
+    # ==========================================
+    # BARRA LATERAL - PARÂMETROS FINANCEIROS
+    # ==========================================
+    st.sidebar.header("⚙️ Custos de Controladores MPC")
+    st.sidebar.markdown("*(Insira os valores da Schneider aqui)*")
+    preco_mpc15 = st.sidebar.number_input("MP-C-15A (R$)", value=0.0, step=100.0)
+    preco_mpc18 = st.sidebar.number_input("MP-C-18A (R$)", value=0.0, step=100.0)
+    preco_mpc24 = st.sidebar.number_input("MP-C-24A (R$)", value=0.0, step=100.0)
+    preco_mpc36 = st.sidebar.number_input("MP-C-36A (R$)", value=0.0, step=100.0)
+    
+    st.sidebar.header("⚙️ Regras de Infraestrutura")
     taxa_mo = st.sidebar.number_input("Custo Mão de Obra (MO)", value=74.02, step=1.0)
     taxa_cabo_infra = st.sidebar.number_input("Custo Cabo + Infra", value=164.50, step=1.0)
 
-    # FUNÇÃO SEGURA PARA CONVERTER VALORES FINANCEIROS
-    def converter_valor(val):
-        try:
-            v = str(val).upper().replace('R$', '').strip()
-            if v in ['NAN', 'NONE', '', '-']: return 0.0
-            if ',' in v:
-                v = v.replace('.', '').replace(',', '.')
-            return float(v)
-        except:
-            return 0.0
+    # ==========================================
+    # DICIONÁRIO E REGRAS DE OURO DA SIARCON
+    # ==========================================
+    REGRA_INSTRUMENTOS = {
+        "Transmissor de pressão dif. para ar (Inversor)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
+        "Transmissor de temperatura e umidade": {"AI": 2, "AO": 2, "DI": 0, "DO": 0},
+        "Pressostato dif. para ar – Filtro G4": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Pressostato dif. para ar – Filtro F9": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Pressostato dif. para ar H13": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Sensor de temperatura insuflamento": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula controle de água gelada": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula controle de água quente": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula controle de vapor": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Resistência de aquecimento": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
+        "Transmissor de pressão para água": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
+        "Transmissor de fluxo para água": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
+    }
 
-    @st.cache_data
-    def carregar_dados_custos():
-        import os
-        
-        diretorio_atual = os.getcwd()
-        pasta_dados = os.path.join(diretorio_atual, "dados")
-        arquivos_na_pasta = os.listdir(pasta_dados) if os.path.exists(pasta_dados) else []
-        
-        nome_cag = next((f for f in arquivos_na_pasta if "CAG" in f.upper()), "CAG.csv")
-        nome_ahu = next((f for f in arquivos_na_pasta if "AHU" in f.upper()), "AHU01.csv")
-        nome_infra = next((f for f in arquivos_na_pasta if "INFRA" in f.upper()), "Infra.csv")
-        
-        cag_path = os.path.join(pasta_dados, nome_cag)
-        ahu_path = os.path.join(pasta_dados, nome_ahu)
-        infra_path = os.path.join(pasta_dados, nome_infra)
+    CUSTO_AI_AO = 565.00
+    CUSTO_DI_DO = 120.00
+    
+    PRECOS_IHM = {
+        "Sem IHM": 0.0,
+        "IHM 4,3 polegadas": 1700.00,
+        "IHM 7 polegadas": 3400.00,
+        "IHM 10 polegadas": 8500.00
+    }
 
-        # --- NOVA FUNÇÃO DE LEITURA BLINDADA ---
-        def ler_csv_blindado(caminho, palavra_chave):
-            try:
-                # Tenta ler como texto puro para evitar formatações escondidas do Pandas
-                df = pd.read_csv(caminho, sep=',', header=None, dtype=str)
-                if len(df.columns) <= 2:
-                    df = pd.read_csv(caminho, sep=';', header=None, dtype=str)
-            except Exception:
-                df = pd.read_csv(caminho, sep=';', header=None, dtype=str)
+    def calcular_painel_fisico(qtd_controladores):
+        if qtd_controladores == 0:
+            return "Sem Painel Físico", 0.0
+        elif qtd_controladores <= 2:
+            return "Painel 600x400mm", 3200.00
+        elif qtd_controladores <= 5:
+            return "Painel 800x600mm", 5150.00
+        else:
+            return "Painel 1200x600mm", 9250.00
+
+    def dimensionar_controladores(total_io):
+        # Lógica: Otimiza usando o menor número de controladores possível.
+        c36 = c24 = c18 = c15 = 0
+        rem = total_io
+        while rem > 0:
+            if rem > 24:
+                c36 += 1
+                rem -= 36
+            elif rem > 18:
+                c24 += 1
+                rem -= 24
+            elif rem > 15:
+                c18 += 1
+                rem -= 18
+            else:
+                c15 += 1
+                rem -= 15
+        return c36, c24, c18, c15
+
+    # ==========================================
+    # ABAS DA INTERFACE
+    # ==========================================
+    aba_auto, aba_planilhas, aba_infra, aba_resumo = st.tabs([
+        "🚀 Dimensionamento Automático", 
+        "🛠️ Modo Planilhas (Antigo)", 
+        "🔌 Infraestrutura", 
+        "📊 Resumo Final"
+    ])
+
+    with aba_auto:
+        st.header("Motor de Dimensionamento SIARCON")
+        st.markdown("Crie os painéis, adicione os equipamentos e o sistema calculará I/Os, controladores MPC e a caixa do painel.")
+        
+        if st.button("➕ Adicionar Novo Painel"):
+            st.session_state.paineis_auto.append({
+                "id": len(st.session_state.paineis_auto),
+                "nome": f"Painel {len(st.session_state.paineis_auto) + 1}",
+                "equipamentos": "",
+                "ihm": "Sem IHM",
+                "instrumentos": {k: 0 for k in REGRA_INSTRUMENTOS.keys()}
+            })
+
+        for p_idx, p_data in enumerate(st.session_state.paineis_auto):
+            with st.expander(f"⚙️ {p_data['nome']} - {p_data['equipamentos']}", expanded=True):
+                c_nome, c_equip, c_ihm = st.columns([1, 2, 1])
+                p_data['nome'] = c_nome.text_input("Identificação do Painel", value=p_data['nome'], key=f"n_{p_idx}")
+                p_data['equipamentos'] = c_equip.text_input("Lista de Equipamentos (ex: UTA 01, UTA 02)", value=p_data['equipamentos'], key=f"e_{p_idx}")
+                p_data['ihm'] = c_ihm.selectbox("IHM do Painel", list(PRECOS_IHM.keys()), index=list(PRECOS_IHM.keys()).index(p_data['ihm']), key=f"i_{p_idx}")
                 
-            header_idx = 0
-            for i, row in df.iterrows():
-                linha_texto = " ".join([str(x).upper() for x in row.values])
-                if palavra_chave in linha_texto:
-                    header_idx = i
-                    break
+                st.markdown("**Selecione as quantidades de instrumentos para este painel:**")
+                col_inst1, col_inst2 = st.columns(2)
+                
+                instrumentos_lista = list(REGRA_INSTRUMENTOS.keys())
+                meio = len(instrumentos_lista) // 2
+                
+                total_ai = total_ao = total_di = total_do = 0
+                
+                for i, inst in enumerate(instrumentos_lista):
+                    coluna = col_inst1 if i < meio else col_inst2
+                    qtd = coluna.number_input(inst, min_value=0, step=1, value=p_data['instrumentos'][inst], key=f"inst_{p_idx}_{i}")
+                    p_data['instrumentos'][inst] = qtd
                     
-            raw_cols = df.iloc[header_idx].astype(str).tolist()
+                    # Calcula I/Os na hora
+                    total_ai += qtd * REGRA_INSTRUMENTOS[inst]["AI"]
+                    total_ao += qtd * REGRA_INSTRUMENTOS[inst]["AO"]
+                    total_di += qtd * REGRA_INSTRUMENTOS[inst]["DI"]
+                    total_do += qtd * REGRA_INSTRUMENTOS[inst]["DO"]
+
+                total_io_pontos = total_ai + total_ao + total_di + total_do
+                c36, c24, c18, c15 = dimensionar_controladores(total_io_pontos)
+                total_controladores = c36 + c24 + c18 + c15
+                nome_caixa, preco_caixa = calcular_painel_fisico(total_controladores)
+
+                st.markdown("---")
+                st.markdown(f"**Cálculo Automático do {p_data['nome']}:**")
+                res_c1, res_c2, res_c3 = st.columns(3)
+                
+                res_c1.info(f"**Mapeamento I/O (Total: {total_io_pontos} pontos)**\n\nAI: {total_ai} | AO: {total_ao}\nDI: {total_di} | DO: {total_do}")
+                
+                txt_controladores = ""
+                if c36 > 0: txt_controladores += f"• {c36}x MP-C-36A\n"
+                if c24 > 0: txt_controladores += f"• {c24}x MP-C-24A\n"
+                if c18 > 0: txt_controladores += f"• {c18}x MP-C-18A\n"
+                if c15 > 0: txt_controladores += f"• {c15}x MP-C-15A\n"
+                if txt_controladores == "": txt_controladores = "Nenhum ponto I/O adicionado."
+                
+                res_c2.success(f"**Controladores Schneider Exigidos**\n\n{txt_controladores}")
+                res_c3.warning(f"**Dimensionamento Físico**\n\n• {nome_caixa}\n• {p_data['ihm']}")
+
+    with aba_planilhas:
+        st.header("Leitura das Planilhas Antigas")
+        st.markdown("Módulo mantido para compatibilidade com orçamentos antigos gerados no Excel.")
+        
+        # FUNÇÃO SEGURA PARA CONVERTER VALORES FINANCEIROS
+        def converter_valor(val):
+            try:
+                v = str(val).upper().replace('R$', '').strip()
+                if v in ['NAN', 'NONE', '', '-']: return 0.0
+                if ',' in v: v = v.replace('.', '').replace(',', '.')
+                return float(v)
+            except:
+                return 0.0
+
+        @st.cache_data
+        def carregar_dados_custos():
+            diretorio_atual = os.getcwd()
+            pasta_dados = os.path.join(diretorio_atual, "dados")
+            arquivos_na_pasta = os.listdir(pasta_dados) if os.path.exists(pasta_dados) else []
             
-            clean_cols = []
-            for j, col in enumerate(raw_cols):
-                c = col.strip().upper()
-                if c in ['NAN', '', 'NONE', 'UNNAMED']:
-                    clean_cols.append(f"VAZIA_{j}")
-                elif c in clean_cols:
-                    # Trata colunas repetidas (ex: CABO e CABO de novo)
-                    clean_cols.append(f"{c}_{j}")
-                else:
-                    clean_cols.append(c)
+            nome_cag = next((f for f in arquivos_na_pasta if "CAG" in f.upper()), "CAG.csv")
+            nome_ahu = next((f for f in arquivos_na_pasta if "AHU" in f.upper()), "AHU01.csv")
+            nome_infra = next((f for f in arquivos_na_pasta if "INFRA" in f.upper()), "Infra.csv")
+            
+            cag_path = os.path.join(pasta_dados, nome_cag)
+            ahu_path = os.path.join(pasta_dados, nome_ahu)
+            infra_path = os.path.join(pasta_dados, nome_infra)
+
+            def ler_csv_blindado(caminho, palavra_chave):
+                try:
+                    df = pd.read_csv(caminho, sep=',', header=None, dtype=str)
+                    if len(df.columns) <= 2: df = pd.read_csv(caminho, sep=';', header=None, dtype=str)
+                except Exception:
+                    df = pd.read_csv(caminho, sep=';', header=None, dtype=str)
                     
-            df.columns = clean_cols
-            df = df.iloc[header_idx+1:].reset_index(drop=True)
-            return df
+                header_idx = 0
+                for i, row in df.iterrows():
+                    linha_texto = " ".join([str(x).upper() for x in row.values])
+                    if palavra_chave in linha_texto:
+                        header_idx = i
+                        break
+                        
+                raw_cols = df.iloc[header_idx].astype(str).tolist()
+                clean_cols = []
+                for j, col in enumerate(raw_cols):
+                    c = col.strip().upper()
+                    if c in ['NAN', '', 'NONE', 'UNNAMED']: clean_cols.append(f"VAZIA_{j}")
+                    elif c in clean_cols: clean_cols.append(f"{c}_{j}")
+                    else: clean_cols.append(c)
+                        
+                df.columns = clean_cols
+                df = df.iloc[header_idx+1:].reset_index(drop=True)
+                return df
 
-        cag_df = ler_csv_blindado(cag_path, "ITEM")
-        ahu_df = ler_csv_blindado(ahu_path, "ITEM")
-        infra_df = ler_csv_blindado(infra_path, "INSTRUMENTAÇÃO")
-        
-        # Limpeza robusta - Elimina as linhas em branco de forma segura
-        if 'ITEM' in cag_df.columns:
-            cag_df = cag_df.dropna(subset=['ITEM'])
-            cag_df = cag_df[cag_df['ITEM'].astype(str).str.strip() != 'NAN']
-            
-        if 'ITEM' in ahu_df.columns:
-            ahu_df = ahu_df.dropna(subset=['ITEM'])
-            ahu_df = ahu_df[ahu_df['ITEM'].astype(str).str.strip() != 'NAN']
-            
-        if 'INSTRUMENTAÇÃO' in infra_df.columns:
-            infra_df = infra_df.dropna(subset=['INSTRUMENTAÇÃO'])
-            infra_df = infra_df[infra_df['INSTRUMENTAÇÃO'].astype(str).str.strip() != 'NAN']
-        
-        return cag_df, ahu_df, infra_df
+            try:
+                cag_df = ler_csv_blindado(cag_path, "ITEM")
+                ahu_df = ler_csv_blindado(ahu_path, "ITEM")
+                infra_df = ler_csv_blindado(infra_path, "INSTRUMENTAÇÃO")
+                
+                if 'ITEM' in cag_df.columns:
+                    cag_df = cag_df.dropna(subset=['ITEM'])
+                    cag_df = cag_df[cag_df['ITEM'].astype(str).str.strip() != 'NAN']
+                    
+                if 'ITEM' in ahu_df.columns:
+                    ahu_df = ahu_df.dropna(subset=['ITEM'])
+                    ahu_df = ahu_df[ahu_df['ITEM'].astype(str).str.strip() != 'NAN']
+                    
+                if 'INSTRUMENTAÇÃO' in infra_df.columns:
+                    infra_df = infra_df.dropna(subset=['INSTRUMENTAÇÃO'])
+                    infra_df = infra_df[infra_df['INSTRUMENTAÇÃO'].astype(str).str.strip() != 'NAN']
+                
+                return cag_df, ahu_df, infra_df
+            except Exception:
+                return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-    try:
         cag_df, ahu_df, infra_df = carregar_dados_custos()
         
-        aba_equip, aba_infra, aba_resumo = st.tabs(["🛠️ Equipamentos", "🔌 Infraestrutura", "📊 Resumo e Exportação"])
-
-        with aba_equip:
-            st.header("Seleção de Instrumentos por Equipamento")
+        if not cag_df.empty and not ahu_df.empty:
             col1, col2 = st.columns(2)
-            
             with col1:
-                st.subheader("CAG")
+                st.subheader("CAG (Planilha)")
                 for index, row in cag_df.iterrows():
                     c1, c2 = st.columns([3, 1])
                     item_nome = str(row.get('ITEM', 'Item Desconhecido'))
                     valor_unit = converter_valor(row.get('VALOR UNITÁRIO', 0))
-                    
                     c1.write(f"{item_nome} (R$ {valor_unit:.2f})")
-                    qtd = c2.number_input(f"Qtd", min_value=0, value=0, key=f"cag_{index}")
-                    
+                    qtd = c2.number_input(f"Qtd", min_value=0, value=0, key=f"cag_plan_{index}")
                     if qtd > 0:
-                        st.session_state.orcamento.append({
-                            "Categoria": "CAG",
-                            "Item": item_nome,
-                            "Quantidade": qtd,
-                            "Valor_Unitario": valor_unit,
-                            "Custo_Total": qtd * valor_unit
-                        })
+                        st.session_state.orcamento.append({"Categoria": "Manual - Planilha", "Item": item_nome, "Quantidade": qtd, "Custo_Total": qtd * valor_unit})
                         
             with col2:
-                st.subheader("AHU01")
+                st.subheader("AHU01 (Planilha)")
                 for index, row in ahu_df.iterrows():
                     c1, c2 = st.columns([3, 1])
                     item_nome = str(row.get('ITEM', 'Item Desconhecido'))
                     valor_unit = converter_valor(row.get('VALOR UNITÁRIO', 0))
-                    
                     c1.write(f"{item_nome} (R$ {valor_unit:.2f})")
-                    qtd = c2.number_input(f"Qtd", min_value=0, value=0, key=f"ahu_{index}")
-                    
+                    qtd = c2.number_input(f"Qtd", min_value=0, value=0, key=f"ahu_plan_{index}")
                     if qtd > 0:
-                        st.session_state.orcamento.append({
-                            "Categoria": "AHU01",
-                            "Item": item_nome,
-                            "Quantidade": qtd,
-                            "Valor_Unitario": valor_unit,
-                            "Custo_Total": qtd * valor_unit
-                        })
+                        st.session_state.orcamento.append({"Categoria": "Manual - Planilha", "Item": item_nome, "Quantidade": qtd, "Custo_Total": qtd * valor_unit})
 
-        with aba_infra:
-            st.header("Cálculo de Infraestrutura")
-            st.markdown("Insira a distância média para calcular cabos e eletrocalhas/tubulações.")
-            
-            if 'INSTRUMENTAÇÃO' in infra_df.columns:
-                for index, row in infra_df.iterrows():
-                    tipo_inst = str(row['INSTRUMENTAÇÃO']).strip()
-                    
-                    # Pega o valor da coluna "CABO_6" (a segunda vez que CABO aparece na sua planilha) e da coluna "INFRA"
-                    custo_cabo = converter_valor(row.iloc[6]) if len(row) > 6 else 0.0
-                    custo_infra = converter_valor(row.get('INFRA', 0))
-                    
-                    if tipo_inst in ["", "NAN", "NONE", "-", "EQUIPAMENTOS", "TOTAL EQUIPAMENTOS"]:
-                        continue
-
-                    st.write(f"**{tipo_inst}** (Cabo: R${custo_cabo:.2f}/m | Infra: R${custo_infra:.2f}/m)")
-                    c1, c2 = st.columns(2)
-                    qtd_inst = c1.number_input("Qtd. de Instrumentos", min_value=0, value=0, key=f"infra_qtd_{index}")
-                    dist_media = c2.number_input("Distância Média (m)", min_value=0.0, value=0.0, step=1.0, key=f"infra_dist_{index}")
-                    
-                    if qtd_inst > 0 and dist_media > 0:
-                        metragem = qtd_inst * dist_media
-                        st.session_state.orcamento.append({
-                            "Categoria": "Infraestrutura",
-                            "Item": f"Cabo para {tipo_inst} ({metragem}m)",
-                            "Quantidade": metragem,
-                            "Valor_Unitario": custo_cabo,
-                            "Custo_Total": metragem * custo_cabo
-                        })
-                        st.session_state.orcamento.append({
-                            "Categoria": "Infraestrutura",
-                            "Item": f"Infra Física para {tipo_inst} ({metragem}m)",
-                            "Quantidade": metragem,
-                            "Valor_Unitario": custo_infra,
-                            "Custo_Total": metragem * custo_infra
-                        })
-
-        with aba_resumo:
-            st.header("Resumo do Orçamento")
-            
-            if st.session_state.orcamento:
-                df_resumo = pd.DataFrame(st.session_state.orcamento)
-                df_resumo = df_resumo.groupby(['Categoria', 'Item', 'Valor_Unitario'], as_index=False).agg({'Quantidade': 'sum', 'Custo_Total': 'sum'})
-                
-                st.dataframe(df_resumo, use_container_width=True)
-                
-                total_projeto = df_resumo['Custo_Total'].sum()
-                st.subheader(f"Custo Total de Materiais: R$ {total_projeto:,.2f}")
-                
-                buffer = io.BytesIO()
-                with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                    df_resumo.to_excel(writer, index=False, sheet_name='Orcamento')
-                
-                st.download_button(
-                    label="📥 Exportar Orçamento para Excel",
-                    data=buffer.getvalue(),
-                    file_name="orcamento_automacao.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-            else:
-                st.info("Selecione itens nas abas de Equipamentos e Infraestrutura para ver o resumo.")
-
-        st.session_state.orcamento = []
+    with aba_infra:
+        st.header("Cálculo de Infraestrutura")
+        st.markdown("Insira a distância média para calcular cabos e eletrocalhas/tubulações.")
         
-    except Exception as e:
-        st.error(f"⚠️ Erro ao processar as planilhas: {e}")
+        if not infra_df.empty and 'INSTRUMENTAÇÃO' in infra_df.columns:
+            for index, row in infra_df.iterrows():
+                tipo_inst = str(row['INSTRUMENTAÇÃO']).strip()
+                custo_cabo = converter_valor(row.iloc[6]) if len(row) > 6 else 0.0
+                custo_infra = converter_valor(row.get('INFRA', 0))
+                
+                if tipo_inst in ["", "NAN", "NONE", "-", "EQUIPAMENTOS", "TOTAL EQUIPAMENTOS"]: continue
+
+                st.write(f"**{tipo_inst}** (Cabo: R${custo_cabo:.2f}/m | Infra: R${custo_infra:.2f}/m)")
+                c1, c2 = st.columns(2)
+                qtd_inst = c1.number_input("Qtd. de Instrumentos", min_value=0, value=0, key=f"infra_qtd_{index}")
+                dist_media = c2.number_input("Distância Média (m)", min_value=0.0, value=0.0, step=1.0, key=f"infra_dist_{index}")
+                
+                if qtd_inst > 0 and dist_media > 0:
+                    metragem = qtd_inst * dist_media
+                    st.session_state.orcamento.append({"Categoria": "Infraestrutura", "Item": f"Cabo ({tipo_inst})", "Quantidade": metragem, "Custo_Total": metragem * custo_cabo})
+                    st.session_state.orcamento.append({"Categoria": "Infraestrutura", "Item": f"Infra ({tipo_inst})", "Quantidade": metragem, "Custo_Total": metragem * custo_infra})
+
+    with aba_resumo:
+        st.header("Consolidação Financeira do Orçamento")
+        
+        custo_materiais_auto = 0.0
+        linhas_resumo = []
+
+        # 1. Processando Custos do Motor de Dimensionamento (Aba 1)
+        for p in st.session_state.paineis_auto:
+            total_ai = total_ao = total_di = total_do = 0
+            for inst, qtd in p['instrumentos'].items():
+                if qtd > 0:
+                    total_ai += qtd * REGRA_INSTRUMENTOS[inst]["AI"]
+                    total_ao += qtd * REGRA_INSTRUMENTOS[inst]["AO"]
+                    total_di += qtd * REGRA_INSTRUMENTOS[inst]["DI"]
+                    total_do += qtd * REGRA_INSTRUMENTOS[inst]["DO"]
+                    linhas_resumo.append({"Categoria": f"{p['nome']} - Instrumentos", "Item": inst, "Qtd": qtd, "Custo_Total": 0.0}) # Instrumentos de campo (Preço N/A na regra)
+
+            tot_io = total_ai + total_ao + total_di + total_do
+            if tot_io > 0:
+                # Custo de I/Os mapeados
+                custo_ana = (total_ai + total_ao) * CUSTO_AI_AO
+                custo_dig = (total_di + total_do) * CUSTO_DI_DO
+                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Analógicos (AI/AO)", "Qtd": (total_ai + total_ao), "Custo_Total": custo_ana})
+                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Digitais (DI/DO)", "Qtd": (total_di + total_do), "Custo_Total": custo_dig})
+                
+                # Custo Controladores
+                c36, c24, c18, c15 = dimensionar_controladores(tot_io)
+                if c36 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-36A", "Qtd": c36, "Custo_Total": c36 * preco_mpc36})
+                if c24 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Qtd": c24, "Custo_Total": c24 * preco_mpc24})
+                if c18 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-18A", "Qtd": c18, "Custo_Total": c18 * preco_mpc18})
+                if c15 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-15A", "Qtd": c15, "Custo_Total": c15 * preco_mpc15})
+                
+                # Custo Caixa do Painel
+                nome_caixa, preco_caixa = calcular_painel_fisico(c36 + c24 + c18 + c15)
+                linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura", "Item": nome_caixa, "Qtd": 1, "Custo_Total": preco_caixa})
+                
+                # Custo IHM
+                if PRECOS_IHM[p['ihm']] > 0:
+                    linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura", "Item": p['ihm'], "Qtd": 1, "Custo_Total": PRECOS_IHM[p['ihm']]})
+
+        # 2. Processando Custos Manuais e Infraestrutura (Abas 2 e 3)
+        for item in st.session_state.orcamento:
+            linhas_resumo.append({"Categoria": item['Categoria'], "Item": item['Item'], "Qtd": item['Quantidade'], "Custo_Total": item['Custo_Total']})
+
+        # Renderizando a Tabela Final
+        if len(linhas_resumo) > 0:
+            df_final = pd.DataFrame(linhas_resumo)
+            df_agrupado = df_final.groupby(['Categoria', 'Item'], as_index=False).agg({'Qtd': 'sum', 'Custo_Total': 'sum'})
+            st.dataframe(df_agrupado, use_container_width=True)
+            
+            subtotal_materiais = df_agrupado['Custo_Total'].sum()
+            custo_servicos_logica = subtotal_materiais * 0.25
+            total_projeto = subtotal_materiais + custo_servicos_logica
+            
+            st.markdown("---")
+            c1, c2, c3 = st.columns(3)
+            c1.info(f"**Subtotal Materiais/Hardware:**\nR$ {subtotal_materiais:,.2f}")
+            c2.warning(f"**Serviços de Lógica (25%):**\nR$ {custo_servicos_logica:,.2f}")
+            c3.success(f"**CUSTO TOTAL ESTIMADO:**\nR$ {total_projeto:,.2f}")
+            
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                df_agrupado.to_excel(writer, index=False, sheet_name='Detalhamento')
+            
+            st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        else:
+            st.info("Adicione painéis na aba 'Dimensionamento Automático' ou itens de Infraestrutura para visualizar o orçamento final.")
+
+        # Limpa o orçamento infra/manual a cada ciclo para evitar duplicar na tela
+        st.session_state.orcamento = []
