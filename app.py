@@ -5,6 +5,7 @@ import io
 from datetime import date
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import os
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide", page_icon="📄")
@@ -380,10 +381,14 @@ elif menu_selecionado == "💰 Estimativa de Custos":
 
     @st.cache_data
     def carregar_dados_custos():
-        # O Pandas vai buscar os arquivos exatamente na pasta "dados" que criamos no Passo 2
-        cag_df = pd.read_csv("dados/CAG.csv", skiprows=3) 
-        ahu_df = pd.read_csv("dados/AHU01.csv", skiprows=3)
-        infra_df = pd.read_csv("dados/Infra.csv", skiprows=4)
+        # Usando caminhos mais dinâmicos
+        cag_path = "dados/CAG.csv"
+        ahu_path = "dados/AHU01.csv"
+        infra_path = "dados/Infra.csv"
+
+        cag_df = pd.read_csv(cag_path, skiprows=3) 
+        ahu_df = pd.read_csv(ahu_path, skiprows=3)
+        infra_df = pd.read_csv(infra_path, skiprows=4)
         
         cag_df = cag_df.dropna(subset=['ITEM'])
         ahu_df = ahu_df.dropna(subset=['ITEM'])
@@ -499,7 +504,23 @@ elif menu_selecionado == "💰 Estimativa de Custos":
 
         st.session_state.orcamento = []
         
-    except FileNotFoundError:
-        st.error("⚠️ Arquivos CSV não encontrados! Certifique-se de que os arquivos 'CAG.csv', 'AHU01.csv' e 'Infra.csv' estão dentro da pasta 'dados' no seu GitHub.")
+    except FileNotFoundError as e:
+        # AQUI ESTÁ O RASTREADOR DE ERROS
+        st.error(f"⚠️ Erro ao carregar os arquivos: {e}")
+        st.warning("Diagnóstico do Servidor Streamlit:")
+        st.code(f"Diretório atual de execução: {os.getcwd()}")
+        
+        # Lista o que existe na raiz do projeto
+        arquivos_raiz = os.listdir(os.getcwd())
+        st.code(f"Conteúdo da pasta principal: {arquivos_raiz}")
+        
+        # Verifica se a pasta 'dados' existe e lista o que tem dentro dela
+        if "dados" in arquivos_raiz:
+            st.success("✅ A pasta 'dados' FOI ENCONTRADA!")
+            arquivos_dados = os.listdir(os.path.join(os.getcwd(), "dados"))
+            st.code(f"Arquivos dentro da pasta 'dados': {arquivos_dados}")
+        else:
+            st.error("❌ A pasta 'dados' NÃO FOI ENCONTRADA na nuvem. Verifique no GitHub se o nome ficou correto.")
+
     except Exception as e:
         st.error(f"Erro ao processar as planilhas de custo: {e}")
