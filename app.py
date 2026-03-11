@@ -25,7 +25,6 @@ st.sidebar.markdown("---")
 # ==============================================================================
 if menu_selecionado == "📄 Gerador de Propostas":
     
-    # Submenu específico da proposta na barra lateral
     st.sidebar.subheader("Opções da Proposta")
     modo_preenchimento = st.sidebar.radio(
         "Como deseja preencher o Escopo Técnico?",
@@ -34,10 +33,8 @@ if menu_selecionado == "📄 Gerador de Propostas":
 
     st.title("📄 Gerador de Propostas - SIARCON")
 
-    # === NOME EXATO DA PLANILHA DO BANCO DE DADOS ===
     PLANILHA_NOME = "DB_Propostas_Siarcon" 
 
-    # --- CONEXÃO SEGURA ---
     @st.cache_resource
     def conectar_google_sheets():
         try:
@@ -50,8 +47,7 @@ if menu_selecionado == "📄 Gerador de Propostas":
             st.error(f"Erro na conexão com Google Sheets: {e}")
             st.stop()
 
-    # --- CARREGAR DADOS ---
-    def carregar_dados():
+    def carregar_dados_propostas():
         sh = conectar_google_sheets()
         def ler_aba(nome):
             try: return pd.DataFrame(sh.worksheet(nome).get_all_records())
@@ -69,7 +65,7 @@ if menu_selecionado == "📄 Gerador de Propostas":
             st.error(f"Erro ao salvar: {e}")
 
     try:
-        df_escopos, df_exclusoes, df_resp, df_clientes, df_coberturas = carregar_dados()
+        df_escopos, df_exclusoes, df_resp, df_clientes, df_coberturas = carregar_dados_propostas()
     except Exception as e:
         st.error("Erro ao ler banco de dados. Verifique a planilha.")
         st.stop()
@@ -79,9 +75,7 @@ if menu_selecionado == "📄 Gerador de Propostas":
                  7:'Julho', 8:'Agosto', 9:'Setembro', 10:'Outubro', 11:'Novembro', 12:'Dezembro'}
         return f"Limeira, {dt.day} de {meses[dt.month]} de {dt.year}"
 
-    # ==============================================================================
-    # 1. DADOS DO PROJETO E CLIENTE
-    # ==============================================================================
+    # --- 1. DADOS DO PROJETO E CLIENTE ---
     st.header("1. Cliente e Projeto")
 
     with st.expander("➕ Cadastrar NOVO Cliente"):
@@ -116,9 +110,7 @@ if menu_selecionado == "📄 Gerador de Propostas":
         nome_projeto = st.text_input("Nome do Projeto")
         num_prop = st.text_input("Nº Proposta", value=f"P-{hoje.year}-XXX")
 
-    # ==============================================================================
-    # 2. COBERTURA
-    # ==============================================================================
+    # --- 2. COBERTURA ---
     st.markdown("---")
     st.header("2. Cobertura")
 
@@ -134,9 +126,7 @@ if menu_selecionado == "📄 Gerador de Propostas":
     tem_docs = st.checkbox("Incluir Documentos de Referência?", value=True)
     lista_docs = st.text_area("Lista de Documentos:") if tem_docs else ""
 
-    # ==============================================================================
-    # 3. RESPONSABILIDADES DO CLIENTE
-    # ==============================================================================
+    # --- 3. RESPONSABILIDADES DO CLIENTE ---
     st.markdown("---")
     st.header("3. Responsabilidades do Cliente")
 
@@ -151,9 +141,7 @@ if menu_selecionado == "📄 Gerador de Propostas":
     sel_resp = st.multiselect("Selecione:", list(dict_resp.keys()), default=list(dict_resp.keys()))
     resp_final = [dict_resp[k] for k in sel_resp if k in dict_resp]
 
-    # ==============================================================================
-    # 4. ESCOPO TÉCNICO
-    # ==============================================================================
+    # --- 4. ESCOPO TÉCNICO ---
     st.markdown("---")
     intro = st.text_area("Introdução do Escopo", value="Trata-se do fornecimento de materiais e mão de obra conforme itens abaixo:")
 
@@ -161,9 +149,6 @@ if menu_selecionado == "📄 Gerador de Propostas":
     eap_estruturada = []    
     valor_total_calculado = 0.0
 
-    # ---------------------------------------------------------
-    # MODO 1: PREENCHIMENTO MANUAL
-    # ---------------------------------------------------------
     if modo_preenchimento == "📋 Preenchimento Manual":
         st.header("4. Escopo Técnico (Modo Manual)")
         
@@ -213,9 +198,6 @@ if menu_selecionado == "📄 Gerador de Propostas":
                         escopo_estruturado.append({'nome': f"{contador_cat}. {cat.upper()}", 'itens': lista_detalhada})
                         contador_cat += 1
 
-    # ---------------------------------------------------------
-    # MODO 2: PREENCHIMENTO AUTOMÁTICO (EXCEL)
-    # ---------------------------------------------------------
     else:
         st.header("4. Escopo Técnico (Upload da Planilha)")
         arquivo_excel = st.file_uploader("📂 Faça o upload da Planilha Orçamentária (.xlsx)", type=["xlsx"])
@@ -321,9 +303,7 @@ if menu_selecionado == "📄 Gerador de Propostas":
             except Exception as e:
                 st.error(f"Erro ao processar a planilha: {e}")
 
-    # ==============================================================================
-    # 5. EXCLUSÕES
-    # ==============================================================================
+    # --- 5. EXCLUSÕES ---
     st.markdown("---")
     st.header("5. Exclusões")
 
@@ -338,9 +318,7 @@ if menu_selecionado == "📄 Gerador de Propostas":
     sel_exc = st.multiselect("Exclusões:", list(dict_exc.keys()), default=list(dict_exc.keys()))
     exc_final = [dict_exc[k] for k in sel_exc if k in dict_exc]
 
-    # ==============================================================================
-    # 6. COMERCIAL
-    # ==============================================================================
+    # --- 6. COMERCIAL ---
     st.markdown("---")
     st.header("6. Comercial")
 
@@ -350,9 +328,7 @@ if menu_selecionado == "📄 Gerador de Propostas":
     valor = c_v.text_input("Valor Total (R$):", value=valor_formatado_sugerido if valor_total_calculado > 0 else "")
     mes = c_m.text_input("Mês/Ano Base", value=f"{hoje.month}/{hoje.year}")
 
-    # ==============================================================================
-    # BOTÃO GERAR PROPOSTA
-    # ==============================================================================
+    # --- BOTÃO GERAR PROPOSTA ---
     st.markdown("---")
     if st.button("🚀 GERAR PROPOSTA (.DOCX)", type="primary"):
         
@@ -395,29 +371,22 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     st.title("💰 Estimativa de Custos - Automação e Infra")
     st.markdown("Selecione os equipamentos e infraestrutura para gerar a estimativa final.")
 
-    # Inicializa o orçamento no estado da sessão (se não existir)
     if 'orcamento' not in st.session_state:
         st.session_state.orcamento = []
 
-    # Regras de Custos Manuais (Sidebar)
     st.sidebar.header("⚙️ Regras e Taxas")
     taxa_mo = st.sidebar.number_input("Custo Mão de Obra (MO)", value=74.02, step=1.0)
     taxa_cabo_infra = st.sidebar.number_input("Custo Cabo + Infra", value=164.50, step=1.0)
 
-    # Carregando as bases de custo do seu GitHub
     @st.cache_data
     def carregar_dados_custos():
-        # Lembre-se de certificar que os arquivos estão na pasta 'dados' no GitHub com esses nomes
+        # O Pandas vai buscar os arquivos exatamente na pasta "dados" que criamos no Passo 2
         cag_df = pd.read_csv("dados/CAG.csv", skiprows=3) 
         ahu_df = pd.read_csv("dados/AHU01.csv", skiprows=3)
         infra_df = pd.read_csv("dados/Infra.csv", skiprows=4)
         
-        # Limpa linhas vazias baseadas na coluna ITEM para os equipamentos
         cag_df = cag_df.dropna(subset=['ITEM'])
         ahu_df = ahu_df.dropna(subset=['ITEM'])
-        
-        # Limpa linhas vazias baseadas na coluna de Instrumentação para a Infraestrutura
-        # O .iloc[:, 0] pega a primeira coluna independentemente do nome (que deve ser a INSTRUMENTAÇÃO)
         infra_df = infra_df.dropna(subset=[infra_df.columns[0]])
         
         return cag_df, ahu_df, infra_df
@@ -425,7 +394,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     try:
         cag_df, ahu_df, infra_df = carregar_dados_custos()
         
-        # Interface Principal (Abas)
         aba_equip, aba_infra, aba_resumo = st.tabs(["🛠️ Equipamentos", "🔌 Infraestrutura", "📊 Resumo e Exportação"])
 
         with aba_equip:
@@ -475,12 +443,10 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             st.markdown("Insira a distância média para calcular cabos e eletrocalhas/tubulações.")
             
             for index, row in infra_df.iterrows():
-                # Lendo usando o índice da coluna para evitar problemas de nomes duplicados na planilha
-                tipo_inst = str(row.iloc[0]) # Coluna 0: INSTRUMENTAÇÃO
-                custo_cabo = float(row.iloc[5]) if pd.notna(row.iloc[5]) else 0.0 # Coluna 5: CABO (R$)
-                custo_infra = float(row.iloc[6]) if pd.notna(row.iloc[6]) else 0.0 # Coluna 6: INFRA (R$)
+                tipo_inst = str(row.iloc[0]) 
+                custo_cabo = float(row.iloc[5]) if pd.notna(row.iloc[5]) else 0.0 
+                custo_infra = float(row.iloc[6]) if pd.notna(row.iloc[6]) else 0.0 
                 
-                # Pula linhas de cabeçalho perdidas na planilha
                 if tipo_inst.strip() in ["", "nan", "-", "Equipamentos", "Total Equipamentos"]:
                     continue
 
@@ -511,8 +477,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             
             if st.session_state.orcamento:
                 df_resumo = pd.DataFrame(st.session_state.orcamento)
-                
-                # Agrupa e soma os custos caso a tela recarregue (evita duplicatas no session_state)
                 df_resumo = df_resumo.groupby(['Categoria', 'Item', 'Valor_Unitario'], as_index=False).agg({'Quantidade': 'sum', 'Custo_Total': 'sum'})
                 
                 st.dataframe(df_resumo, use_container_width=True)
@@ -520,7 +484,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 total_projeto = df_resumo['Custo_Total'].sum()
                 st.subheader(f"Custo Total de Materiais: R$ {total_projeto:,.2f}")
                 
-                # Opção para exportar para Excel
                 buffer = io.BytesIO()
                 with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                     df_resumo.to_excel(writer, index=False, sheet_name='Orcamento')
@@ -534,7 +497,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             else:
                 st.info("Selecione itens nas abas de Equipamentos e Infraestrutura para ver o resumo.")
 
-        # Limpa o orcamento atual para evitar duplicação no próximo clique/recarregamento
         st.session_state.orcamento = []
         
     except FileNotFoundError:
