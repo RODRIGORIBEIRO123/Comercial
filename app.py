@@ -381,15 +381,31 @@ elif menu_selecionado == "💰 Estimativa de Custos":
 
     @st.cache_data
     def carregar_dados_custos():
-        # Usando caminhos mais dinâmicos
-        cag_path = "dados/CAG.csv"
-        ahu_path = "dados/AHU01.csv"
-        infra_path = "dados/Infra.csv"
+        import os
+        
+        # Pega o caminho absoluto do servidor para não ter erro de pasta
+        diretorio_atual = os.getcwd()
+        pasta_dados = os.path.join(diretorio_atual, "dados")
+        
+        # Lê exatamente os arquivos que o servidor está enxergando lá dentro
+        arquivos_na_pasta = os.listdir(pasta_dados)
+        
+        # Busca dinamicamente ignorando letras maiúsculas/minúsculas ou espaços escondidos
+        nome_cag = next((f for f in arquivos_na_pasta if "CAG" in f.upper()), "CAG.csv")
+        nome_ahu = next((f for f in arquivos_na_pasta if "AHU" in f.upper()), "AHU01.csv")
+        nome_infra = next((f for f in arquivos_na_pasta if "INFRA" in f.upper()), "Infra.csv")
+        
+        # Monta o caminho blindado
+        cag_path = os.path.join(pasta_dados, nome_cag)
+        ahu_path = os.path.join(pasta_dados, nome_ahu)
+        infra_path = os.path.join(pasta_dados, nome_infra)
 
+        # Faz a leitura
         cag_df = pd.read_csv(cag_path, skiprows=3) 
         ahu_df = pd.read_csv(ahu_path, skiprows=3)
         infra_df = pd.read_csv(infra_path, skiprows=4)
         
+        # Limpeza
         cag_df = cag_df.dropna(subset=['ITEM'])
         ahu_df = ahu_df.dropna(subset=['ITEM'])
         infra_df = infra_df.dropna(subset=[infra_df.columns[0]])
@@ -504,23 +520,18 @@ elif menu_selecionado == "💰 Estimativa de Custos":
 
         st.session_state.orcamento = []
         
-    except FileNotFoundError as e:
-        # AQUI ESTÁ O RASTREADOR DE ERROS
-        st.error(f"⚠️ Erro ao carregar os arquivos: {e}")
+    except Exception as e:
+        # Rastreador de erros melhorado
+        st.error(f"⚠️ Erro ao processar as planilhas: {e}")
         st.warning("Diagnóstico do Servidor Streamlit:")
         st.code(f"Diretório atual de execução: {os.getcwd()}")
         
-        # Lista o que existe na raiz do projeto
         arquivos_raiz = os.listdir(os.getcwd())
         st.code(f"Conteúdo da pasta principal: {arquivos_raiz}")
         
-        # Verifica se a pasta 'dados' existe e lista o que tem dentro dela
         if "dados" in arquivos_raiz:
             st.success("✅ A pasta 'dados' FOI ENCONTRADA!")
             arquivos_dados = os.listdir(os.path.join(os.getcwd(), "dados"))
             st.code(f"Arquivos dentro da pasta 'dados': {arquivos_dados}")
         else:
-            st.error("❌ A pasta 'dados' NÃO FOI ENCONTRADA na nuvem. Verifique no GitHub se o nome ficou correto.")
-
-    except Exception as e:
-        st.error(f"Erro ao processar as planilhas de custo: {e}")
+            st.error("❌ A pasta 'dados' NÃO FOI ENCONTRADA.")
