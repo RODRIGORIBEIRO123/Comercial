@@ -439,11 +439,11 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "IHM 10 polegadas": 8500.00
     }
 
-    # Lógica do Painel Físico
+    # Lógica do Painel Físico - ATUALIZADA
     def calcular_painel_fisico(qtd_controladores):
         if qtd_controladores == 0: return "Sem Painel Físico", 0.0
-        elif qtd_controladores <= 2: return "Painel 600x400mm", 3200.00
-        elif qtd_controladores <= 5: return "Painel 800x600mm", 5150.00
+        elif qtd_controladores <= 2: return "Painel 600x400mm", 4500.00
+        elif qtd_controladores <= 5: return "Painel 800x600mm", 5900.00
         else: return "Painel 1200x600mm", 9250.00
 
     # Lógica dos Controladores Schneider
@@ -758,11 +758,29 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         if len(linhas_resumo) > 0:
             df_final = pd.DataFrame(linhas_resumo)
             df_agrupado = df_final.groupby(['Categoria', 'Item'], as_index=False).agg({'Qtd': 'sum', 'Custo_Total': 'sum'})
-            st.dataframe(df_agrupado, use_container_width=True)
             
             subtotal_materiais = df_agrupado['Custo_Total'].sum()
             custo_servicos_logica = subtotal_materiais * 0.25  # Adicionando os 25% solicitados
             total_projeto = subtotal_materiais + custo_servicos_logica
+            
+            # --- Adicionando as linhas de Lógica e Total no Excel ---
+            df_servicos = pd.DataFrame([{
+                'Categoria': 'Serviços / Mão de Obra', 
+                'Item': 'Serviços de Lógica (25%)', 
+                'Qtd': 1, 
+                'Custo_Total': custo_servicos_logica
+            }])
+            
+            df_total = pd.DataFrame([{
+                'Categoria': 'TOTAL GERAL', 
+                'Item': 'Custo Total Estimado', 
+                'Qtd': '-', 
+                'Custo_Total': total_projeto
+            }])
+            
+            df_exportacao = pd.concat([df_agrupado, df_servicos, df_total], ignore_index=True)
+            
+            st.dataframe(df_agrupado, use_container_width=True)
             
             st.markdown("---")
             c1, c2, c3 = st.columns(3)
@@ -772,7 +790,8 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                df_agrupado.to_excel(writer, index=False, sheet_name='Detalhamento')
+                # Agora o Excel vai com as linhas de Serviço de Lógica e o Totalzão no final
+                df_exportacao.to_excel(writer, index=False, sheet_name='Detalhamento')
             
             st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
