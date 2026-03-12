@@ -439,7 +439,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "IHM 10 polegadas": 8500.00
     }
 
-    # Lógica do Painel Físico - ATUALIZADA
+    # Lógica do Painel Físico - ATUALIZADA VALORES
     def calcular_painel_fisico(qtd_controladores):
         if qtd_controladores == 0: return "Sem Painel Físico", 0.0
         elif qtd_controladores <= 2: return "Painel 600x400mm", 4500.00
@@ -754,7 +754,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         for item in st.session_state.orcamento:
             linhas_resumo.append({"Categoria": item['Categoria'], "Item": item['Item'], "Qtd": item['Quantidade'], "Custo_Total": item['Custo_Total']})
 
-        # Renderizando a Tabela Final
+        # Renderizando a Tabela Final e Gerando Arquivo Excel
         if len(linhas_resumo) > 0:
             df_final = pd.DataFrame(linhas_resumo)
             df_agrupado = df_final.groupby(['Categoria', 'Item'], as_index=False).agg({'Qtd': 'sum', 'Custo_Total': 'sum'})
@@ -788,10 +788,49 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             c2.warning(f"**Serviços de Lógica (25%):**\nR$ {custo_servicos_logica:,.2f}")
             c3.success(f"**CUSTO TOTAL ESTIMADO:**\nR$ {total_projeto:,.2f}")
             
+            # --- Gerar a Tabela de Pontos de I/O ---
+            linhas_pontos = []
+            for p in st.session_state.paineis_auto:
+                mult = p.get('multiplicador', 1)
+                for inst, qtd in p['instrumentos'].items():
+                    if qtd > 0:
+                        qtd_final = qtd * mult
+                        linhas_pontos.append({
+                            "Painel": p['nome'],
+                            "Instrumento": inst,
+                            "Quantidade": qtd_final,
+                            "Entrada Digital (DI)": qtd_final * REGRA_IO[inst]["DI"],
+                            "Saída Digital (DO)": qtd_final * REGRA_IO[inst]["DO"],
+                            "Entrada Analógica (AI)": qtd_final * REGRA_IO[inst]["AI"],
+                            "Saída Analógica (AO)": qtd_final * REGRA_IO[inst]["AO"]
+                        })
+            
+            df_pontos = pd.DataFrame(linhas_pontos)
+            if not df_pontos.empty:
+                # Adiciona uma linha de somatório geral na tabela de pontos
+                total_di = df_pontos['Entrada Digital (DI)'].sum()
+                total_do = df_pontos['Saída Digital (DO)'].sum()
+                total_ai = df_pontos['Entrada Analógica (AI)'].sum()
+                total_ao = df_pontos['Saída Analógica (AO)'].sum()
+                total_qtd = df_pontos['Quantidade'].sum()
+                
+                linha_total = pd.DataFrame([{
+                    "Painel": "TOTAL GERAL",
+                    "Instrumento": "-",
+                    "Quantidade": total_qtd,
+                    "Entrada Digital (DI)": total_di,
+                    "Saída Digital (DO)": total_do,
+                    "Entrada Analógica (AI)": total_ai,
+                    "Saída Analógica (AO)": total_ao
+                }])
+                df_pontos = pd.concat([df_pontos, linha_total], ignore_index=True)
+
+            # --- Criação do Arquivo Excel Final com 2 Abas ---
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                # Agora o Excel vai com as linhas de Serviço de Lógica e o Totalzão no final
-                df_exportacao.to_excel(writer, index=False, sheet_name='Detalhamento')
+                df_exportacao.to_excel(writer, index=False, sheet_name='Detalhamento Financeiro')
+                if not df_pontos.empty:
+                    df_pontos.to_excel(writer, index=False, sheet_name='Lista de Pontos (IO)')
             
             st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
