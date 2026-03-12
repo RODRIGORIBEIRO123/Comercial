@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from docxtpl import DocxTemplate
 import io
-from datetime import date
+from datetime import date, datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import os
@@ -371,46 +371,66 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     
     st.title("💰 Engenharia e Custos - Automação e Infra")
 
-    # Inicializa estados na memória
-    if 'orcamento' not in st.session_state:
-        st.session_state.orcamento = []
-    if 'paineis_auto' not in st.session_state:
-        st.session_state.paineis_auto = []
-
     # ==========================================
-    # BARRA LATERAL - PARÂMETROS FINANCEIROS
+    # 1. INICIALIZAÇÃO DE VARIÁVEIS NA MEMÓRIA
     # ==========================================
-    st.sidebar.header("⚙️ Custos de Controladores MPC")
-    st.sidebar.markdown("*(Insira os valores da Schneider aqui)*")
-    preco_mpc15 = st.sidebar.number_input("MP-C-15A (R$)", value=0.0, step=100.0)
-    preco_mpc18 = st.sidebar.number_input("MP-C-18A (R$)", value=0.0, step=100.0)
-    preco_mpc24 = st.sidebar.number_input("MP-C-24A (R$)", value=0.0, step=100.0)
-    preco_mpc36 = st.sidebar.number_input("MP-C-36A (R$)", value=0.0, step=100.0)
+    if 'orcamento' not in st.session_state: st.session_state.orcamento = []
+    if 'paineis_auto' not in st.session_state: st.session_state.paineis_auto = []
+    if 'historico_precos' not in st.session_state: st.session_state.historico_precos = []
     
-    st.sidebar.header("⚙️ Regras de Infraestrutura")
-    taxa_mo = st.sidebar.number_input("Custo Mão de Obra (MO)", value=74.02, step=1.0)
-    taxa_cabo_infra = st.sidebar.number_input("Custo Cabo + Infra", value=164.50, step=1.0)
+    # Base de Preços Inicial da SIARCON
+    if 'precos_banco' not in st.session_state:
+        st.session_state.precos_banco = {
+            "Transmissor de pressão dif. para ar SEM display": 1490.00,
+            "Transmissor de pressão dif. para ar COM display": 2110.00,
+            "Transmissor de temperatura e umidade SEM display": 2050.00,
+            "Transmissor de temperatura e umidade COM display": 2650.00,
+            "Pressostato dif. para ar – Filtro G4": 349.00,
+            "Transmissor dif. para ar – Filtro G4 (Analógico)": 1490.00,
+            "Pressostato dif. para ar – Filtro F9": 349.00,
+            "Transmissor dif. para ar – Filtro F9 (Analógico)": 1490.00,
+            "Pressostato dif. para ar H13": 349.00,
+            "Transmissor dif. para ar H13 (Analógico)": 1490.00,
+            "Sensor de temperatura insuflamento": 800.00,
+            "Transmissor de pressão para água": 1080.00,
+            "Transmissor de fluxo para água": 4450.00,
+            "Válvula controle de água gelada": 2650.00,
+            "Válvula controle de água quente": 3210.00,
+            "Válvula controle de vapor": 0.0,
+            "Resistência de aquecimento": 0.0,
+            "MP-C-15A": 4649.49,
+            "MP-C-18A": 5185.54,
+            "MP-C-24A": 7290.75,
+            "MP-C-36A": 9459.08,
+            "Custo AI/AO": 565.00,
+            "Custo DI/DO": 120.00
+        }
 
     # ==========================================
-    # DICIONÁRIO E REGRAS DE OURO DA SIARCON
+    # 2. DICIONÁRIO DE REGRAS DE ENGENHARIA (I/Os)
     # ==========================================
-    REGRA_INSTRUMENTOS = {
-        "Transmissor de pressão dif. para ar (Inversor)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
-        "Transmissor de temperatura e umidade": {"AI": 2, "AO": 2, "DI": 0, "DO": 0},
+    REGRA_IO = {
+        "Transmissor de pressão dif. para ar SEM display": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
+        "Transmissor de pressão dif. para ar COM display": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
+        "Transmissor de temperatura e umidade SEM display": {"AI": 2, "AO": 2, "DI": 0, "DO": 0},
+        "Transmissor de temperatura e umidade COM display": {"AI": 2, "AO": 2, "DI": 0, "DO": 0},
+        
+        # Filtros (Opcional entre Digital ou Analógico)
         "Pressostato dif. para ar – Filtro G4": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Transmissor dif. para ar – Filtro G4 (Analógico)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Pressostato dif. para ar – Filtro F9": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Transmissor dif. para ar – Filtro F9 (Analógico)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Pressostato dif. para ar H13": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Transmissor dif. para ar H13 (Analógico)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        
         "Sensor de temperatura insuflamento": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
+        "Transmissor de pressão para água": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
+        "Transmissor de fluxo para água": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
         "Válvula controle de água gelada": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
         "Válvula controle de água quente": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
         "Válvula controle de vapor": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
         "Resistência de aquecimento": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
-        "Transmissor de pressão para água": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
-        "Transmissor de fluxo para água": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
     }
-
-    CUSTO_AI_AO = 565.00
-    CUSTO_DI_DO = 120.00
     
     PRECOS_IHM = {
         "Sem IHM": 0.0,
@@ -419,69 +439,65 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "IHM 10 polegadas": 8500.00
     }
 
+    # Lógica do Painel Físico
     def calcular_painel_fisico(qtd_controladores):
-        if qtd_controladores == 0:
-            return "Sem Painel Físico", 0.0
-        elif qtd_controladores <= 2:
-            return "Painel 600x400mm", 3200.00
-        elif qtd_controladores <= 5:
-            return "Painel 800x600mm", 5150.00
-        else:
-            return "Painel 1200x600mm", 9250.00
+        if qtd_controladores == 0: return "Sem Painel Físico", 0.0
+        elif qtd_controladores <= 2: return "Painel 600x400mm", 3200.00
+        elif qtd_controladores <= 5: return "Painel 800x600mm", 5150.00
+        else: return "Painel 1200x600mm", 9250.00
 
+    # Lógica dos Controladores Schneider
     def dimensionar_controladores(total_io):
-        # Lógica: Otimiza usando o menor número de controladores possível.
         c36 = c24 = c18 = c15 = 0
         rem = total_io
         while rem > 0:
             if rem > 24:
-                c36 += 1
-                rem -= 36
+                c36 += 1; rem -= 36
             elif rem > 18:
-                c24 += 1
-                rem -= 24
+                c24 += 1; rem -= 24
             elif rem > 15:
-                c18 += 1
-                rem -= 18
+                c18 += 1; rem -= 18
             else:
-                c15 += 1
-                rem -= 15
+                c15 += 1; rem -= 15
         return c36, c24, c18, c15
 
     # ==========================================
-    # ABAS DA INTERFACE
+    # 3. INTERFACE DE ABAS
     # ==========================================
-    aba_auto, aba_planilhas, aba_infra, aba_resumo = st.tabs([
+    aba_auto, aba_planilhas, aba_infra, aba_precos, aba_resumo = st.tabs([
         "🚀 Dimensionamento Automático", 
-        "🛠️ Modo Planilhas (Antigo)", 
+        "🛠️ Modo Planilhas Antigas", 
         "🔌 Infraestrutura", 
+        "💲 Base de Preços",
         "📊 Resumo Final"
     ])
 
     with aba_auto:
         st.header("Motor de Dimensionamento SIARCON")
-        st.markdown("Crie os painéis, adicione os equipamentos e o sistema calculará I/Os, controladores MPC e a caixa do painel.")
+        st.markdown("Crie os painéis, ajuste o **multiplicador** (para equipamentos iguais) e o sistema calculará as quantidades totais.")
         
         if st.button("➕ Adicionar Novo Painel"):
             st.session_state.paineis_auto.append({
                 "id": len(st.session_state.paineis_auto),
                 "nome": f"Painel {len(st.session_state.paineis_auto) + 1}",
                 "equipamentos": "",
+                "multiplicador": 1,
                 "ihm": "Sem IHM",
-                "instrumentos": {k: 0 for k in REGRA_INSTRUMENTOS.keys()}
+                "instrumentos": {k: 0 for k in REGRA_IO.keys()}
             })
 
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
-            with st.expander(f"⚙️ {p_data['nome']} - {p_data['equipamentos']}", expanded=True):
-                c_nome, c_equip, c_ihm = st.columns([1, 2, 1])
-                p_data['nome'] = c_nome.text_input("Identificação do Painel", value=p_data['nome'], key=f"n_{p_idx}")
-                p_data['equipamentos'] = c_equip.text_input("Lista de Equipamentos (ex: UTA 01, UTA 02)", value=p_data['equipamentos'], key=f"e_{p_idx}")
+            with st.expander(f"⚙️ {p_data['nome']} - {p_data['equipamentos']} (x{p_data['multiplicador']})", expanded=True):
+                c_nome, c_equip, c_mult, c_ihm = st.columns([1, 2, 1, 1])
+                p_data['nome'] = c_nome.text_input("Identificação", value=p_data['nome'], key=f"n_{p_idx}")
+                p_data['equipamentos'] = c_equip.text_input("Equipamentos (ex: UTA 01 a 04)", value=p_data['equipamentos'], key=f"e_{p_idx}")
+                p_data['multiplicador'] = c_mult.number_input("Qtd. Equipamentos Iguais", min_value=1, value=p_data.get('multiplicador', 1), key=f"m_{p_idx}")
                 p_data['ihm'] = c_ihm.selectbox("IHM do Painel", list(PRECOS_IHM.keys()), index=list(PRECOS_IHM.keys()).index(p_data['ihm']), key=f"i_{p_idx}")
                 
-                st.markdown("**Selecione as quantidades de instrumentos para este painel:**")
+                st.markdown("**Selecione a quantidade de instrumentos (para APENAS 1 equipamento):**")
                 col_inst1, col_inst2 = st.columns(2)
                 
-                instrumentos_lista = list(REGRA_INSTRUMENTOS.keys())
+                instrumentos_lista = list(REGRA_IO.keys())
                 meio = len(instrumentos_lista) // 2
                 
                 total_ai = total_ao = total_di = total_do = 0
@@ -491,11 +507,10 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                     qtd = coluna.number_input(inst, min_value=0, step=1, value=p_data['instrumentos'][inst], key=f"inst_{p_idx}_{i}")
                     p_data['instrumentos'][inst] = qtd
                     
-                    # Calcula I/Os na hora
-                    total_ai += qtd * REGRA_INSTRUMENTOS[inst]["AI"]
-                    total_ao += qtd * REGRA_INSTRUMENTOS[inst]["AO"]
-                    total_di += qtd * REGRA_INSTRUMENTOS[inst]["DI"]
-                    total_do += qtd * REGRA_INSTRUMENTOS[inst]["DO"]
+                    total_ai += qtd * REGRA_IO[inst]["AI"]
+                    total_ao += qtd * REGRA_IO[inst]["AO"]
+                    total_di += qtd * REGRA_IO[inst]["DI"]
+                    total_do += qtd * REGRA_IO[inst]["DO"]
 
                 total_io_pontos = total_ai + total_ao + total_di + total_do
                 c36, c24, c18, c15 = dimensionar_controladores(total_io_pontos)
@@ -503,27 +518,62 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 nome_caixa, preco_caixa = calcular_painel_fisico(total_controladores)
 
                 st.markdown("---")
-                st.markdown(f"**Cálculo Automático do {p_data['nome']}:**")
+                st.markdown(f"**Dimensionamento para 1 unidade (O total final será multiplicado por {p_data['multiplicador']}):**")
                 res_c1, res_c2, res_c3 = st.columns(3)
                 
-                res_c1.info(f"**Mapeamento I/O (Total: {total_io_pontos} pontos)**\n\nAI: {total_ai} | AO: {total_ao}\nDI: {total_di} | DO: {total_do}")
+                res_c1.info(f"**Pontos I/O Físicos (Total: {total_io_pontos})**\n\nAI: {total_ai} | AO: {total_ao}\nDI: {total_di} | DO: {total_do}")
                 
                 txt_controladores = ""
                 if c36 > 0: txt_controladores += f"• {c36}x MP-C-36A\n"
                 if c24 > 0: txt_controladores += f"• {c24}x MP-C-24A\n"
                 if c18 > 0: txt_controladores += f"• {c18}x MP-C-18A\n"
                 if c15 > 0: txt_controladores += f"• {c15}x MP-C-15A\n"
-                if txt_controladores == "": txt_controladores = "Nenhum ponto I/O adicionado."
+                if txt_controladores == "": txt_controladores = "Nenhum I/O configurado."
                 
-                res_c2.success(f"**Controladores Schneider Exigidos**\n\n{txt_controladores}")
-                res_c3.warning(f"**Dimensionamento Físico**\n\n• {nome_caixa}\n• {p_data['ihm']}")
+                res_c2.success(f"**Controladores Necessários**\n\n{txt_controladores}")
+                res_c3.warning(f"**Estrutura do Quadro**\n\n• {nome_caixa}\n• {p_data['ihm']}")
+
+    with aba_precos:
+        st.header("Gestão da Base de Preços")
+        st.markdown("Atualize os valores nesta tabela. O sistema usará esses preços para todos os cálculos de orçamentos e salvará o histórico.")
+        
+        df_precos = pd.DataFrame(list(st.session_state.precos_banco.items()), columns=["Item / Equipamento", "Valor Atual (R$)"])
+        edited_df = st.data_editor(df_precos, use_container_width=True, hide_index=True)
+        
+        if st.button("💾 Salvar Novos Preços", type="primary"):
+            alterou_algo = False
+            for idx, row in edited_df.iterrows():
+                item = row['Item / Equipamento']
+                novo_valor = row['Valor Atual (R$)']
+                antigo_valor = st.session_state.precos_banco[item]
+                
+                if novo_valor != antigo_valor:
+                    st.session_state.historico_precos.append({
+                        "Data/Hora": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                        "Item Alterado": item,
+                        "Valor Antigo": f"R$ {antigo_valor:.2f}",
+                        "Novo Valor": f"R$ {novo_valor:.2f}"
+                    })
+                    st.session_state.precos_banco[item] = novo_valor
+                    alterou_algo = True
+            
+            if alterou_algo:
+                st.success("✅ Preços atualizados e gravados no histórico!")
+            else:
+                st.info("Nenhuma alteração foi feita na tabela.")
+
+        st.markdown("---")
+        st.subheader("Histórico de Atualizações nesta Sessão")
+        if st.session_state.historico_precos:
+            st.dataframe(pd.DataFrame(st.session_state.historico_precos).iloc[::-1], use_container_width=True, hide_index=True)
+        else:
+            st.write("Sem registros de alterações ainda.")
 
     with aba_planilhas:
         st.header("Leitura das Planilhas Antigas")
-        st.markdown("Módulo mantido para compatibilidade com orçamentos antigos gerados no Excel.")
+        st.markdown("Módulo mantido para compatibilidade com arquivos de csv antigos.")
         
-        # FUNÇÃO SEGURA PARA CONVERTER VALORES FINANCEIROS
-        def converter_valor(val):
+        def converter_valor_plan(val):
             try:
                 v = str(val).upper().replace('R$', '').strip()
                 if v in ['NAN', 'NONE', '', '-']: return 0.0
@@ -533,7 +583,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 return 0.0
 
         @st.cache_data
-        def carregar_dados_custos():
+        def carregar_dados_planilhas():
             diretorio_atual = os.getcwd()
             pasta_dados = os.path.join(diretorio_atual, "dados")
             arquivos_na_pasta = os.listdir(pasta_dados) if os.path.exists(pasta_dados) else []
@@ -593,7 +643,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             except Exception:
                 return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-        cag_df, ahu_df, infra_df = carregar_dados_custos()
+        cag_df, ahu_df, infra_df = carregar_dados_planilhas()
         
         if not cag_df.empty and not ahu_df.empty:
             col1, col2 = st.columns(2)
@@ -602,7 +652,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 for index, row in cag_df.iterrows():
                     c1, c2 = st.columns([3, 1])
                     item_nome = str(row.get('ITEM', 'Item Desconhecido'))
-                    valor_unit = converter_valor(row.get('VALOR UNITÁRIO', 0))
+                    valor_unit = converter_valor_plan(row.get('VALOR UNITÁRIO', 0))
                     c1.write(f"{item_nome} (R$ {valor_unit:.2f})")
                     qtd = c2.number_input(f"Qtd", min_value=0, value=0, key=f"cag_plan_{index}")
                     if qtd > 0:
@@ -613,7 +663,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 for index, row in ahu_df.iterrows():
                     c1, c2 = st.columns([3, 1])
                     item_nome = str(row.get('ITEM', 'Item Desconhecido'))
-                    valor_unit = converter_valor(row.get('VALOR UNITÁRIO', 0))
+                    valor_unit = converter_valor_plan(row.get('VALOR UNITÁRIO', 0))
                     c1.write(f"{item_nome} (R$ {valor_unit:.2f})")
                     qtd = c2.number_input(f"Qtd", min_value=0, value=0, key=f"ahu_plan_{index}")
                     if qtd > 0:
@@ -626,8 +676,8 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         if not infra_df.empty and 'INSTRUMENTAÇÃO' in infra_df.columns:
             for index, row in infra_df.iterrows():
                 tipo_inst = str(row['INSTRUMENTAÇÃO']).strip()
-                custo_cabo = converter_valor(row.iloc[6]) if len(row) > 6 else 0.0
-                custo_infra = converter_valor(row.get('INFRA', 0))
+                custo_cabo = converter_valor_plan(row.iloc[6]) if len(row) > 6 else 0.0
+                custo_infra = converter_valor_plan(row.get('INFRA', 0))
                 
                 if tipo_inst in ["", "NAN", "NONE", "-", "EQUIPAMENTOS", "TOTAL EQUIPAMENTOS"]: continue
 
@@ -644,44 +694,49 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     with aba_resumo:
         st.header("Consolidação Financeira do Orçamento")
         
-        custo_materiais_auto = 0.0
         linhas_resumo = []
 
-        # 1. Processando Custos do Motor de Dimensionamento (Aba 1)
+        # 1. Processando Custos do Motor Automático
         for p in st.session_state.paineis_auto:
+            mult = p.get('multiplicador', 1)
             total_ai = total_ao = total_di = total_do = 0
+            
+            # Conta os Instrumentos de Campo * Multiplicador
             for inst, qtd in p['instrumentos'].items():
                 if qtd > 0:
-                    total_ai += qtd * REGRA_INSTRUMENTOS[inst]["AI"]
-                    total_ao += qtd * REGRA_INSTRUMENTOS[inst]["AO"]
-                    total_di += qtd * REGRA_INSTRUMENTOS[inst]["DI"]
-                    total_do += qtd * REGRA_INSTRUMENTOS[inst]["DO"]
-                    linhas_resumo.append({"Categoria": f"{p['nome']} - Instrumentos", "Item": inst, "Qtd": qtd, "Custo_Total": 0.0}) # Instrumentos de campo (Preço N/A na regra)
+                    total_ai += qtd * REGRA_IO[inst]["AI"]
+                    total_ao += qtd * REGRA_IO[inst]["AO"]
+                    total_di += qtd * REGRA_IO[inst]["DI"]
+                    total_do += qtd * REGRA_IO[inst]["DO"]
+                    
+                    qtd_final = qtd * mult
+                    preco_item = st.session_state.precos_banco.get(inst, 0.0)
+                    linhas_resumo.append({"Categoria": f"{p['nome']} - Instrumentos", "Item": inst, "Qtd": qtd_final, "Custo_Total": qtd_final * preco_item})
 
             tot_io = total_ai + total_ao + total_di + total_do
             if tot_io > 0:
-                # Custo de I/Os mapeados
-                custo_ana = (total_ai + total_ao) * CUSTO_AI_AO
-                custo_dig = (total_di + total_do) * CUSTO_DI_DO
-                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Analógicos (AI/AO)", "Qtd": (total_ai + total_ao), "Custo_Total": custo_ana})
-                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Digitais (DI/DO)", "Qtd": (total_di + total_do), "Custo_Total": custo_dig})
+                # Custo de I/Os mapeados * Multiplicador
+                custo_ana = (total_ai + total_ao) * st.session_state.precos_banco["Custo AI/AO"] * mult
+                custo_dig = (total_di + total_do) * st.session_state.precos_banco["Custo DI/DO"] * mult
+                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os (Licenças/Pontos)", "Item": "Pontos Analógicos (AI/AO)", "Qtd": (total_ai + total_ao) * mult, "Custo_Total": custo_ana})
+                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os (Licenças/Pontos)", "Item": "Pontos Digitais (DI/DO)", "Qtd": (total_di + total_do) * mult, "Custo_Total": custo_dig})
                 
-                # Custo Controladores
+                # Custo Controladores * Multiplicador
                 c36, c24, c18, c15 = dimensionar_controladores(tot_io)
-                if c36 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-36A", "Qtd": c36, "Custo_Total": c36 * preco_mpc36})
-                if c24 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Qtd": c24, "Custo_Total": c24 * preco_mpc24})
-                if c18 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-18A", "Qtd": c18, "Custo_Total": c18 * preco_mpc18})
-                if c15 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-15A", "Qtd": c15, "Custo_Total": c15 * preco_mpc15})
+                if c36 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-36A", "Qtd": c36 * mult, "Custo_Total": c36 * mult * st.session_state.precos_banco["MP-C-36A"]})
+                if c24 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Qtd": c24 * mult, "Custo_Total": c24 * mult * st.session_state.precos_banco["MP-C-24A"]})
+                if c18 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-18A", "Qtd": c18 * mult, "Custo_Total": c18 * mult * st.session_state.precos_banco["MP-C-18A"]})
+                if c15 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-15A", "Qtd": c15 * mult, "Custo_Total": c15 * mult * st.session_state.precos_banco["MP-C-15A"]})
                 
-                # Custo Caixa do Painel
+                # Custo Caixa do Painel * Multiplicador
                 nome_caixa, preco_caixa = calcular_painel_fisico(c36 + c24 + c18 + c15)
-                linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura", "Item": nome_caixa, "Qtd": 1, "Custo_Total": preco_caixa})
+                linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": nome_caixa, "Qtd": 1 * mult, "Custo_Total": preco_caixa * mult})
                 
-                # Custo IHM
+                # Custo IHM * Multiplicador
                 if PRECOS_IHM[p['ihm']] > 0:
-                    linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura", "Item": p['ihm'], "Qtd": 1, "Custo_Total": PRECOS_IHM[p['ihm']]})
+                    linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": p['ihm'], "Qtd": 1 * mult, "Custo_Total": PRECOS_IHM[p['ihm']] * mult})
 
-        # 2. Processando Custos Manuais e Infraestrutura (Abas 2 e 3)
+        # 2. Processando Custos Manuais e Infraestrutura (Aba 2 e 3)
         for item in st.session_state.orcamento:
             linhas_resumo.append({"Categoria": item['Categoria'], "Item": item['Item'], "Qtd": item['Quantidade'], "Custo_Total": item['Custo_Total']})
 
@@ -692,7 +747,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             st.dataframe(df_agrupado, use_container_width=True)
             
             subtotal_materiais = df_agrupado['Custo_Total'].sum()
-            custo_servicos_logica = subtotal_materiais * 0.25
+            custo_servicos_logica = subtotal_materiais * 0.25  # Adicionando os 25% solicitados
             total_projeto = subtotal_materiais + custo_servicos_logica
             
             st.markdown("---")
@@ -709,5 +764,5 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         else:
             st.info("Adicione painéis na aba 'Dimensionamento Automático' ou itens de Infraestrutura para visualizar o orçamento final.")
 
-        # Limpa o orçamento infra/manual a cada ciclo para evitar duplicar na tela
+        # Limpa o orçamento infra/manual a cada ciclo
         st.session_state.orcamento = []
