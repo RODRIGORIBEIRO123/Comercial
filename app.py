@@ -113,7 +113,7 @@ if menu_selecionado == "📄 Gerador de Propostas":
 
     # --- 2. COBERTURA ---
     st.markdown("---")
-    st.header("2. Cobertura")
+    st.header("2. COBERTURA")
 
     with st.expander("➕ Cadastrar NOVA Cobertura"):
         with st.form("form_cob"):
@@ -474,7 +474,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
 
     with aba_auto:
         st.header("Motor de Dimensionamento SIARCON")
-        st.markdown("Crie os painéis, ajuste o **multiplicador** (para equipamentos iguais) e o sistema calculará as quantidades totais.")
+        st.markdown("Crie os painéis, ajuste o **multiplicador** (para agrupar equipamentos iguais no mesmo quadro) e o sistema calculará a otimização dos controladores.")
         
         if st.button("➕ Adicionar Novo Painel"):
             st.session_state.paineis_auto.append({
@@ -487,14 +487,14 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             })
 
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
-            with st.expander(f"⚙️ {p_data['nome']} - {p_data['equipamentos']} (x{p_data['multiplicador']})", expanded=True):
+            with st.expander(f"⚙️ {p_data['nome']} - {p_data['equipamentos']} (Atende {p_data['multiplicador']} eq.)", expanded=True):
                 c_nome, c_equip, c_mult, c_ihm = st.columns([1, 2, 1, 1])
                 p_data['nome'] = c_nome.text_input("Identificação", value=p_data['nome'], key=f"n_{p_idx}")
-                p_data['equipamentos'] = c_equip.text_input("Equipamentos (ex: UTA 01 a 04)", value=p_data['equipamentos'], key=f"e_{p_idx}")
-                p_data['multiplicador'] = c_mult.number_input("Qtd. Equipamentos Iguais", min_value=1, value=p_data.get('multiplicador', 1), key=f"m_{p_idx}")
+                p_data['equipamentos'] = c_equip.text_input("Equipamentos (ex: UTA 01 a 05)", value=p_data['equipamentos'], key=f"e_{p_idx}")
+                p_data['multiplicador'] = c_mult.number_input("Qtd. Equipamentos no Quadro", min_value=1, value=p_data.get('multiplicador', 1), key=f"m_{p_idx}")
                 p_data['ihm'] = c_ihm.selectbox("IHM do Painel", list(PRECOS_IHM.keys()), index=list(PRECOS_IHM.keys()).index(p_data['ihm']), key=f"i_{p_idx}")
                 
-                st.markdown("**Selecione a quantidade de instrumentos (para APENAS 1 equipamento):**")
+                st.markdown("**Selecione os instrumentos para APENAS 1 equipamento (O sistema multiplicará automaticamente):**")
                 col_inst1, col_inst2 = st.columns(2)
                 
                 instrumentos_lista = list(REGRA_IO.keys())
@@ -512,16 +512,23 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                     total_di += qtd * REGRA_IO[inst]["DI"]
                     total_do += qtd * REGRA_IO[inst]["DO"]
 
-                total_io_pontos = total_ai + total_ao + total_di + total_do
+                # O grande "Pulo do Gato": Soma os pontos de todos os equipamentos do quadro antes de dimensionar
+                mult = p_data['multiplicador']
+                total_ai_mult = total_ai * mult
+                total_ao_mult = total_ao * mult
+                total_di_mult = total_di * mult
+                total_do_mult = total_do * mult
+
+                total_io_pontos = total_ai_mult + total_ao_mult + total_di_mult + total_do_mult
                 c36, c24, c18, c15 = dimensionar_controladores(total_io_pontos)
                 total_controladores = c36 + c24 + c18 + c15
                 nome_caixa, preco_caixa = calcular_painel_fisico(total_controladores)
 
                 st.markdown("---")
-                st.markdown(f"**Dimensionamento para 1 unidade (O total final será multiplicado por {p_data['multiplicador']}):**")
+                st.markdown(f"**Dimensionamento Total do Quadro (Considerando a soma de {mult} equipamentos):**")
                 res_c1, res_c2, res_c3 = st.columns(3)
                 
-                res_c1.info(f"**Pontos I/O Físicos (Total: {total_io_pontos})**\n\nAI: {total_ai} | AO: {total_ao}\nDI: {total_di} | DO: {total_do}")
+                res_c1.info(f"**Pontos I/O Físicos (Total: {total_io_pontos})**\n\nAI: {total_ai_mult} | AO: {total_ao_mult}\nDI: {total_di_mult} | DO: {total_do_mult}")
                 
                 txt_controladores = ""
                 if c36 > 0: txt_controladores += f"• {c36}x MP-C-36A\n"
@@ -530,8 +537,8 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 if c15 > 0: txt_controladores += f"• {c15}x MP-C-15A\n"
                 if txt_controladores == "": txt_controladores = "Nenhum I/O configurado."
                 
-                res_c2.success(f"**Controladores Necessários**\n\n{txt_controladores}")
-                res_c3.warning(f"**Estrutura do Quadro**\n\n• {nome_caixa}\n• {p_data['ihm']}")
+                res_c2.success(f"**Controladores Otimizados**\n\n{txt_controladores}")
+                res_c3.warning(f"**Estrutura Centralizada**\n\n• 1x {nome_caixa}\n• 1x {p_data['ihm']}")
 
     with aba_precos:
         st.header("Gestão da Base de Preços")
@@ -699,42 +706,49 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         # 1. Processando Custos do Motor Automático
         for p in st.session_state.paineis_auto:
             mult = p.get('multiplicador', 1)
-            total_ai = total_ao = total_di = total_do = 0
+            total_ai_unit = total_ao_unit = total_di_unit = total_do_unit = 0
             
             # Conta os Instrumentos de Campo * Multiplicador
             for inst, qtd in p['instrumentos'].items():
                 if qtd > 0:
-                    total_ai += qtd * REGRA_IO[inst]["AI"]
-                    total_ao += qtd * REGRA_IO[inst]["AO"]
-                    total_di += qtd * REGRA_IO[inst]["DI"]
-                    total_do += qtd * REGRA_IO[inst]["DO"]
+                    total_ai_unit += qtd * REGRA_IO[inst]["AI"]
+                    total_ao_unit += qtd * REGRA_IO[inst]["AO"]
+                    total_di_unit += qtd * REGRA_IO[inst]["DI"]
+                    total_do_unit += qtd * REGRA_IO[inst]["DO"]
                     
                     qtd_final = qtd * mult
                     preco_item = st.session_state.precos_banco.get(inst, 0.0)
                     linhas_resumo.append({"Categoria": f"{p['nome']} - Instrumentos", "Item": inst, "Qtd": qtd_final, "Custo_Total": qtd_final * preco_item})
 
-            tot_io = total_ai + total_ao + total_di + total_do
-            if tot_io > 0:
-                # Custo de I/Os mapeados * Multiplicador
-                custo_ana = (total_ai + total_ao) * st.session_state.precos_banco["Custo AI/AO"] * mult
-                custo_dig = (total_di + total_do) * st.session_state.precos_banco["Custo DI/DO"] * mult
-                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os (Licenças/Pontos)", "Item": "Pontos Analógicos (AI/AO)", "Qtd": (total_ai + total_ao) * mult, "Custo_Total": custo_ana})
-                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os (Licenças/Pontos)", "Item": "Pontos Digitais (DI/DO)", "Qtd": (total_di + total_do) * mult, "Custo_Total": custo_dig})
+            # Calcula os I/Os totais agrupados no painel
+            total_ai_painel = total_ai_unit * mult
+            total_ao_painel = total_ao_unit * mult
+            total_di_painel = total_di_unit * mult
+            total_do_painel = total_do_unit * mult
+            
+            tot_io_painel = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
+
+            if tot_io_painel > 0:
+                # Custo de I/Os mapeados (total do painel)
+                custo_ana = (total_ai_painel + total_ao_painel) * st.session_state.precos_banco["Custo AI/AO"]
+                custo_dig = (total_di_painel + total_do_painel) * st.session_state.precos_banco["Custo DI/DO"]
+                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os (Licenças/Pontos)", "Item": "Pontos Analógicos (AI/AO)", "Qtd": (total_ai_painel + total_ao_painel), "Custo_Total": custo_ana})
+                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os (Licenças/Pontos)", "Item": "Pontos Digitais (DI/DO)", "Qtd": (total_di_painel + total_do_painel), "Custo_Total": custo_dig})
                 
-                # Custo Controladores * Multiplicador
-                c36, c24, c18, c15 = dimensionar_controladores(tot_io)
-                if c36 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-36A", "Qtd": c36 * mult, "Custo_Total": c36 * mult * st.session_state.precos_banco["MP-C-36A"]})
-                if c24 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Qtd": c24 * mult, "Custo_Total": c24 * mult * st.session_state.precos_banco["MP-C-24A"]})
-                if c18 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-18A", "Qtd": c18 * mult, "Custo_Total": c18 * mult * st.session_state.precos_banco["MP-C-18A"]})
-                if c15 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-15A", "Qtd": c15 * mult, "Custo_Total": c15 * mult * st.session_state.precos_banco["MP-C-15A"]})
+                # Custo Controladores: Otimizados com base no somatório geral de I/Os no painel
+                c36, c24, c18, c15 = dimensionar_controladores(tot_io_painel)
+                if c36 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-36A", "Qtd": c36, "Custo_Total": c36 * st.session_state.precos_banco["MP-C-36A"]})
+                if c24 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Qtd": c24, "Custo_Total": c24 * st.session_state.precos_banco["MP-C-24A"]})
+                if c18 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-18A", "Qtd": c18, "Custo_Total": c18 * st.session_state.precos_banco["MP-C-18A"]})
+                if c15 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-15A", "Qtd": c15, "Custo_Total": c15 * st.session_state.precos_banco["MP-C-15A"]})
                 
-                # Custo Caixa do Painel * Multiplicador
+                # Custo Caixa do Painel (UMA ÚNICA CAIXA)
                 nome_caixa, preco_caixa = calcular_painel_fisico(c36 + c24 + c18 + c15)
-                linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": nome_caixa, "Qtd": 1 * mult, "Custo_Total": preco_caixa * mult})
+                linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": nome_caixa, "Qtd": 1, "Custo_Total": preco_caixa})
                 
-                # Custo IHM * Multiplicador
+                # Custo IHM (UMA ÚNICA IHM)
                 if PRECOS_IHM[p['ihm']] > 0:
-                    linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": p['ihm'], "Qtd": 1 * mult, "Custo_Total": PRECOS_IHM[p['ihm']] * mult})
+                    linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": p['ihm'], "Qtd": 1, "Custo_Total": PRECOS_IHM[p['ihm']]})
 
         # 2. Processando Custos Manuais e Infraestrutura (Aba 2 e 3)
         for item in st.session_state.orcamento:
