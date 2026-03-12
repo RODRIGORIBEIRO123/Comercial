@@ -372,64 +372,110 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     st.title("💰 Engenharia e Custos - Automação e Infra")
 
     # ==========================================
-    # 1. INICIALIZAÇÃO DE VARIÁVEIS NA MEMÓRIA
+    # 1. INICIALIZAÇÃO E BASE DE DADOS
     # ==========================================
+    # Atualiza forçadamente a base de preços caso o código mude os nomes
+    banco_padrao_precos = {
+        # Controle
+        "Transmissor de pressão Dif. Para ar (Vazão de ar)": 1490.00,
+        "Transmissor de temperatura (Controle)": 800.00,
+        "Transmissor de temperatura e umidade (Controle)": 2050.00,
+        "Resistência aquecimento (Equipamento)": 0.0,
+        "Resistência de aquecimento (Duto)": 0.0,
+        "Válvula de água gelada": 2650.00,
+        "Válvula de água quente": 3210.00,
+        "Válvula de vapor": 0.0,
+        
+        # Monitoramento (Equipamento)
+        "Transmissor pressão para filtro G4": 1490.00,
+        "Transmissor pressão Filtro F9": 1490.00,
+        "Transmissor pressão filtro H13": 1490.00,
+        "Pressostato para filtro G4": 349.00,
+        "Pressostato Filtro F9": 349.00,
+        "Pressostato filtro H13": 349.00,
+        
+        # Monitoramento (Ambiente)
+        "Transmissor de pressão diferencial (Pressão entre salas)": 1490.00,
+        "Transmissor de pressão diferencial com display (Pressão entre salas)": 2110.00,
+        "Transmissor de temperatura (Ambiente)": 2050.00,
+        "Transmissor de temperatura com display (Ambiente)": 2650.00,
+        "Transmissor de temperatura e umidade (Ambiente)": 2050.00,
+        "Transmissor de temperatura e umidade com display (Ambiente)": 2650.00,
+        
+        # Sistemas e Painéis
+        "MP-C-15A": 4649.49,
+        "MP-C-18A": 5185.54,
+        "MP-C-24A": 7290.75,
+        "MP-C-36A": 9459.08,
+        "Custo AI/AO": 565.00,
+        "Custo DI/DO": 120.00
+    }
+
+    if 'precos_banco' not in st.session_state or "Transmissor de pressão Dif. Para ar (Vazão de ar)" not in st.session_state.precos_banco:
+        st.session_state.precos_banco = banco_padrao_precos
+
     if 'orcamento' not in st.session_state: st.session_state.orcamento = []
     if 'paineis_auto' not in st.session_state: st.session_state.paineis_auto = []
     if 'historico_precos' not in st.session_state: st.session_state.historico_precos = []
-    
-    # Base de Preços Inicial da SIARCON
-    if 'precos_banco' not in st.session_state:
-        st.session_state.precos_banco = {
-            "Transmissor de pressão dif. para ar SEM display": 1490.00,
-            "Transmissor de pressão dif. para ar COM display": 2110.00,
-            "Transmissor de temperatura e umidade SEM display": 2050.00,
-            "Transmissor de temperatura e umidade COM display": 2650.00,
-            "Pressostato dif. para ar – Filtro G4": 349.00,
-            "Transmissor dif. para ar – Filtro G4 (Analógico)": 1490.00,
-            "Pressostato dif. para ar – Filtro F9": 349.00,
-            "Transmissor dif. para ar – Filtro F9 (Analógico)": 1490.00,
-            "Pressostato dif. para ar H13": 349.00,
-            "Transmissor dif. para ar H13 (Analógico)": 1490.00,
-            "Sensor de temperatura insuflamento": 800.00,
-            "Transmissor de pressão para água": 1080.00,
-            "Transmissor de fluxo para água": 4450.00,
-            "Válvula controle de água gelada": 2650.00,
-            "Válvula controle de água quente": 3210.00,
-            "Válvula controle de vapor": 0.0,
-            "Resistência de aquecimento": 0.0,
-            "MP-C-15A": 4649.49,
-            "MP-C-18A": 5185.54,
-            "MP-C-24A": 7290.75,
-            "MP-C-36A": 9459.08,
-            "Custo AI/AO": 565.00,
-            "Custo DI/DO": 120.00
-        }
 
     # ==========================================
-    # 2. DICIONÁRIO DE REGRAS DE ENGENHARIA (I/Os)
+    # 2. DICIONÁRIO DE REGRAS DE ENGENHARIA (I/Os e Grupos)
     # ==========================================
+    GRUPOS_INSTRUMENTOS = {
+        "🔹 Equipamento (Controle)": [
+            "Transmissor de pressão Dif. Para ar (Vazão de ar)",
+            "Transmissor de temperatura (Controle)",
+            "Transmissor de temperatura e umidade (Controle)",
+            "Resistência aquecimento (Equipamento)",
+            "Resistência de aquecimento (Duto)",
+            "Válvula de água gelada",
+            "Válvula de água quente",
+            "Válvula de vapor"
+        ],
+        "🔸 Monitoramento (Equipamento)": [
+            "Transmissor pressão para filtro G4",
+            "Transmissor pressão Filtro F9",
+            "Transmissor pressão filtro H13",
+            "Pressostato para filtro G4",
+            "Pressostato Filtro F9",
+            "Pressostato filtro H13"
+        ],
+        "🟢 Monitoramento (Ambiente)": [
+            "Transmissor de pressão diferencial (Pressão entre salas)",
+            "Transmissor de pressão diferencial com display (Pressão entre salas)",
+            "Transmissor de temperatura (Ambiente)",
+            "Transmissor de temperatura com display (Ambiente)",
+            "Transmissor de temperatura e umidade (Ambiente)",
+            "Transmissor de temperatura e umidade com display (Ambiente)"
+        ]
+    }
+
     REGRA_IO = {
-        "Transmissor de pressão dif. para ar SEM display": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
-        "Transmissor de pressão dif. para ar COM display": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
-        "Transmissor de temperatura e umidade SEM display": {"AI": 2, "AO": 2, "DI": 0, "DO": 0},
-        "Transmissor de temperatura e umidade COM display": {"AI": 2, "AO": 2, "DI": 0, "DO": 0},
-        
-        # Filtros (Opcional entre Digital ou Analógico)
-        "Pressostato dif. para ar – Filtro G4": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "Transmissor dif. para ar – Filtro G4 (Analógico)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Pressostato dif. para ar – Filtro F9": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "Transmissor dif. para ar – Filtro F9 (Analógico)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Pressostato dif. para ar H13": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "Transmissor dif. para ar H13 (Analógico)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        
-        "Sensor de temperatura insuflamento": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
-        "Transmissor de pressão para água": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
-        "Transmissor de fluxo para água": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula controle de água gelada": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula controle de água quente": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula controle de vapor": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Resistência de aquecimento": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
+        # Controle
+        "Transmissor de pressão Dif. Para ar (Vazão de ar)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
+        "Transmissor de temperatura (Controle)": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
+        "Transmissor de temperatura e umidade (Controle)": {"AI": 2, "AO": 2, "DI": 0, "DO": 0},
+        "Resistência aquecimento (Equipamento)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
+        "Resistência de aquecimento (Duto)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
+        "Válvula de água gelada": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula de água quente": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula de vapor": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+
+        # Monitoramento (Equipamento)
+        "Transmissor pressão para filtro G4": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor pressão Filtro F9": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor pressão filtro H13": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Pressostato para filtro G4": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Pressostato Filtro F9": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Pressostato filtro H13": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+
+        # Monitoramento (Ambiente)
+        "Transmissor de pressão diferencial (Pressão entre salas)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial com display (Pressão entre salas)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura (Ambiente)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura com display (Ambiente)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura e umidade (Ambiente)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura e umidade com display (Ambiente)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
     }
     
     PRECOS_IHM = {
@@ -439,14 +485,12 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "IHM 10 polegadas": 8500.00
     }
 
-    # Lógica do Painel Físico - ATUALIZADA VALORES
     def calcular_painel_fisico(qtd_controladores):
         if qtd_controladores == 0: return "Sem Painel Físico", 0.0
         elif qtd_controladores <= 2: return "Painel 600x400mm", 4500.00
         elif qtd_controladores <= 5: return "Painel 800x600mm", 5900.00
         else: return "Painel 1200x600mm", 9250.00
 
-    # Lógica dos Controladores Schneider
     def dimensionar_controladores(total_io):
         c36 = c24 = c18 = c15 = 0
         rem = total_io
@@ -494,25 +538,35 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 p_data['multiplicador'] = c_mult.number_input("Qtd. Equipamentos no Quadro", min_value=1, value=p_data.get('multiplicador', 1), key=f"m_{p_idx}")
                 p_data['ihm'] = c_ihm.selectbox("IHM do Painel", list(PRECOS_IHM.keys()), index=list(PRECOS_IHM.keys()).index(p_data['ihm']), key=f"i_{p_idx}")
                 
-                st.markdown("**Selecione os instrumentos para APENAS 1 equipamento (O sistema multiplicará automaticamente):**")
-                col_inst1, col_inst2 = st.columns(2)
-                
-                instrumentos_lista = list(REGRA_IO.keys())
-                meio = len(instrumentos_lista) // 2
+                st.markdown("---")
+                st.markdown("#### Selecione os instrumentos para APENAS 1 equipamento")
+                st.markdown("*(O sistema multiplicará automaticamente pela quantidade de equipamentos informada acima)*")
                 
                 total_ai = total_ao = total_di = total_do = 0
                 
-                for i, inst in enumerate(instrumentos_lista):
-                    coluna = col_inst1 if i < meio else col_inst2
-                    qtd = coluna.number_input(inst, min_value=0, step=1, value=p_data['instrumentos'][inst], key=f"inst_{p_idx}_{i}")
-                    p_data['instrumentos'][inst] = qtd
+                # Renderiza a nova interface em 3 colunas, dividida por grupos
+                for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
+                    st.markdown(f"**{grupo_nome}**")
+                    cols = st.columns(3)
                     
-                    total_ai += qtd * REGRA_IO[inst]["AI"]
-                    total_ao += qtd * REGRA_IO[inst]["AO"]
-                    total_di += qtd * REGRA_IO[inst]["DI"]
-                    total_do += qtd * REGRA_IO[inst]["DO"]
+                    for i, inst in enumerate(lista_itens):
+                        # Garante que a chave existe na memória caso o painel seja antigo
+                        if inst not in p_data['instrumentos']:
+                            p_data['instrumentos'][inst] = 0
+                            
+                        with cols[i % 3]:
+                            qtd = st.number_input(inst, min_value=0, step=1, value=p_data['instrumentos'][inst], key=f"inst_{p_idx}_{inst}")
+                            p_data['instrumentos'][inst] = qtd
+                            
+                            # Soma os I/Os unitários
+                            total_ai += qtd * REGRA_IO[inst]["AI"]
+                            total_ao += qtd * REGRA_IO[inst]["AO"]
+                            total_di += qtd * REGRA_IO[inst]["DI"]
+                            total_do += qtd * REGRA_IO[inst]["DO"]
+                    
+                    st.write("") # Espaço extra entre os grupos
 
-                # O grande "Pulo do Gato": Soma os pontos de todos os equipamentos do quadro antes de dimensionar
+                # Soma os pontos de todos os equipamentos do quadro antes de dimensionar
                 mult = p_data['multiplicador']
                 total_ai_mult = total_ai * mult
                 total_ao_mult = total_ao * mult
@@ -552,7 +606,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             for idx, row in edited_df.iterrows():
                 item = row['Item / Equipamento']
                 novo_valor = row['Valor Atual (R$)']
-                antigo_valor = st.session_state.precos_banco[item]
+                antigo_valor = st.session_state.precos_banco.get(item, 0.0)
                 
                 if novo_valor != antigo_valor:
                     st.session_state.historico_precos.append({
