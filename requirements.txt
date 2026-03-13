@@ -4,3 +4,5 @@ openpyxl
 docxtpl
 gspread
 oauth2client
+google-generativeai
+pillow
