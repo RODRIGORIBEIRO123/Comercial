@@ -681,18 +681,28 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                     alterou_algo = True
             
             if alterou_algo:
-                # Rotina para Salvar no Banco de Dados Real (Google Sheets)
+                # Rotina para Salvar no Banco de Dados Real com Auto-Criação de Abas
                 try:
                     sh = conectar_google_sheets()
                     
-                    # 1. Atualiza a aba Precos
-                    ws_precos = sh.worksheet("Precos")
+                    # 1. Atualiza ou Cria a aba Precos
+                    try:
+                        ws_precos = sh.worksheet("Precos")
+                    except:
+                        ws_precos = sh.add_worksheet(title="Precos", rows="100", cols="2")
+                        ws_precos.append_row(["Item", "Valor"])
+                        
                     ws_precos.clear()
                     dados_precos_matriz = [["Item", "Valor"]] + [[k, v] for k, v in st.session_state.precos_banco.items()]
                     ws_precos.append_rows(dados_precos_matriz)
                     
-                    # 2. Atualiza a aba Historico_Precos
-                    ws_hist = sh.worksheet("Historico_Precos")
+                    # 2. Atualiza ou Cria a aba Historico_Precos
+                    try:
+                        ws_hist = sh.worksheet("Historico_Precos")
+                    except:
+                        ws_hist = sh.add_worksheet(title="Historico_Precos", rows="1000", cols="4")
+                        ws_hist.append_row(["Data/Hora", "Item Alterado", "Valor Antigo", "Novo Valor"])
+                        
                     linhas_h = []
                     for h in novos_historicos:
                         linhas_h.append([h["Data/Hora"], h["Item Alterado"], h["Valor Antigo"], h["Novo Valor"]])
@@ -701,7 +711,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                         
                     st.success("✅ Preços atualizados e gravados na nuvem com sucesso!")
                 except Exception as e:
-                    st.error(f"⚠️ Os preços foram atualizados nesta tela, mas não salvos na nuvem. Erro: {e}. Lembre-se de criar as abas 'Precos' e 'Historico_Precos' na sua planilha.")
+                    st.error(f"⚠️ Os preços foram atualizados nesta tela, mas houve um erro crítico ao acessar o banco. Erro: {e}.")
             else:
                 st.info("Nenhuma alteração foi feita na tabela.")
 
@@ -952,16 +962,22 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             
             st.markdown("---")
             
-            # --- NOVO BOTÃO DE SALVAR NO GOOGLE SHEETS ---
+            # --- NOVO BOTÃO DE SALVAR COM AUTO-CRIAÇÃO DE ABA ---
             if st.button("☁️ Salvar Levantamento no Banco de Dados", type="secondary", use_container_width=True):
                 if not nome_projeto_orcamento:
                     st.warning("⚠️ Atenção: Preencha o 'Nome do Projeto / Cliente' lá no topo da página antes de salvar.")
                 else:
                     try:
                         sh = conectar_google_sheets()
-                        ws_hist_orc = sh.worksheet("Historico_Orcamentos")
-                        agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
                         
+                        # Tenta achar a aba, se não achar, cria na hora
+                        try:
+                            ws_hist_orc = sh.worksheet("Historico_Orcamentos")
+                        except:
+                            ws_hist_orc = sh.add_worksheet(title="Historico_Orcamentos", rows="1000", cols="5")
+                            ws_hist_orc.append_row(["Data/Hora", "Nome do Projeto", "Subtotal Hardware", "Serviços de Lógica", "Custo Total Estimado"])
+                        
+                        agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
                         nova_linha_banco = [
                             agora,
                             nome_projeto_orcamento,
@@ -972,7 +988,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                         ws_hist_orc.append_row(nova_linha_banco)
                         st.success(f"✅ Orçamento para '{nome_projeto_orcamento}' salvo com sucesso no Google Sheets!")
                     except Exception as e:
-                        st.error(f"Erro ao salvar no banco. Verifique se você já criou a aba 'Historico_Orcamentos' no Google Sheets. Detalhe técnico: {e}")
+                        st.error(f"Erro ao salvar no banco. Detalhe técnico: {e}")
 
             # --- VISUALIZAR HISTÓRICO DENTRO DO APP ---
             with st.expander("📂 Ver Histórico de Levantamentos Salvos no Banco"):
@@ -984,7 +1000,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                     else:
                         st.write("Nenhum levantamento salvo ainda.")
                 except:
-                    st.write("A aba 'Historico_Orcamentos' ainda não existe ou está vazia.")
+                    st.write("Nenhum levantamento foi salvo ou a aba ainda não existe.")
 
         else:
             st.info("Adicione painéis na aba 'Dimensionamento Automático' ou itens de Infraestrutura para visualizar o orçamento final.")
