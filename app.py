@@ -375,9 +375,17 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     
     st.title("💰 Engenharia e Custos - Automação e Infra")
     
-    # Variável persistente do Nome do Projeto
+    # === INICIALIZAÇÃO DE TODAS AS VARIÁVEIS DO STREAMLIT AQUI ===
     if 'nome_projeto_orcamento' not in st.session_state:
         st.session_state.nome_projeto_orcamento = ""
+    if 'projeto_para_abrir' not in st.session_state:
+        st.session_state.projeto_para_abrir = None
+    if 'dados_projeto_abrir' not in st.session_state:
+        st.session_state.dados_projeto_abrir = {}
+    if 'orcamento' not in st.session_state: 
+        st.session_state.orcamento = []
+    if 'historico_precos' not in st.session_state: 
+        st.session_state.historico_precos = []
         
     nome_proj = st.text_input("🏷️ Nome do Projeto / Cliente (Para salvar no Histórico):", 
                               value=st.session_state.nome_projeto_orcamento,
@@ -396,7 +404,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         return client.open(PLANILHA_NOME)
 
     # ==========================================
-    # 1. INICIALIZAÇÃO E BASE DE DADOS
+    # 1. BASE DE DADOS E CARREGAMENTO ONLINE
     # ==========================================
     banco_padrao_precos = {
         "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1490.00,
@@ -429,12 +437,10 @@ elif menu_selecionado == "💰 Estimativa de Custos":
 
     if 'banco_precos_carregado' not in st.session_state:
         st.session_state.precos_banco = banco_padrao_precos.copy()
-        st.session_state.historico_precos = []
         
         try:
             sh = conectar_google_sheets()
             try:
-                # Usa leitura bruta para evitar problemas de cabeçalho
                 aba_p = sh.worksheet("Precos").get_all_values()
                 if len(aba_p) > 1:
                     precos_bd = {linha[0]: float(linha[1]) for linha in aba_p[1:] if len(linha) > 1}
@@ -456,8 +462,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     if len(st.session_state.paineis_auto) > 0:
         if "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)" not in st.session_state.paineis_auto[0]['grupos_equipamentos'][0]['instrumentos']:
              st.session_state.paineis_auto = []
-
-    if 'orcamento' not in st.session_state: st.session_state.orcamento = []
 
     # ==========================================
     # 2. DICIONÁRIO DE REGRAS DE ENGENHARIA
@@ -952,7 +956,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             with st.expander("📂 Ver Histórico de Levantamentos Salvos no Banco"):
                 try:
                     sh = conectar_google_sheets()
-                    # Lê a matriz bruta para não perder a coluna do JSON caso o cabeçalho esteja vazio
                     todas_linhas = sh.worksheet("Historico_Orcamentos").get_all_values()
                     
                     if len(todas_linhas) > 1:
@@ -960,7 +963,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                         
                         dados_historico = todas_linhas[1:]
                         
-                        # Mostra os mais recentes primeiro
                         for idx_rev, linha in enumerate(dados_historico[::-1]):
                             idx_real = len(dados_historico) - 1 - idx_rev
                             
@@ -985,13 +987,11 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                                     
                                 st.markdown("---")
                                 
-                        # CAIXA DE PERGUNTA PARA CONFIRMAR O CARREGAMENTO
                         if st.session_state.get('projeto_para_abrir') is not None:
-                            dados_abrir = st.session_state.dados_projeto_abrir
+                            dados_abrir = st.session_state.get('dados_projeto_abrir', {})
                             nome_abrir = dados_abrir.get('nome', '')
                             json_str = str(dados_abrir.get('json', '')).strip()
                             
-                            # Verifica se o projeto antigo não tem JSON salvo
                             if not json_str.startswith('['):
                                 st.warning("⚠️ Este levantamento é antigo e possui apenas o valor financeiro salvo (a memória dos equipamentos não foi registrada na época).")
                                 if st.button("Voltar", key="btn_voltar_antigo"):
