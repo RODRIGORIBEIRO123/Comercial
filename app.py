@@ -374,7 +374,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     # ==========================================
     # 1. INICIALIZAÇÃO E BASE DE DADOS
     # ==========================================
-    # Atualiza forçadamente a base de preços caso o código mude os nomes
     banco_padrao_precos = {
         # Controle
         "Transmissor de pressão Dif. Para ar (Vazão de ar)": 1490.00,
@@ -415,11 +414,15 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         st.session_state.precos_banco = banco_padrao_precos
 
     if 'orcamento' not in st.session_state: st.session_state.orcamento = []
-    if 'paineis_auto' not in st.session_state: st.session_state.paineis_auto = []
+    
+    # Validação de Estrutura Antiga (Reset se necessário)
+    if 'paineis_auto' not in st.session_state or (len(st.session_state.paineis_auto) > 0 and 'grupos_equipamentos' not in st.session_state.paineis_auto[0]):
+        st.session_state.paineis_auto = []
+        
     if 'historico_precos' not in st.session_state: st.session_state.historico_precos = []
 
     # ==========================================
-    # 2. DICIONÁRIO DE REGRAS DE ENGENHARIA (I/Os e Grupos)
+    # 2. DICIONÁRIO DE REGRAS DE ENGENHARIA
     # ==========================================
     GRUPOS_INSTRUMENTOS = {
         "🔹 Equipamento (Controle)": [
@@ -451,7 +454,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     }
 
     REGRA_IO = {
-        # Controle
         "Transmissor de pressão Dif. Para ar (Vazão de ar)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
         "Transmissor de temperatura (Controle)": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
         "Transmissor de temperatura e umidade (Controle)": {"AI": 2, "AO": 2, "DI": 0, "DO": 0},
@@ -460,16 +462,12 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "Válvula de água gelada": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
         "Válvula de água quente": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
         "Válvula de vapor": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-
-        # Monitoramento (Equipamento)
         "Transmissor pressão para filtro G4": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor pressão Filtro F9": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor pressão filtro H13": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Pressostato para filtro G4": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
         "Pressostato Filtro F9": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
         "Pressostato filtro H13": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-
-        # Monitoramento (Ambiente)
         "Transmissor de pressão diferencial (Pressão entre salas)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de pressão diferencial com display (Pressão entre salas)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de temperatura (Ambiente)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
@@ -495,14 +493,10 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         c36 = c24 = c18 = c15 = 0
         rem = total_io
         while rem > 0:
-            if rem > 24:
-                c36 += 1; rem -= 36
-            elif rem > 18:
-                c24 += 1; rem -= 24
-            elif rem > 15:
-                c18 += 1; rem -= 18
-            else:
-                c15 += 1; rem -= 15
+            if rem > 24: c36 += 1; rem -= 36
+            elif rem > 18: c24 += 1; rem -= 24
+            elif rem > 15: c18 += 1; rem -= 18
+            else: c15 += 1; rem -= 15
         return c36, c24, c18, c15
 
     # ==========================================
@@ -518,71 +512,97 @@ elif menu_selecionado == "💰 Estimativa de Custos":
 
     with aba_auto:
         st.header("Motor de Dimensionamento SIARCON")
-        st.markdown("Crie os painéis, ajuste o **multiplicador** (para agrupar equipamentos iguais no mesmo quadro) e o sistema calculará a otimização dos controladores.")
+        st.markdown("Crie um painel principal e adicione **múltiplos grupos de equipamentos** dentro dele. O sistema calculará a otimização dos controladores em um único quadro.")
         
-        if st.button("➕ Adicionar Novo Painel"):
+        if st.button("➕ Adicionar Novo Painel Físico"):
             st.session_state.paineis_auto.append({
                 "id": len(st.session_state.paineis_auto),
-                "nome": f"Painel {len(st.session_state.paineis_auto) + 1}",
-                "equipamentos": "",
-                "multiplicador": 1,
+                "nome": f"Quadro Automação {len(st.session_state.paineis_auto) + 1}",
                 "ihm": "Sem IHM",
-                "instrumentos": {k: 0 for k in REGRA_IO.keys()}
+                "grupos_equipamentos": [
+                    {
+                        "nome_grupo": "Equipamento 1 (ex: UTA 01)",
+                        "multiplicador": 1,
+                        "instrumentos": {k: 0 for k in REGRA_IO.keys()}
+                    }
+                ]
             })
 
+        # Iteração de cada PAINEL
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
-            with st.expander(f"⚙️ {p_data['nome']} - {p_data['equipamentos']} (Atende {p_data['multiplicador']} eq.)", expanded=True):
-                c_nome, c_equip, c_mult, c_ihm = st.columns([1, 2, 1, 1])
-                p_data['nome'] = c_nome.text_input("Identificação", value=p_data['nome'], key=f"n_{p_idx}")
-                p_data['equipamentos'] = c_equip.text_input("Equipamentos (ex: UTA 01 a 05)", value=p_data['equipamentos'], key=f"e_{p_idx}")
-                p_data['multiplicador'] = c_mult.number_input("Qtd. Equipamentos no Quadro", min_value=1, value=p_data.get('multiplicador', 1), key=f"m_{p_idx}")
-                p_data['ihm'] = c_ihm.selectbox("IHM do Painel", list(PRECOS_IHM.keys()), index=list(PRECOS_IHM.keys()).index(p_data['ihm']), key=f"i_{p_idx}")
+            with st.expander(f"📦 {p_data['nome']}", expanded=True):
+                
+                # Configurações do Painel
+                c_nome_painel, c_ihm_painel = st.columns([2, 1])
+                p_data['nome'] = c_nome_painel.text_input("Identificação do Quadro Físico", value=p_data['nome'], key=f"n_p_{p_idx}")
+                p_data['ihm'] = c_ihm_painel.selectbox("IHM Geral do Quadro", list(PRECOS_IHM.keys()), index=list(PRECOS_IHM.keys()).index(p_data['ihm']), key=f"i_p_{p_idx}")
                 
                 st.markdown("---")
-                st.markdown("#### Selecione os instrumentos para APENAS 1 equipamento")
-                st.markdown("*(O sistema multiplicará automaticamente pela quantidade de equipamentos informada acima)*")
                 
-                total_ai = total_ao = total_di = total_do = 0
+                # Variáveis de Somatório do Painel Inteiro
+                total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
+
+                # Iteração de cada GRUPO DENTRO DO PAINEL
+                for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
+                    st.markdown(f"#### ⚙️ Grupo: {g_data['nome_grupo']}")
+                    
+                    cg_nome, cg_mult = st.columns([3, 1])
+                    g_data['nome_grupo'] = cg_nome.text_input("Nome do Equipamento/Ambiente", value=g_data['nome_grupo'], key=f"n_g_{p_idx}_{g_idx}")
+                    g_data['multiplicador'] = cg_mult.number_input("Qtd. de Equipamentos Iguais", min_value=1, value=g_data.get('multiplicador', 1), key=f"m_g_{p_idx}_{g_idx}")
+                    
+                    st.markdown("*(Selecione os instrumentos para APENAS 1 unidade deste grupo)*")
+                    
+                    # Variáveis do Grupo Específico
+                    total_ai_grupo = total_ao_grupo = total_di_grupo = total_do_grupo = 0
+                    
+                    # Layout 3 colunas
+                    for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
+                        st.markdown(f"**{grupo_nome}**")
+                        cols = st.columns(3)
+                        
+                        for i, inst in enumerate(lista_itens):
+                            if inst not in g_data['instrumentos']:
+                                g_data['instrumentos'][inst] = 0
+                                
+                            with cols[i % 3]:
+                                qtd = st.number_input(inst, min_value=0, step=1, value=g_data['instrumentos'][inst], key=f"inst_{p_idx}_{g_idx}_{inst}")
+                                g_data['instrumentos'][inst] = qtd
+                                
+                                # Soma I/O do grupo
+                                total_ai_grupo += qtd * REGRA_IO[inst]["AI"]
+                                total_ao_grupo += qtd * REGRA_IO[inst]["AO"]
+                                total_di_grupo += qtd * REGRA_IO[inst]["DI"]
+                                total_do_grupo += qtd * REGRA_IO[inst]["DO"]
+                        st.write("") # Espaçamento
+                    
+                    st.divider() # Linha divisória após o grupo
+                    
+                    # Adiciona os totais do Grupo (multiplicados) ao somatório do Painel
+                    mult = g_data['multiplicador']
+                    total_ai_painel += total_ai_grupo * mult
+                    total_ao_painel += total_ao_grupo * mult
+                    total_di_painel += total_di_grupo * mult
+                    total_do_painel += total_do_grupo * mult
                 
-                # Renderiza a nova interface em 3 colunas, dividida por grupos
-                for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
-                    st.markdown(f"**{grupo_nome}**")
-                    cols = st.columns(3)
-                    
-                    for i, inst in enumerate(lista_itens):
-                        # Garante que a chave existe na memória caso o painel seja antigo
-                        if inst not in p_data['instrumentos']:
-                            p_data['instrumentos'][inst] = 0
-                            
-                        with cols[i % 3]:
-                            qtd = st.number_input(inst, min_value=0, step=1, value=p_data['instrumentos'][inst], key=f"inst_{p_idx}_{inst}")
-                            p_data['instrumentos'][inst] = qtd
-                            
-                            # Soma os I/Os unitários
-                            total_ai += qtd * REGRA_IO[inst]["AI"]
-                            total_ao += qtd * REGRA_IO[inst]["AO"]
-                            total_di += qtd * REGRA_IO[inst]["DI"]
-                            total_do += qtd * REGRA_IO[inst]["DO"]
-                    
-                    st.write("") # Espaço extra entre os grupos
+                # Botão para adicionar mais equipamentos NO MESMO PAINEL
+                if st.button(f"➕ Adicionar Equipamento Diferente neste Quadro", key=f"add_grp_{p_idx}"):
+                    p_data['grupos_equipamentos'].append({
+                        "nome_grupo": f"Equipamento {len(p_data['grupos_equipamentos']) + 1}",
+                        "multiplicador": 1,
+                        "instrumentos": {k: 0 for k in REGRA_IO.keys()}
+                    })
+                    st.rerun()
 
-                # Soma os pontos de todos os equipamentos do quadro antes de dimensionar
-                mult = p_data['multiplicador']
-                total_ai_mult = total_ai * mult
-                total_ao_mult = total_ao * mult
-                total_di_mult = total_di * mult
-                total_do_mult = total_do * mult
-
-                total_io_pontos = total_ai_mult + total_ao_mult + total_di_mult + total_do_mult
+                # ---- FECHAMENTO E CÁLCULO GERAL DO PAINEL ----
+                total_io_pontos = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
                 c36, c24, c18, c15 = dimensionar_controladores(total_io_pontos)
                 total_controladores = c36 + c24 + c18 + c15
                 nome_caixa, preco_caixa = calcular_painel_fisico(total_controladores)
 
-                st.markdown("---")
-                st.markdown(f"**Dimensionamento Total do Quadro (Considerando a soma de {mult} equipamentos):**")
+                st.markdown(f"### 📊 Resumo do {p_data['nome']}")
                 res_c1, res_c2, res_c3 = st.columns(3)
                 
-                res_c1.info(f"**Pontos I/O Físicos (Total: {total_io_pontos})**\n\nAI: {total_ai_mult} | AO: {total_ao_mult}\nDI: {total_di_mult} | DO: {total_do_mult}")
+                res_c1.info(f"**Pontos Físicos Totais ( {total_io_pontos} )**\n\nAI: {total_ai_painel} | AO: {total_ao_painel}\nDI: {total_di_painel} | DO: {total_do_painel}")
                 
                 txt_controladores = ""
                 if c36 > 0: txt_controladores += f"• {c36}x MP-C-36A\n"
@@ -756,40 +776,57 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         st.header("Consolidação Financeira do Orçamento")
         
         linhas_resumo = []
+        linhas_pontos = []
 
-        # 1. Processando Custos do Motor Automático
+        # 1. Processando Custos do Motor Automático (Hierarquia: Painel > Grupos)
         for p in st.session_state.paineis_auto:
-            mult = p.get('multiplicador', 1)
-            total_ai_unit = total_ao_unit = total_di_unit = total_do_unit = 0
             
-            # Conta os Instrumentos de Campo * Multiplicador
-            for inst, qtd in p['instrumentos'].items():
-                if qtd > 0:
-                    total_ai_unit += qtd * REGRA_IO[inst]["AI"]
-                    total_ao_unit += qtd * REGRA_IO[inst]["AO"]
-                    total_di_unit += qtd * REGRA_IO[inst]["DI"]
-                    total_do_unit += qtd * REGRA_IO[inst]["DO"]
-                    
-                    qtd_final = qtd * mult
-                    preco_item = st.session_state.precos_banco.get(inst, 0.0)
-                    linhas_resumo.append({"Categoria": f"{p['nome']} - Instrumentos", "Item": inst, "Qtd": qtd_final, "Custo_Total": qtd_final * preco_item})
+            total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
+            
+            for g in p['grupos_equipamentos']:
+                mult = g.get('multiplicador', 1)
+                
+                # Conta os Instrumentos de Campo deste Grupo
+                for inst, qtd in g['instrumentos'].items():
+                    if qtd > 0:
+                        qtd_final = qtd * mult
+                        preco_item = st.session_state.precos_banco.get(inst, 0.0)
+                        
+                        # Adiciona aos totais do painel para o cálculo final
+                        total_ai_painel += qtd_final * REGRA_IO[inst]["AI"]
+                        total_ao_painel += qtd_final * REGRA_IO[inst]["AO"]
+                        total_di_painel += qtd_final * REGRA_IO[inst]["DI"]
+                        total_do_painel += qtd_final * REGRA_IO[inst]["DO"]
+                        
+                        linhas_resumo.append({
+                            "Categoria": f"{p['nome']} - Campo", 
+                            "Item": f"{inst} ({g['nome_grupo']})", 
+                            "Qtd": qtd_final, 
+                            "Custo_Total": qtd_final * preco_item
+                        })
+                        
+                        # Planilha de Pontos (Excel)
+                        linhas_pontos.append({
+                            "Painel": p['nome'],
+                            "Grupo/Equipamento": g['nome_grupo'],
+                            "Instrumento": inst,
+                            "Quantidade Total": qtd_final,
+                            "Entrada Digital (DI)": qtd_final * REGRA_IO[inst]["DI"],
+                            "Saída Digital (DO)": qtd_final * REGRA_IO[inst]["DO"],
+                            "Entrada Analógica (AI)": qtd_final * REGRA_IO[inst]["AI"],
+                            "Saída Analógica (AO)": qtd_final * REGRA_IO[inst]["AO"]
+                        })
 
-            # Calcula os I/Os totais agrupados no painel
-            total_ai_painel = total_ai_unit * mult
-            total_ao_painel = total_ao_unit * mult
-            total_di_painel = total_di_unit * mult
-            total_do_painel = total_do_unit * mult
-            
             tot_io_painel = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
 
             if tot_io_painel > 0:
-                # Custo de I/Os mapeados (total do painel)
+                # Custo de I/Os mapeados (Total consolidado do painel)
                 custo_ana = (total_ai_painel + total_ao_painel) * st.session_state.precos_banco["Custo AI/AO"]
                 custo_dig = (total_di_painel + total_do_painel) * st.session_state.precos_banco["Custo DI/DO"]
-                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os (Licenças/Pontos)", "Item": "Pontos Analógicos (AI/AO)", "Qtd": (total_ai_painel + total_ao_painel), "Custo_Total": custo_ana})
-                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os (Licenças/Pontos)", "Item": "Pontos Digitais (DI/DO)", "Qtd": (total_di_painel + total_do_painel), "Custo_Total": custo_dig})
+                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Analógicos (AI/AO)", "Qtd": (total_ai_painel + total_ao_painel), "Custo_Total": custo_ana})
+                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Digitais (DI/DO)", "Qtd": (total_di_painel + total_do_painel), "Custo_Total": custo_dig})
                 
-                # Custo Controladores: Otimizados com base no somatório geral de I/Os no painel
+                # Custo Controladores (Otimizados globalmente no painel)
                 c36, c24, c18, c15 = dimensionar_controladores(tot_io_painel)
                 if c36 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-36A", "Qtd": c36, "Custo_Total": c36 * st.session_state.precos_banco["MP-C-36A"]})
                 if c24 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Qtd": c24, "Custo_Total": c24 * st.session_state.precos_banco["MP-C-24A"]})
@@ -814,24 +851,12 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             df_agrupado = df_final.groupby(['Categoria', 'Item'], as_index=False).agg({'Qtd': 'sum', 'Custo_Total': 'sum'})
             
             subtotal_materiais = df_agrupado['Custo_Total'].sum()
-            custo_servicos_logica = subtotal_materiais * 0.25  # Adicionando os 25% solicitados
+            custo_servicos_logica = subtotal_materiais * 0.25  
             total_projeto = subtotal_materiais + custo_servicos_logica
             
-            # --- Adicionando as linhas de Lógica e Total no Excel ---
-            df_servicos = pd.DataFrame([{
-                'Categoria': 'Serviços / Mão de Obra', 
-                'Item': 'Serviços de Lógica (25%)', 
-                'Qtd': 1, 
-                'Custo_Total': custo_servicos_logica
-            }])
-            
-            df_total = pd.DataFrame([{
-                'Categoria': 'TOTAL GERAL', 
-                'Item': 'Custo Total Estimado', 
-                'Qtd': '-', 
-                'Custo_Total': total_projeto
-            }])
-            
+            # Adicionando as linhas de Lógica e Total no Excel 
+            df_servicos = pd.DataFrame([{'Categoria': 'Serviços / Mão de Obra', 'Item': 'Serviços de Lógica (25%)', 'Qtd': 1, 'Custo_Total': custo_servicos_logica}])
+            df_total = pd.DataFrame([{'Categoria': 'TOTAL GERAL', 'Item': 'Custo Total Estimado', 'Qtd': '-', 'Custo_Total': total_projeto}])
             df_exportacao = pd.concat([df_agrupado, df_servicos, df_total], ignore_index=True)
             
             st.dataframe(df_agrupado, use_container_width=True)
@@ -843,22 +868,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             c3.success(f"**CUSTO TOTAL ESTIMADO:**\nR$ {total_projeto:,.2f}")
             
             # --- Gerar a Tabela de Pontos de I/O ---
-            linhas_pontos = []
-            for p in st.session_state.paineis_auto:
-                mult = p.get('multiplicador', 1)
-                for inst, qtd in p['instrumentos'].items():
-                    if qtd > 0:
-                        qtd_final = qtd * mult
-                        linhas_pontos.append({
-                            "Painel": p['nome'],
-                            "Instrumento": inst,
-                            "Quantidade": qtd_final,
-                            "Entrada Digital (DI)": qtd_final * REGRA_IO[inst]["DI"],
-                            "Saída Digital (DO)": qtd_final * REGRA_IO[inst]["DO"],
-                            "Entrada Analógica (AI)": qtd_final * REGRA_IO[inst]["AI"],
-                            "Saída Analógica (AO)": qtd_final * REGRA_IO[inst]["AO"]
-                        })
-            
             df_pontos = pd.DataFrame(linhas_pontos)
             if not df_pontos.empty:
                 # Adiciona uma linha de somatório geral na tabela de pontos
@@ -866,12 +875,13 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 total_do = df_pontos['Saída Digital (DO)'].sum()
                 total_ai = df_pontos['Entrada Analógica (AI)'].sum()
                 total_ao = df_pontos['Saída Analógica (AO)'].sum()
-                total_qtd = df_pontos['Quantidade'].sum()
+                total_qtd = df_pontos['Quantidade Total'].sum()
                 
                 linha_total = pd.DataFrame([{
                     "Painel": "TOTAL GERAL",
+                    "Grupo/Equipamento": "-",
                     "Instrumento": "-",
-                    "Quantidade": total_qtd,
+                    "Quantidade Total": total_qtd,
                     "Entrada Digital (DI)": total_di,
                     "Saída Digital (DO)": total_do,
                     "Entrada Analógica (AI)": total_ai,
@@ -884,7 +894,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                 df_exportacao.to_excel(writer, index=False, sheet_name='Detalhamento Financeiro')
                 if not df_pontos.empty:
-                    df_pontos.to_excel(writer, index=False, sheet_name='Lista de Pontos (IO)')
+                    df_pontos.to_excel(writer, index=False, sheet_name='Matriz de Pontos (IO)')
             
             st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
