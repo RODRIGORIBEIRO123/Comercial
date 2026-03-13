@@ -3,13 +3,16 @@ import pandas as pd
 from docxtpl import DocxTemplate
 import io
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timezone, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import os
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide", page_icon="📄")
+
+# Define o fuso horário de Brasília (UTC-3)
+fuso_br = timezone(timedelta(hours=-3))
 
 # === MENU LATERAL PRINCIPAL ===
 st.sidebar.image("https://via.placeholder.com/150x50.png?text=SIARCON", use_container_width=True)
@@ -372,7 +375,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     
     st.title("💰 Engenharia e Custos - Automação e Infra")
     
-    # Variável persistente do Nome do Projeto para manter mesmo quando recarregar histórico
+    # Variável persistente do Nome do Projeto
     if 'nome_projeto_orcamento' not in st.session_state:
         st.session_state.nome_projeto_orcamento = ""
         
@@ -393,7 +396,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         return client.open(PLANILHA_NOME)
 
     # ==========================================
-    # 1. INICIALIZAÇÃO E BASE DE DADOS (COM INTEGRAÇÃO GSHEETS)
+    # 1. INICIALIZAÇÃO E BASE DE DADOS
     # ==========================================
     banco_padrao_precos = {
         "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1490.00,
@@ -655,7 +658,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 
                 if novo_valor != antigo_valor:
                     novo_hist = {
-                        "Data/Hora": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                        "Data/Hora": datetime.now(fuso_br).strftime("%d/%m/%Y %H:%M:%S"),
                         "Item Alterado": item,
                         "Valor Antigo": f"R$ {antigo_valor:.2f}",
                         "Novo Valor": f"R$ {novo_valor:.2f}"
@@ -828,7 +831,9 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         linhas_resumo = []
         linhas_pontos = []
 
+        # 1. Processando Custos do Motor Automático (Hierarquia: Painel > Grupos)
         for p in st.session_state.paineis_auto:
+            
             total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
             
             for g in p['grupos_equipamentos']:
@@ -927,9 +932,8 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                             ws_hist_orc = sh.add_worksheet(title="Historico_Orcamentos", rows="1000", cols="6")
                             ws_hist_orc.append_row(["Data/Hora", "Nome do Projeto", "Subtotal Hardware", "Serviços de Lógica", "Custo Total Estimado", "Configuracao_JSON"])
                         
-                        agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                        agora = datetime.now(fuso_br).strftime("%d/%m/%Y %H:%M:%S")
                         
-                        # Transforma toda a configuração em Texto JSON Oculto
                         json_config = json.dumps(st.session_state.paineis_auto)
                         
                         nova_linha_banco = [
@@ -953,7 +957,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                     if not df_hist_orc.empty:
                         st.markdown("### Histórico de Projetos")
                         
-                        # Cria uma lista interativa com botões de Abrir
                         for idx, row in df_hist_orc[::-1].iterrows():
                             with st.container():
                                 c1, c2, c3, c4 = st.columns([2, 3, 2, 1])
@@ -961,33 +964,42 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                                 c2.write(f"**{row.get('Nome do Projeto', '')}**")
                                 c3.write(row.get('Custo Total Estimado', ''))
                                 
-                                # Verifica se esse histórico tem o código JSON salvo na coluna
-                                tem_json = 'Configuracao_JSON' in row and str(row['Configuracao_JSON']).startswith('[')
-                                
-                                if tem_json:
-                                    if c4.button("📂 Abrir", key=f"btn_abrir_{idx}"):
-                                        st.session_state.projeto_para_abrir = idx
-                                else:
-                                    c4.write("*(Antigo)*")
+                                # Sempre exibe o botão de abrir, mesmo nos antigos
+                                if c4.button("📂 Abrir", key=f"btn_abrir_{idx}"):
+                                    st.session_state.projeto_para_abrir = idx
+                                    
                                 st.markdown("---")
                                 
                         # CAIXA DE PERGUNTA PARA CONFIRMAR O CARREGAMENTO
                         if st.session_state.get('projeto_para_abrir') is not None:
                             idx_abrir = st.session_state.projeto_para_abrir
                             row_abrir = df_hist_orc.loc[idx_abrir]
-                            st.warning(f"⚠️ Deseja abrir o levantamento **{row_abrir.get('Nome do Projeto', '')}**? Os dados atuais que estão na tela serão substituídos por este histórico.")
                             
-                            c_sim, c_nao = st.columns(2)
-                            if c_sim.button("✔️ Sim, carregar dados", use_container_width=True):
-                                json_str = row_abrir.get('Configuracao_JSON', '[]')
-                                st.session_state.paineis_auto = json.loads(json_str)
-                                st.session_state.nome_projeto_orcamento = row_abrir.get('Nome do Projeto', '')
-                                st.session_state.projeto_para_abrir = None
-                                st.rerun()
-                                
-                            if c_nao.button("❌ Não, cancelar", use_container_width=True):
-                                st.session_state.projeto_para_abrir = None
-                                st.rerun()
+                            # Tenta achar o JSON mesmo se a coluna foi renomeada ou ignorada
+                            json_str = str(row_abrir.get('Configuracao_JSON', ''))
+                            if not json_str or json_str.strip() == '':
+                                vals = list(row_abrir.values())
+                                if len(vals) >= 6:
+                                    json_str = str(vals[5])
+                                    
+                            # Se não for uma lista JSON válida, é um projeto antigo sem memória
+                            if not json_str.startswith('['):
+                                st.warning("⚠️ Este levantamento é antigo e possui apenas o valor financeiro salvo (a memória dos equipamentos não foi registrada na época).")
+                                if st.button("Voltar", key="btn_voltar_antigo"):
+                                    st.session_state.projeto_para_abrir = None
+                                    st.rerun()
+                            else:
+                                st.warning(f"⚠️ Deseja abrir o levantamento **{row_abrir.get('Nome do Projeto', '')}**? Os dados atuais que estão na tela serão substituídos por este histórico.")
+                                c_sim, c_nao = st.columns(2)
+                                if c_sim.button("✔️ Sim, carregar dados", use_container_width=True):
+                                    st.session_state.paineis_auto = json.loads(json_str)
+                                    st.session_state.nome_projeto_orcamento = row_abrir.get('Nome do Projeto', '')
+                                    st.session_state.projeto_para_abrir = None
+                                    st.rerun()
+                                    
+                                if c_nao.button("❌ Não, cancelar", use_container_width=True):
+                                    st.session_state.projeto_para_abrir = None
+                                    st.rerun()
                                 
                     else:
                         st.write("Nenhum levantamento salvo ainda.")
@@ -996,3 +1008,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
 
         else:
             st.info("Adicione painéis na aba 'Dimensionamento Automático' ou itens de Infraestrutura para visualizar o orçamento final.")
+
+        # Limpa o orçamento infra/manual a cada ciclo
+        st.session_state.orcamento = []
