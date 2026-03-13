@@ -376,30 +376,30 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     # ==========================================
     banco_padrao_precos = {
         # Controle
-        "Transmissor de pressão Dif. Para ar (Vazão de ar)": 1490.00,
-        "Transmissor de temperatura (Controle)": 800.00,
-        "Transmissor de temperatura e umidade (Controle)": 2050.00,
-        "Resistência aquecimento (Equipamento)": 0.0,
-        "Resistência de aquecimento (Duto)": 0.0,
-        "Válvula de água gelada": 2650.00,
-        "Válvula de água quente": 3210.00,
-        "Válvula de vapor": 0.0,
+        "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1490.00,
+        "Transmissor de temperatura (TT) (Controle)": 800.00,
+        "Transmissor de temperatura e umidade (TT/MT ou TMT) (Controle)": 2050.00,
+        "Resistência aquecimento (RAQ) (Equipamento)": 0.0,
+        "Resistência de aquecimento (RAQ) (Duto)": 0.0,
+        "Válvula de água gelada (TCV)": 2650.00,
+        "Válvula de água quente (TCV)": 3210.00,
+        "Válvula de vapor (TCV)": 0.0,
         
         # Monitoramento (Equipamento)
-        "Transmissor pressão para filtro G4": 1490.00,
-        "Transmissor pressão Filtro F9": 1490.00,
-        "Transmissor pressão filtro H13": 1490.00,
-        "Pressostato para filtro G4": 349.00,
-        "Pressostato Filtro F9": 349.00,
-        "Pressostato filtro H13": 349.00,
+        "Transmissor pressão para filtro G4 (PDIT)": 1490.00,
+        "Transmissor pressão Filtro F9 (PDIT)": 1490.00,
+        "Transmissor pressão filtro H13 (PDIT)": 1490.00,
+        "Pressostato para filtro G4 (PSH)": 349.00,
+        "Pressostato Filtro F9 (PSH)": 349.00,
+        "Pressostato filtro H13 (PSH)": 349.00,
         
         # Monitoramento (Ambiente)
-        "Transmissor de pressão diferencial (Pressão entre salas)": 1490.00,
-        "Transmissor de pressão diferencial com display (Pressão entre salas)": 2110.00,
-        "Transmissor de temperatura (Ambiente)": 2050.00,
-        "Transmissor de temperatura com display (Ambiente)": 2650.00,
-        "Transmissor de temperatura e umidade (Ambiente)": 2050.00,
-        "Transmissor de temperatura e umidade com display (Ambiente)": 2650.00,
+        "Transmissor de pressão diferencial (Pressão entre salas) (PDT)": 1490.00,
+        "Transmissor de pressão diferencial com display (Pressão entre salas) (PDIT)": 2110.00,
+        "Transmissor de temperatura (TT) (Ambiente)": 2050.00,
+        "Transmissor de temperatura com display (TIT) (Ambiente)": 2650.00,
+        "Transmissor de temperatura e umidade (TT/MT ou TMT) (Ambiente)": 2050.00,
+        "Transmissor de temperatura e umidade com display (TT/MT ou TMT) (Ambiente)": 2650.00,
         
         # Sistemas e Painéis
         "MP-C-15A": 4649.49,
@@ -410,7 +410,8 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "Custo DI/DO": 120.00
     }
 
-    if 'precos_banco' not in st.session_state or "Transmissor de pressão Dif. Para ar (Vazão de ar)" not in st.session_state.precos_banco:
+    # Reseta o banco se estiver com a nomenclatura antiga para não quebrar a tela
+    if 'precos_banco' not in st.session_state or "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)" not in st.session_state.precos_banco:
         st.session_state.precos_banco = banco_padrao_precos
 
     if 'orcamento' not in st.session_state: st.session_state.orcamento = []
@@ -418,6 +419,11 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     # Validação de Estrutura Antiga (Reset se necessário)
     if 'paineis_auto' not in st.session_state or (len(st.session_state.paineis_auto) > 0 and 'grupos_equipamentos' not in st.session_state.paineis_auto[0]):
         st.session_state.paineis_auto = []
+    
+    # Validação extra se os instrumentos dentro dos painéis ainda estão com nome velho
+    if len(st.session_state.paineis_auto) > 0:
+        if "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)" not in st.session_state.paineis_auto[0]['grupos_equipamentos'][0]['instrumentos']:
+             st.session_state.paineis_auto = []
         
     if 'historico_precos' not in st.session_state: st.session_state.historico_precos = []
 
@@ -426,54 +432,59 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     # ==========================================
     GRUPOS_INSTRUMENTOS = {
         "🔹 Equipamento (Controle)": [
-            "Transmissor de pressão Dif. Para ar (Vazão de ar)",
-            "Transmissor de temperatura (Controle)",
-            "Transmissor de temperatura e umidade (Controle)",
-            "Resistência aquecimento (Equipamento)",
-            "Resistência de aquecimento (Duto)",
-            "Válvula de água gelada",
-            "Válvula de água quente",
-            "Válvula de vapor"
+            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)",
+            "Transmissor de temperatura (TT) (Controle)",
+            "Transmissor de temperatura e umidade (TT/MT ou TMT) (Controle)",
+            "Resistência aquecimento (RAQ) (Equipamento)",
+            "Resistência de aquecimento (RAQ) (Duto)",
+            "Válvula de água gelada (TCV)",
+            "Válvula de água quente (TCV)",
+            "Válvula de vapor (TCV)"
         ],
         "🔸 Monitoramento (Equipamento)": [
-            "Transmissor pressão para filtro G4",
-            "Transmissor pressão Filtro F9",
-            "Transmissor pressão filtro H13",
-            "Pressostato para filtro G4",
-            "Pressostato Filtro F9",
-            "Pressostato filtro H13"
+            "Transmissor pressão para filtro G4 (PDIT)",
+            "Transmissor pressão Filtro F9 (PDIT)",
+            "Transmissor pressão filtro H13 (PDIT)",
+            "Pressostato para filtro G4 (PSH)",
+            "Pressostato Filtro F9 (PSH)",
+            "Pressostato filtro H13 (PSH)"
         ],
         "🟢 Monitoramento (Ambiente)": [
-            "Transmissor de pressão diferencial (Pressão entre salas)",
-            "Transmissor de pressão diferencial com display (Pressão entre salas)",
-            "Transmissor de temperatura (Ambiente)",
-            "Transmissor de temperatura com display (Ambiente)",
-            "Transmissor de temperatura e umidade (Ambiente)",
-            "Transmissor de temperatura e umidade com display (Ambiente)"
+            "Transmissor de pressão diferencial (Pressão entre salas) (PDT)",
+            "Transmissor de pressão diferencial com display (Pressão entre salas) (PDIT)",
+            "Transmissor de temperatura (TT) (Ambiente)",
+            "Transmissor de temperatura com display (TIT) (Ambiente)",
+            "Transmissor de temperatura e umidade (TT/MT ou TMT) (Ambiente)",
+            "Transmissor de temperatura e umidade com display (TT/MT ou TMT) (Ambiente)"
         ]
     }
 
     REGRA_IO = {
-        "Transmissor de pressão Dif. Para ar (Vazão de ar)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
-        "Transmissor de temperatura (Controle)": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
-        "Transmissor de temperatura e umidade (Controle)": {"AI": 2, "AO": 2, "DI": 0, "DO": 0},
-        "Resistência aquecimento (Equipamento)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
-        "Resistência de aquecimento (Duto)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
-        "Válvula de água gelada": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula de água quente": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula de vapor": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Transmissor pressão para filtro G4": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor pressão Filtro F9": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor pressão filtro H13": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Pressostato para filtro G4": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "Pressostato Filtro F9": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "Pressostato filtro H13": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "Transmissor de pressão diferencial (Pressão entre salas)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de pressão diferencial com display (Pressão entre salas)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura (Ambiente)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura com display (Ambiente)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura e umidade (Ambiente)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura e umidade com display (Ambiente)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
+        # Controle
+        "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
+        "Transmissor de temperatura (TT) (Controle)": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
+        "Transmissor de temperatura e umidade (TT/MT ou TMT) (Controle)": {"AI": 2, "AO": 2, "DI": 0, "DO": 0},
+        "Resistência aquecimento (RAQ) (Equipamento)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
+        "Resistência de aquecimento (RAQ) (Duto)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
+        "Válvula de água gelada (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula de água quente (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula de vapor (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+
+        # Monitoramento (Equipamento)
+        "Transmissor pressão para filtro G4 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor pressão Filtro F9 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor pressão filtro H13 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Pressostato para filtro G4 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Pressostato Filtro F9 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Pressostato filtro H13 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+
+        # Monitoramento (Ambiente)
+        "Transmissor de pressão diferencial (Pressão entre salas) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial com display (Pressão entre salas) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura (TT) (Ambiente)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura com display (TIT) (Ambiente)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura e umidade (TT/MT ou TMT) (Ambiente)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura e umidade com display (TT/MT ou TMT) (Ambiente)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
     }
     
     PRECOS_IHM = {
