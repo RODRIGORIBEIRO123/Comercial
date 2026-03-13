@@ -34,7 +34,8 @@ def conectar_google_sheets():
 # Configuração da Inteligência Artificial (Google Gemini)
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model_ia = genai.GenerativeModel('gemini-1.5-pro')
+    # CORREÇÃO AQUI: Atualizado para o modelo flash, mais rápido e disponível na chave gratuita
+    model_ia = genai.GenerativeModel('gemini-1.5-flash')
     ia_disponivel = True
 except Exception as e:
     ia_disponivel = False
@@ -552,12 +553,8 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                             if img_upload and st.button("🔍 Extrair Quantidades", type="primary", key=f"btn_ia_{p_idx}_{g_idx}"):
                                 with st.spinner("A IA está analisando a engenharia do diagrama... (Isso pode levar alguns segundos)"):
                                     try:
-                                        # Prepara o arquivo dependendo do formato (PDF vs Imagem)
                                         if img_upload.name.lower().endswith('.pdf'):
-                                            arquivo_ia = {
-                                                "mime_type": "application/pdf",
-                                                "data": img_upload.getvalue()
-                                            }
+                                            arquivo_ia = {"mime_type": "application/pdf", "data": img_upload.getvalue()}
                                         else:
                                             arquivo_ia = Image.open(img_upload)
 
