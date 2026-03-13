@@ -11,6 +11,25 @@ import os
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide", page_icon="📄")
 
+# ==========================================
+# 🟢 CONEXÃO COM O GOOGLE SHEETS (NOVO MÉTODO)
+# ==========================================
+# APAGUE O TEXTO ABAIXO E COLE O LINK REAL DA SUA PLANILHA DENTRO DAS ASPAS:
+PLANILHA_URL = "https://docs.google.com/spreadsheets/d/1DgBxNqwUepO2RW6GdRwnFHxg7dLlWiRGZjdglkQ8Ls0/edit?gid=1169331401#gid=1169331401"
+
+@st.cache_resource
+def conectar_google_sheets():
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds_dict = st.secrets["gcp_service_account"]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        # Agora o robô é forçado a abrir o link exato da sua planilha
+        return client.open_by_url(PLANILHA_URL)
+    except Exception as e:
+        st.error(f"Erro na conexão com Google Sheets: {e}. Verifique se o link da planilha está correto e se ela foi compartilhada com o e-mail do robô.")
+        st.stop()
+
 # Define o fuso horário de Brasília (UTC-3)
 fuso_br = timezone(timedelta(hours=-3))
 
@@ -37,20 +56,6 @@ if menu_selecionado == "📄 Gerador de Propostas":
     )
 
     st.title("📄 Gerador de Propostas - SIARCON")
-
-    PLANILHA_NOME = "DB_Propostas_Siarcon" 
-
-    @st.cache_resource
-    def conectar_google_sheets():
-        try:
-            scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-            creds_dict = st.secrets["gcp_service_account"]
-            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-            client = gspread.authorize(creds)
-            return client.open(PLANILHA_NOME)
-        except Exception as e:
-            st.error(f"Erro na conexão com Google Sheets: {e}")
-            st.stop()
 
     def carregar_dados_propostas():
         sh = conectar_google_sheets()
@@ -392,16 +397,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                               placeholder="Ex: Reforma UTA Siemens - Prédio 2")
     st.session_state.nome_projeto_orcamento = nome_proj
     st.markdown("---")
-
-    PLANILHA_NOME = "DB_Propostas_Siarcon" 
-
-    @st.cache_resource
-    def conectar_google_sheets():
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds_dict = st.secrets["gcp_service_account"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        client = gspread.authorize(creds)
-        return client.open(PLANILHA_NOME)
 
     # ==========================================
     # 1. BASE DE DADOS E CARREGAMENTO ONLINE
