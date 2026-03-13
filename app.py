@@ -370,12 +370,25 @@ if menu_selecionado == "📄 Gerador de Propostas":
 elif menu_selecionado == "💰 Estimativa de Custos":
     
     st.title("💰 Engenharia e Custos - Automação e Infra")
+    
+    # NOVO CAMPO PARA O NOME DO PROJETO / HISTÓRICO
+    nome_projeto_orcamento = st.text_input("🏷️ Nome do Projeto / Cliente (Para salvar no Histórico):", placeholder="Ex: Reforma UTA Siemens - Prédio 2")
+    st.markdown("---")
+
+    PLANILHA_NOME = "DB_Propostas_Siarcon" 
+
+    @st.cache_resource
+    def conectar_google_sheets():
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds_dict = st.secrets["gcp_service_account"]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        return client.open(PLANILHA_NOME)
 
     # ==========================================
-    # 1. INICIALIZAÇÃO E BASE DE DADOS
+    # 1. INICIALIZAÇÃO E BASE DE DADOS (COM INTEGRAÇÃO GSHEETS)
     # ==========================================
     banco_padrao_precos = {
-        # Controle
         "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1490.00,
         "Transmissor de temperatura (TT) (Controle)": 800.00,
         "Transmissor de temperatura e umidade (TT/MT ou TMT) (Controle)": 2050.00,
@@ -384,24 +397,18 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "Válvula de água gelada (TCV)": 2650.00,
         "Válvula de água quente (TCV)": 3210.00,
         "Válvula de vapor (TCV)": 0.0,
-        
-        # Monitoramento (Equipamento)
         "Transmissor pressão para filtro G4 (PDIT)": 1490.00,
         "Transmissor pressão Filtro F9 (PDIT)": 1490.00,
         "Transmissor pressão filtro H13 (PDIT)": 1490.00,
         "Pressostato para filtro G4 (PSH)": 349.00,
         "Pressostato Filtro F9 (PSH)": 349.00,
         "Pressostato filtro H13 (PSH)": 349.00,
-        
-        # Monitoramento (Ambiente)
         "Transmissor de pressão diferencial (Pressão entre salas) (PDT)": 1490.00,
         "Transmissor de pressão diferencial com display (Pressão entre salas) (PDIT)": 2110.00,
         "Transmissor de temperatura (TT) (Ambiente)": 2050.00,
         "Transmissor de temperatura com display (TIT) (Ambiente)": 2650.00,
         "Transmissor de temperatura e umidade (TT/MT ou TMT) (Ambiente)": 2050.00,
         "Transmissor de temperatura e umidade com display (TT/MT ou TMT) (Ambiente)": 2650.00,
-        
-        # Sistemas e Painéis
         "MP-C-15A": 4649.49,
         "MP-C-18A": 5185.54,
         "MP-C-24A": 7290.75,
@@ -410,22 +417,42 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "Custo DI/DO": 120.00
     }
 
-    # Reseta o banco se estiver com a nomenclatura antiga para não quebrar a tela
-    if 'precos_banco' not in st.session_state or "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)" not in st.session_state.precos_banco:
-        st.session_state.precos_banco = banco_padrao_precos
+    # Carrega os preços do banco de dados online na inicialização
+    if 'banco_precos_carregado' not in st.session_state:
+        st.session_state.precos_banco = banco_padrao_precos.copy()
+        st.session_state.historico_precos = []
+        
+        try:
+            sh = conectar_google_sheets()
+            # Puxa os preços
+            try:
+                df_p = pd.DataFrame(sh.worksheet("Precos").get_all_records())
+                if not df_p.empty:
+                    precos_bd = dict(zip(df_p['Item'], df_p['Valor']))
+                    st.session_state.precos_banco.update(precos_bd)
+            except: pass
+            
+            # Puxa o histórico
+            try:
+                df_h = pd.DataFrame(sh.worksheet("Historico_Precos").get_all_records())
+                if not df_h.empty:
+                    st.session_state.historico_precos = df_h.to_dict('records')
+            except: pass
+            
+        except Exception as e:
+            st.toast("Aviso: Iniciando com os preços padrão (Google Sheets não sincronizou)", icon="⚠️")
+            
+        st.session_state.banco_precos_carregado = True
 
-    if 'orcamento' not in st.session_state: st.session_state.orcamento = []
-    
-    # Validação de Estrutura Antiga (Reset se necessário)
+    # Validação de Estrutura Antiga na memória (Reset se necessário)
     if 'paineis_auto' not in st.session_state or (len(st.session_state.paineis_auto) > 0 and 'grupos_equipamentos' not in st.session_state.paineis_auto[0]):
         st.session_state.paineis_auto = []
     
-    # Validação extra se os instrumentos dentro dos painéis ainda estão com nome velho
     if len(st.session_state.paineis_auto) > 0:
         if "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)" not in st.session_state.paineis_auto[0]['grupos_equipamentos'][0]['instrumentos']:
              st.session_state.paineis_auto = []
-        
-    if 'historico_precos' not in st.session_state: st.session_state.historico_precos = []
+
+    if 'orcamento' not in st.session_state: st.session_state.orcamento = []
 
     # ==========================================
     # 2. DICIONÁRIO DE REGRAS DE ENGENHARIA
@@ -627,39 +654,63 @@ elif menu_selecionado == "💰 Estimativa de Custos":
 
     with aba_precos:
         st.header("Gestão da Base de Preços")
-        st.markdown("Atualize os valores nesta tabela. O sistema usará esses preços para todos os cálculos de orçamentos e salvará o histórico.")
+        st.markdown("Atualize os valores nesta tabela. O sistema usará esses preços para todos os cálculos de orçamentos e salvará o histórico diretamente no **Google Sheets**.")
         
         df_precos = pd.DataFrame(list(st.session_state.precos_banco.items()), columns=["Item / Equipamento", "Valor Atual (R$)"])
         edited_df = st.data_editor(df_precos, use_container_width=True, hide_index=True)
         
-        if st.button("💾 Salvar Novos Preços", type="primary"):
+        if st.button("💾 Salvar Novos Preços no Banco de Dados", type="primary"):
             alterou_algo = False
+            novos_historicos = []
+            
             for idx, row in edited_df.iterrows():
                 item = row['Item / Equipamento']
                 novo_valor = row['Valor Atual (R$)']
                 antigo_valor = st.session_state.precos_banco.get(item, 0.0)
                 
                 if novo_valor != antigo_valor:
-                    st.session_state.historico_precos.append({
+                    novo_hist = {
                         "Data/Hora": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                         "Item Alterado": item,
                         "Valor Antigo": f"R$ {antigo_valor:.2f}",
                         "Novo Valor": f"R$ {novo_valor:.2f}"
-                    })
+                    }
+                    st.session_state.historico_precos.append(novo_hist)
+                    novos_historicos.append(novo_hist)
                     st.session_state.precos_banco[item] = novo_valor
                     alterou_algo = True
             
             if alterou_algo:
-                st.success("✅ Preços atualizados e gravados no histórico!")
+                # Rotina para Salvar no Banco de Dados Real (Google Sheets)
+                try:
+                    sh = conectar_google_sheets()
+                    
+                    # 1. Atualiza a aba Precos
+                    ws_precos = sh.worksheet("Precos")
+                    ws_precos.clear()
+                    dados_precos_matriz = [["Item", "Valor"]] + [[k, v] for k, v in st.session_state.precos_banco.items()]
+                    ws_precos.append_rows(dados_precos_matriz)
+                    
+                    # 2. Atualiza a aba Historico_Precos
+                    ws_hist = sh.worksheet("Historico_Precos")
+                    linhas_h = []
+                    for h in novos_historicos:
+                        linhas_h.append([h["Data/Hora"], h["Item Alterado"], h["Valor Antigo"], h["Novo Valor"]])
+                    if linhas_h:
+                        ws_hist.append_rows(linhas_h)
+                        
+                    st.success("✅ Preços atualizados e gravados na nuvem com sucesso!")
+                except Exception as e:
+                    st.error(f"⚠️ Os preços foram atualizados nesta tela, mas não salvos na nuvem. Erro: {e}. Lembre-se de criar as abas 'Precos' e 'Historico_Precos' na sua planilha.")
             else:
                 st.info("Nenhuma alteração foi feita na tabela.")
 
         st.markdown("---")
-        st.subheader("Histórico de Atualizações nesta Sessão")
+        st.subheader("Histórico Geral de Atualizações de Preços")
         if st.session_state.historico_precos:
-            st.dataframe(pd.DataFrame(st.session_state.historico_precos).iloc[::-1], use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(st.session_state.historico_precos)[::-1], use_container_width=True, hide_index=True)
         else:
-            st.write("Sem registros de alterações ainda.")
+            st.write("Sem registros de alterações no banco.")
 
     with aba_planilhas:
         st.header("Leitura das Planilhas Antigas")
@@ -797,13 +848,11 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             for g in p['grupos_equipamentos']:
                 mult = g.get('multiplicador', 1)
                 
-                # Conta os Instrumentos de Campo deste Grupo
                 for inst, qtd in g['instrumentos'].items():
                     if qtd > 0:
                         qtd_final = qtd * mult
                         preco_item = st.session_state.precos_banco.get(inst, 0.0)
                         
-                        # Adiciona aos totais do painel para o cálculo final
                         total_ai_painel += qtd_final * REGRA_IO[inst]["AI"]
                         total_ao_painel += qtd_final * REGRA_IO[inst]["AO"]
                         total_di_painel += qtd_final * REGRA_IO[inst]["DI"]
@@ -816,7 +865,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                             "Custo_Total": qtd_final * preco_item
                         })
                         
-                        # Planilha de Pontos (Excel)
                         linhas_pontos.append({
                             "Painel": p['nome'],
                             "Grupo/Equipamento": g['nome_grupo'],
@@ -831,28 +879,23 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             tot_io_painel = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
 
             if tot_io_painel > 0:
-                # Custo de I/Os mapeados (Total consolidado do painel)
                 custo_ana = (total_ai_painel + total_ao_painel) * st.session_state.precos_banco["Custo AI/AO"]
                 custo_dig = (total_di_painel + total_do_painel) * st.session_state.precos_banco["Custo DI/DO"]
                 linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Analógicos (AI/AO)", "Qtd": (total_ai_painel + total_ao_painel), "Custo_Total": custo_ana})
                 linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Digitais (DI/DO)", "Qtd": (total_di_painel + total_do_painel), "Custo_Total": custo_dig})
                 
-                # Custo Controladores (Otimizados globalmente no painel)
                 c36, c24, c18, c15 = dimensionar_controladores(tot_io_painel)
                 if c36 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-36A", "Qtd": c36, "Custo_Total": c36 * st.session_state.precos_banco["MP-C-36A"]})
                 if c24 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Qtd": c24, "Custo_Total": c24 * st.session_state.precos_banco["MP-C-24A"]})
                 if c18 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-18A", "Qtd": c18, "Custo_Total": c18 * st.session_state.precos_banco["MP-C-18A"]})
                 if c15 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-15A", "Qtd": c15, "Custo_Total": c15 * st.session_state.precos_banco["MP-C-15A"]})
                 
-                # Custo Caixa do Painel (UMA ÚNICA CAIXA)
                 nome_caixa, preco_caixa = calcular_painel_fisico(c36 + c24 + c18 + c15)
                 linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": nome_caixa, "Qtd": 1, "Custo_Total": preco_caixa})
                 
-                # Custo IHM (UMA ÚNICA IHM)
                 if PRECOS_IHM[p['ihm']] > 0:
                     linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": p['ihm'], "Qtd": 1, "Custo_Total": PRECOS_IHM[p['ihm']]})
 
-        # 2. Processando Custos Manuais e Infraestrutura (Aba 2 e 3)
         for item in st.session_state.orcamento:
             linhas_resumo.append({"Categoria": item['Categoria'], "Item": item['Item'], "Qtd": item['Quantidade'], "Custo_Total": item['Custo_Total']})
 
@@ -865,7 +908,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             custo_servicos_logica = subtotal_materiais * 0.25  
             total_projeto = subtotal_materiais + custo_servicos_logica
             
-            # Adicionando as linhas de Lógica e Total no Excel 
             df_servicos = pd.DataFrame([{'Categoria': 'Serviços / Mão de Obra', 'Item': 'Serviços de Lógica (25%)', 'Qtd': 1, 'Custo_Total': custo_servicos_logica}])
             df_total = pd.DataFrame([{'Categoria': 'TOTAL GERAL', 'Item': 'Custo Total Estimado', 'Qtd': '-', 'Custo_Total': total_projeto}])
             df_exportacao = pd.concat([df_agrupado, df_servicos, df_total], ignore_index=True)
@@ -881,7 +923,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             # --- Gerar a Tabela de Pontos de I/O ---
             df_pontos = pd.DataFrame(linhas_pontos)
             if not df_pontos.empty:
-                # Adiciona uma linha de somatório geral na tabela de pontos
                 total_di = df_pontos['Entrada Digital (DI)'].sum()
                 total_do = df_pontos['Saída Digital (DO)'].sum()
                 total_ai = df_pontos['Entrada Analógica (AI)'].sum()
@@ -900,7 +941,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 }])
                 df_pontos = pd.concat([df_pontos, linha_total], ignore_index=True)
 
-            # --- Criação do Arquivo Excel Final com 2 Abas ---
+            # --- Criação do Arquivo Excel Final ---
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                 df_exportacao.to_excel(writer, index=False, sheet_name='Detalhamento Financeiro')
@@ -908,6 +949,43 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                     df_pontos.to_excel(writer, index=False, sheet_name='Matriz de Pontos (IO)')
             
             st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            
+            st.markdown("---")
+            
+            # --- NOVO BOTÃO DE SALVAR NO GOOGLE SHEETS ---
+            if st.button("☁️ Salvar Levantamento no Banco de Dados", type="secondary", use_container_width=True):
+                if not nome_projeto_orcamento:
+                    st.warning("⚠️ Atenção: Preencha o 'Nome do Projeto / Cliente' lá no topo da página antes de salvar.")
+                else:
+                    try:
+                        sh = conectar_google_sheets()
+                        ws_hist_orc = sh.worksheet("Historico_Orcamentos")
+                        agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                        
+                        nova_linha_banco = [
+                            agora,
+                            nome_projeto_orcamento,
+                            f"R$ {subtotal_materiais:.2f}".replace('.', ','),
+                            f"R$ {custo_servicos_logica:.2f}".replace('.', ','),
+                            f"R$ {total_projeto:.2f}".replace('.', ',')
+                        ]
+                        ws_hist_orc.append_row(nova_linha_banco)
+                        st.success(f"✅ Orçamento para '{nome_projeto_orcamento}' salvo com sucesso no Google Sheets!")
+                    except Exception as e:
+                        st.error(f"Erro ao salvar no banco. Verifique se você já criou a aba 'Historico_Orcamentos' no Google Sheets. Detalhe técnico: {e}")
+
+            # --- VISUALIZAR HISTÓRICO DENTRO DO APP ---
+            with st.expander("📂 Ver Histórico de Levantamentos Salvos no Banco"):
+                try:
+                    sh = conectar_google_sheets()
+                    df_hist_orc = pd.DataFrame(sh.worksheet("Historico_Orcamentos").get_all_records())
+                    if not df_hist_orc.empty:
+                        st.dataframe(df_hist_orc.iloc[::-1], use_container_width=True, hide_index=True)
+                    else:
+                        st.write("Nenhum levantamento salvo ainda.")
+                except:
+                    st.write("A aba 'Historico_Orcamentos' ainda não existe ou está vazia.")
+
         else:
             st.info("Adicione painéis na aba 'Dimensionamento Automático' ou itens de Infraestrutura para visualizar o orçamento final.")
 
