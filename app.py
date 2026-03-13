@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from docxtpl import DocxTemplate
 import io
+import json
 from datetime import date, datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -371,8 +372,14 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     
     st.title("💰 Engenharia e Custos - Automação e Infra")
     
-    # NOVO CAMPO PARA O NOME DO PROJETO / HISTÓRICO
-    nome_projeto_orcamento = st.text_input("🏷️ Nome do Projeto / Cliente (Para salvar no Histórico):", placeholder="Ex: Reforma UTA Siemens - Prédio 2")
+    # Variável persistente do Nome do Projeto para manter mesmo quando recarregar histórico
+    if 'nome_projeto_orcamento' not in st.session_state:
+        st.session_state.nome_projeto_orcamento = ""
+        
+    nome_proj = st.text_input("🏷️ Nome do Projeto / Cliente (Para salvar no Histórico):", 
+                              value=st.session_state.nome_projeto_orcamento,
+                              placeholder="Ex: Reforma UTA Siemens - Prédio 2")
+    st.session_state.nome_projeto_orcamento = nome_proj
     st.markdown("---")
 
     PLANILHA_NOME = "DB_Propostas_Siarcon" 
@@ -417,34 +424,27 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "Custo DI/DO": 120.00
     }
 
-    # Carrega os preços do banco de dados online na inicialização
     if 'banco_precos_carregado' not in st.session_state:
         st.session_state.precos_banco = banco_padrao_precos.copy()
         st.session_state.historico_precos = []
         
         try:
             sh = conectar_google_sheets()
-            # Puxa os preços
             try:
                 df_p = pd.DataFrame(sh.worksheet("Precos").get_all_records())
                 if not df_p.empty:
                     precos_bd = dict(zip(df_p['Item'], df_p['Valor']))
                     st.session_state.precos_banco.update(precos_bd)
             except: pass
-            
-            # Puxa o histórico
             try:
                 df_h = pd.DataFrame(sh.worksheet("Historico_Precos").get_all_records())
                 if not df_h.empty:
                     st.session_state.historico_precos = df_h.to_dict('records')
             except: pass
-            
         except Exception as e:
-            st.toast("Aviso: Iniciando com os preços padrão (Google Sheets não sincronizou)", icon="⚠️")
-            
+            pass
         st.session_state.banco_precos_carregado = True
 
-    # Validação de Estrutura Antiga na memória (Reset se necessário)
     if 'paineis_auto' not in st.session_state or (len(st.session_state.paineis_auto) > 0 and 'grupos_equipamentos' not in st.session_state.paineis_auto[0]):
         st.session_state.paineis_auto = []
     
@@ -487,7 +487,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     }
 
     REGRA_IO = {
-        # Controle
         "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
         "Transmissor de temperatura (TT) (Controle)": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
         "Transmissor de temperatura e umidade (TT/MT ou TMT) (Controle)": {"AI": 2, "AO": 2, "DI": 0, "DO": 0},
@@ -496,16 +495,12 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "Válvula de água gelada (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
         "Válvula de água quente (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
         "Válvula de vapor (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-
-        # Monitoramento (Equipamento)
         "Transmissor pressão para filtro G4 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor pressão Filtro F9 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor pressão filtro H13 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Pressostato para filtro G4 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
         "Pressostato Filtro F9 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
         "Pressostato filtro H13 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-
-        # Monitoramento (Ambiente)
         "Transmissor de pressão diferencial (Pressão entre salas) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de pressão diferencial com display (Pressão entre salas) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de temperatura (TT) (Ambiente)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
@@ -566,21 +561,17 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 ]
             })
 
-        # Iteração de cada PAINEL
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
             with st.expander(f"📦 {p_data['nome']}", expanded=True):
                 
-                # Configurações do Painel
                 c_nome_painel, c_ihm_painel = st.columns([2, 1])
                 p_data['nome'] = c_nome_painel.text_input("Identificação do Quadro Físico", value=p_data['nome'], key=f"n_p_{p_idx}")
                 p_data['ihm'] = c_ihm_painel.selectbox("IHM Geral do Quadro", list(PRECOS_IHM.keys()), index=list(PRECOS_IHM.keys()).index(p_data['ihm']), key=f"i_p_{p_idx}")
                 
                 st.markdown("---")
                 
-                # Variáveis de Somatório do Painel Inteiro
                 total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
 
-                # Iteração de cada GRUPO DENTRO DO PAINEL
                 for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
                     st.markdown(f"#### ⚙️ Grupo: {g_data['nome_grupo']}")
                     
@@ -590,10 +581,8 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                     
                     st.markdown("*(Selecione os instrumentos para APENAS 1 unidade deste grupo)*")
                     
-                    # Variáveis do Grupo Específico
                     total_ai_grupo = total_ao_grupo = total_di_grupo = total_do_grupo = 0
                     
-                    # Layout 3 colunas
                     for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
                         st.markdown(f"**{grupo_nome}**")
                         cols = st.columns(3)
@@ -606,23 +595,20 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                                 qtd = st.number_input(inst, min_value=0, step=1, value=g_data['instrumentos'][inst], key=f"inst_{p_idx}_{g_idx}_{inst}")
                                 g_data['instrumentos'][inst] = qtd
                                 
-                                # Soma I/O do grupo
                                 total_ai_grupo += qtd * REGRA_IO[inst]["AI"]
                                 total_ao_grupo += qtd * REGRA_IO[inst]["AO"]
                                 total_di_grupo += qtd * REGRA_IO[inst]["DI"]
                                 total_do_grupo += qtd * REGRA_IO[inst]["DO"]
-                        st.write("") # Espaçamento
+                        st.write("")
                     
-                    st.divider() # Linha divisória após o grupo
+                    st.divider() 
                     
-                    # Adiciona os totais do Grupo (multiplicados) ao somatório do Painel
                     mult = g_data['multiplicador']
                     total_ai_painel += total_ai_grupo * mult
                     total_ao_painel += total_ao_grupo * mult
                     total_di_painel += total_di_grupo * mult
                     total_do_painel += total_do_grupo * mult
                 
-                # Botão para adicionar mais equipamentos NO MESMO PAINEL
                 if st.button(f"➕ Adicionar Equipamento Diferente neste Quadro", key=f"add_grp_{p_idx}"):
                     p_data['grupos_equipamentos'].append({
                         "nome_grupo": f"Equipamento {len(p_data['grupos_equipamentos']) + 1}",
@@ -631,7 +617,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                     })
                     st.rerun()
 
-                # ---- FECHAMENTO E CÁLCULO GERAL DO PAINEL ----
                 total_io_pontos = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
                 c36, c24, c18, c15 = dimensionar_controladores(total_io_pontos)
                 total_controladores = c36 + c24 + c18 + c15
@@ -681,11 +666,8 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                     alterou_algo = True
             
             if alterou_algo:
-                # Rotina para Salvar no Banco de Dados Real com Auto-Criação de Abas
                 try:
                     sh = conectar_google_sheets()
-                    
-                    # 1. Atualiza ou Cria a aba Precos
                     try:
                         ws_precos = sh.worksheet("Precos")
                     except:
@@ -696,7 +678,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                     dados_precos_matriz = [["Item", "Valor"]] + [[k, v] for k, v in st.session_state.precos_banco.items()]
                     ws_precos.append_rows(dados_precos_matriz)
                     
-                    # 2. Atualiza ou Cria a aba Historico_Precos
                     try:
                         ws_hist = sh.worksheet("Historico_Precos")
                     except:
@@ -711,7 +692,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                         
                     st.success("✅ Preços atualizados e gravados na nuvem com sucesso!")
                 except Exception as e:
-                    st.error(f"⚠️ Os preços foram atualizados nesta tela, mas houve um erro crítico ao acessar o banco. Erro: {e}.")
+                    st.error(f"⚠️ Os preços foram atualizados nesta tela, mas houve um erro ao acessar o banco. Erro: {e}.")
             else:
                 st.info("Nenhuma alteração foi feita na tabela.")
 
@@ -783,15 +764,12 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 if 'ITEM' in cag_df.columns:
                     cag_df = cag_df.dropna(subset=['ITEM'])
                     cag_df = cag_df[cag_df['ITEM'].astype(str).str.strip() != 'NAN']
-                    
                 if 'ITEM' in ahu_df.columns:
                     ahu_df = ahu_df.dropna(subset=['ITEM'])
                     ahu_df = ahu_df[ahu_df['ITEM'].astype(str).str.strip() != 'NAN']
-                    
                 if 'INSTRUMENTAÇÃO' in infra_df.columns:
                     infra_df = infra_df.dropna(subset=['INSTRUMENTAÇÃO'])
                     infra_df = infra_df[infra_df['INSTRUMENTAÇÃO'].astype(str).str.strip() != 'NAN']
-                
                 return cag_df, ahu_df, infra_df
             except Exception:
                 return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
@@ -850,9 +828,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         linhas_resumo = []
         linhas_pontos = []
 
-        # 1. Processando Custos do Motor Automático (Hierarquia: Painel > Grupos)
         for p in st.session_state.paineis_auto:
-            
             total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
             
             for g in p['grupos_equipamentos']:
@@ -868,22 +844,12 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                         total_di_painel += qtd_final * REGRA_IO[inst]["DI"]
                         total_do_painel += qtd_final * REGRA_IO[inst]["DO"]
                         
-                        linhas_resumo.append({
-                            "Categoria": f"{p['nome']} - Campo", 
-                            "Item": f"{inst} ({g['nome_grupo']})", 
-                            "Qtd": qtd_final, 
-                            "Custo_Total": qtd_final * preco_item
-                        })
+                        linhas_resumo.append({"Categoria": f"{p['nome']} - Campo", "Item": f"{inst} ({g['nome_grupo']})", "Qtd": qtd_final, "Custo_Total": qtd_final * preco_item})
                         
                         linhas_pontos.append({
-                            "Painel": p['nome'],
-                            "Grupo/Equipamento": g['nome_grupo'],
-                            "Instrumento": inst,
-                            "Quantidade Total": qtd_final,
-                            "Entrada Digital (DI)": qtd_final * REGRA_IO[inst]["DI"],
-                            "Saída Digital (DO)": qtd_final * REGRA_IO[inst]["DO"],
-                            "Entrada Analógica (AI)": qtd_final * REGRA_IO[inst]["AI"],
-                            "Saída Analógica (AO)": qtd_final * REGRA_IO[inst]["AO"]
+                            "Painel": p['nome'], "Grupo/Equipamento": g['nome_grupo'], "Instrumento": inst, "Quantidade Total": qtd_final,
+                            "Entrada Digital (DI)": qtd_final * REGRA_IO[inst]["DI"], "Saída Digital (DO)": qtd_final * REGRA_IO[inst]["DO"],
+                            "Entrada Analógica (AI)": qtd_final * REGRA_IO[inst]["AI"], "Saída Analógica (AO)": qtd_final * REGRA_IO[inst]["AO"]
                         })
 
             tot_io_painel = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
@@ -909,7 +875,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         for item in st.session_state.orcamento:
             linhas_resumo.append({"Categoria": item['Categoria'], "Item": item['Item'], "Qtd": item['Quantidade'], "Custo_Total": item['Custo_Total']})
 
-        # Renderizando a Tabela Final e Gerando Arquivo Excel
         if len(linhas_resumo) > 0:
             df_final = pd.DataFrame(linhas_resumo)
             df_agrupado = df_final.groupby(['Categoria', 'Item'], as_index=False).agg({'Qtd': 'sum', 'Custo_Total': 'sum'})
@@ -930,7 +895,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             c2.warning(f"**Serviços de Lógica (25%):**\nR$ {custo_servicos_logica:,.2f}")
             c3.success(f"**CUSTO TOTAL ESTIMADO:**\nR$ {total_projeto:,.2f}")
             
-            # --- Gerar a Tabela de Pontos de I/O ---
             df_pontos = pd.DataFrame(linhas_pontos)
             if not df_pontos.empty:
                 total_di = df_pontos['Entrada Digital (DI)'].sum()
@@ -939,19 +903,9 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 total_ao = df_pontos['Saída Analógica (AO)'].sum()
                 total_qtd = df_pontos['Quantidade Total'].sum()
                 
-                linha_total = pd.DataFrame([{
-                    "Painel": "TOTAL GERAL",
-                    "Grupo/Equipamento": "-",
-                    "Instrumento": "-",
-                    "Quantidade Total": total_qtd,
-                    "Entrada Digital (DI)": total_di,
-                    "Saída Digital (DO)": total_do,
-                    "Entrada Analógica (AI)": total_ai,
-                    "Saída Analógica (AO)": total_ao
-                }])
+                linha_total = pd.DataFrame([{"Painel": "TOTAL GERAL", "Grupo/Equipamento": "-", "Instrumento": "-", "Quantidade Total": total_qtd, "Entrada Digital (DI)": total_di, "Saída Digital (DO)": total_do, "Entrada Analógica (AI)": total_ai, "Saída Analógica (AO)": total_ao}])
                 df_pontos = pd.concat([df_pontos, linha_total], ignore_index=True)
 
-            # --- Criação do Arquivo Excel Final ---
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                 df_exportacao.to_excel(writer, index=False, sheet_name='Detalhamento Financeiro')
@@ -962,41 +916,79 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             
             st.markdown("---")
             
-            # --- NOVO BOTÃO DE SALVAR COM AUTO-CRIAÇÃO DE ABA ---
             if st.button("☁️ Salvar Levantamento no Banco de Dados", type="secondary", use_container_width=True):
-                if not nome_projeto_orcamento:
+                if not st.session_state.nome_projeto_orcamento:
                     st.warning("⚠️ Atenção: Preencha o 'Nome do Projeto / Cliente' lá no topo da página antes de salvar.")
                 else:
                     try:
                         sh = conectar_google_sheets()
-                        
-                        # Tenta achar a aba, se não achar, cria na hora
-                        try:
-                            ws_hist_orc = sh.worksheet("Historico_Orcamentos")
+                        try: ws_hist_orc = sh.worksheet("Historico_Orcamentos")
                         except:
-                            ws_hist_orc = sh.add_worksheet(title="Historico_Orcamentos", rows="1000", cols="5")
-                            ws_hist_orc.append_row(["Data/Hora", "Nome do Projeto", "Subtotal Hardware", "Serviços de Lógica", "Custo Total Estimado"])
+                            ws_hist_orc = sh.add_worksheet(title="Historico_Orcamentos", rows="1000", cols="6")
+                            ws_hist_orc.append_row(["Data/Hora", "Nome do Projeto", "Subtotal Hardware", "Serviços de Lógica", "Custo Total Estimado", "Configuracao_JSON"])
                         
                         agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                        
+                        # Transforma toda a configuração em Texto JSON Oculto
+                        json_config = json.dumps(st.session_state.paineis_auto)
+                        
                         nova_linha_banco = [
                             agora,
-                            nome_projeto_orcamento,
+                            st.session_state.nome_projeto_orcamento,
                             f"R$ {subtotal_materiais:.2f}".replace('.', ','),
                             f"R$ {custo_servicos_logica:.2f}".replace('.', ','),
-                            f"R$ {total_projeto:.2f}".replace('.', ',')
+                            f"R$ {total_projeto:.2f}".replace('.', ','),
+                            json_config
                         ]
                         ws_hist_orc.append_row(nova_linha_banco)
-                        st.success(f"✅ Orçamento para '{nome_projeto_orcamento}' salvo com sucesso no Google Sheets!")
+                        st.success(f"✅ Orçamento para '{st.session_state.nome_projeto_orcamento}' salvo com sucesso no Google Sheets!")
                     except Exception as e:
                         st.error(f"Erro ao salvar no banco. Detalhe técnico: {e}")
 
-            # --- VISUALIZAR HISTÓRICO DENTRO DO APP ---
             with st.expander("📂 Ver Histórico de Levantamentos Salvos no Banco"):
                 try:
                     sh = conectar_google_sheets()
                     df_hist_orc = pd.DataFrame(sh.worksheet("Historico_Orcamentos").get_all_records())
+                    
                     if not df_hist_orc.empty:
-                        st.dataframe(df_hist_orc.iloc[::-1], use_container_width=True, hide_index=True)
+                        st.markdown("### Histórico de Projetos")
+                        
+                        # Cria uma lista interativa com botões de Abrir
+                        for idx, row in df_hist_orc[::-1].iterrows():
+                            with st.container():
+                                c1, c2, c3, c4 = st.columns([2, 3, 2, 1])
+                                c1.write(f"📅 {row.get('Data/Hora', '')}")
+                                c2.write(f"**{row.get('Nome do Projeto', '')}**")
+                                c3.write(row.get('Custo Total Estimado', ''))
+                                
+                                # Verifica se esse histórico tem o código JSON salvo na coluna
+                                tem_json = 'Configuracao_JSON' in row and str(row['Configuracao_JSON']).startswith('[')
+                                
+                                if tem_json:
+                                    if c4.button("📂 Abrir", key=f"btn_abrir_{idx}"):
+                                        st.session_state.projeto_para_abrir = idx
+                                else:
+                                    c4.write("*(Antigo)*")
+                                st.markdown("---")
+                                
+                        # CAIXA DE PERGUNTA PARA CONFIRMAR O CARREGAMENTO
+                        if st.session_state.get('projeto_para_abrir') is not None:
+                            idx_abrir = st.session_state.projeto_para_abrir
+                            row_abrir = df_hist_orc.loc[idx_abrir]
+                            st.warning(f"⚠️ Deseja abrir o levantamento **{row_abrir.get('Nome do Projeto', '')}**? Os dados atuais que estão na tela serão substituídos por este histórico.")
+                            
+                            c_sim, c_nao = st.columns(2)
+                            if c_sim.button("✔️ Sim, carregar dados", use_container_width=True):
+                                json_str = row_abrir.get('Configuracao_JSON', '[]')
+                                st.session_state.paineis_auto = json.loads(json_str)
+                                st.session_state.nome_projeto_orcamento = row_abrir.get('Nome do Projeto', '')
+                                st.session_state.projeto_para_abrir = None
+                                st.rerun()
+                                
+                            if c_nao.button("❌ Não, cancelar", use_container_width=True):
+                                st.session_state.projeto_para_abrir = None
+                                st.rerun()
+                                
                     else:
                         st.write("Nenhum levantamento salvo ainda.")
                 except:
@@ -1004,6 +996,3 @@ elif menu_selecionado == "💰 Estimativa de Custos":
 
         else:
             st.info("Adicione painéis na aba 'Dimensionamento Automático' ou itens de Infraestrutura para visualizar o orçamento final.")
-
-        # Limpa o orçamento infra/manual a cada ciclo
-        st.session_state.orcamento = []
