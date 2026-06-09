@@ -479,6 +479,28 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "Transmissor de temperatura e umidade com display (TT/MT ou TMT) (Ambiente)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
     }
     
+    # ---------------------------------------------------------
+    # 🆕 NOVO: DICIONÁRIO DE KITS/EQUIPAMENTOS PADRÃO
+    # ---------------------------------------------------------
+    KITS_PADRAO = {
+        "CTA Padrão (Água Gelada)": {
+            "Transmissor de temperatura (TT) (Controle)": 1,
+            "Transmissor de temperatura (TT) (Ambiente)": 1,
+            "Válvula de água gelada (TCV)": 1,
+            "Pressostato para filtro G4 (PSH)": 1,
+            "Pressostato Filtro F9 (PSH)": 1,
+            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1
+        },
+        "Exaustão (Ventilador Simples)": {
+            "Pressostato para filtro G4 (PSH)": 1,
+            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1
+        },
+        "Sala Limpa (Monitoramento)": {
+            "Transmissor de pressão diferencial com display (Pressão entre salas) (PDIT)": 1,
+            "Transmissor de temperatura e umidade com display (TT/MT ou TMT) (Ambiente)": 1
+        }
+    }
+
     PRECOS_IHM = {"Sem IHM": 0.0, "IHM 4,3 polegadas": 1700.00, "IHM 7 polegadas": 3400.00, "IHM 10 polegadas": 8500.00}
 
     def calcular_painel_fisico(qtd_controladores):
@@ -621,13 +643,39 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                     total_di_painel += total_di_grupo * mult
                     total_do_painel += total_do_grupo * mult
                 
-                if st.button(f"➕ Adicionar Equipamento Diferente neste Quadro", key=f"add_grp_{p_idx}"):
-                    p_data['grupos_equipamentos'].append({
-                        "nome_grupo": f"Equipamento {len(p_data['grupos_equipamentos']) + 1}",
-                        "multiplicador": 1,
-                        "instrumentos": {k: 0 for k in REGRA_IO.keys()}
-                    })
-                    st.rerun()
+                # ---------------------------------------------------------
+                # 🆕 NOVO MÓDULO: ADIÇÃO DE KITS PADRÃO
+                # ---------------------------------------------------------
+                st.markdown("#### ➕ Adicionar Novo Equipamento a este Quadro")
+                col_add_blank, col_add_kit = st.columns(2)
+                
+                with col_add_blank:
+                    if st.button(f"📄 Adicionar Grupo em Branco", key=f"add_grp_blank_{p_idx}", use_container_width=True):
+                        p_data['grupos_equipamentos'].append({
+                            "nome_grupo": f"Equipamento {len(p_data['grupos_equipamentos']) + 1}",
+                            "multiplicador": 1,
+                            "instrumentos": {k: 0 for k in REGRA_IO.keys()}
+                        })
+                        st.rerun()
+                        
+                with col_add_kit:
+                    c_sel, c_btn = st.columns([2, 1])
+                    kit_selecionado = c_sel.selectbox("Selecione um Kit Padrão:", ["Selecione..."] + list(KITS_PADRAO.keys()), key=f"sel_kit_{p_idx}", label_visibility="collapsed")
+                    if c_btn.button("📦 Inserir Kit", key=f"add_grp_kit_{p_idx}", use_container_width=True):
+                        if kit_selecionado != "Selecione...":
+                            # Cria dicionário zerado
+                            novos_instrumentos = {k: 0 for k in REGRA_IO.keys()}
+                            # Preenche com os valores do Kit
+                            for item_nome, qtd_padrao in KITS_PADRAO[kit_selecionado].items():
+                                if item_nome in novos_instrumentos:
+                                    novos_instrumentos[item_nome] = qtd_padrao
+                                    
+                            p_data['grupos_equipamentos'].append({
+                                "nome_grupo": f"{kit_selecionado} {len(p_data['grupos_equipamentos']) + 1}",
+                                "multiplicador": 1,
+                                "instrumentos": novos_instrumentos
+                            })
+                            st.rerun()
 
                 total_io_pontos = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
                 c36, c24, c18, c15 = dimensionar_controladores(total_io_pontos)
