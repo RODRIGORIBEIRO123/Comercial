@@ -616,10 +616,17 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             with st.container(border=True):
                 
                 # CABEÇALHO DO QUADRO
+                # CABEÇALHO DO QUADRO
                 c_icone, c_nome_painel, c_ihm_painel = st.columns([0.5, 4, 2])
                 c_icone.markdown("## 🎛️")
                 p_data['nome'] = c_nome_painel.text_input("Nome deste Quadro", value=p_data['nome'], key=f"n_p_{p_idx}", label_visibility="collapsed")
-                p_data['ihm'] = c_ihm_painel.selectbox("Tela/Supervisório", list(PRECOS_IHM.keys()), index=list(PRECOS_IHM.keys()).index(p_data['ihm']), key=f"i_p_{p_idx}", label_visibility="collapsed")
+                
+                # --- Trava de segurança para nomes antigos na memória ---
+                opcoes_ihm = list(PRECOS_IHM.keys())
+                ihm_salva = p_data.get('ihm', opcoes_ihm[0])
+                idx_ihm = opcoes_ihm.index(ihm_salva) if ihm_salva in opcoes_ihm else 2 # Força o index 2 (IHM Padrão 7") se o nome antigo não existir mais
+                
+                p_data['ihm'] = c_ihm_painel.selectbox("Tela/Supervisório", opcoes_ihm, index=idx_ihm, key=f"i_p_{p_idx}", label_visibility="collapsed")
                 
                 st.divider()
                 
