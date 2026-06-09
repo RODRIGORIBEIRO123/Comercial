@@ -16,7 +16,6 @@ st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide",
 # ==========================================
 # 🟢 CONEXÃO COM O GOOGLE SHEETS E IA
 # ==========================================
-# APAGUE O TEXTO ABAIXO E COLE O LINK REAL DA SUA PLANILHA DENTRO DAS ASPAS:
 PLANILHA_URL = "https://docs.google.com/spreadsheets/d/1DgBxNqwUepO2RW6GdRwnFHxg7dLlWiRGZjdglkQ8Ls0/edit?gid=1169331401#gid=1169331401"
 
 @st.cache_resource
@@ -34,7 +33,6 @@ def conectar_google_sheets():
 # Configuração da Inteligência Artificial (Google Gemini)
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    # CORREÇÃO AQUI: Atualizado para o modelo flash, mais rápido e disponível na chave gratuita
     model_ia = genai.GenerativeModel('gemini-1.5-flash')
     ia_disponivel = True
 except Exception as e:
@@ -480,7 +478,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     }
     
     # ---------------------------------------------------------
-    # 🆕 NOVO: DICIONÁRIO DE KITS/EQUIPAMENTOS PADRÃO
+    # 🆕 MÓDULO DE KITS PADRÃO (PODE ME MANDAR OS SEUS PARA EU PREENCHER)
     # ---------------------------------------------------------
     KITS_PADRAO = {
         "CTA Padrão (Água Gelada)": {
@@ -540,7 +538,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 "ihm": "Sem IHM",
                 "grupos_equipamentos": [
                     {
-                        "nome_grupo": "Equipamento 1 (ex: UTA 01)",
+                        "nome_grupo": "Equipamento 1",
                         "multiplicador": 1,
                         "instrumentos": {k: 0 for k in REGRA_IO.keys()}
                     }
@@ -548,109 +546,23 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             })
 
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
-            with st.expander(f"📦 {p_data['nome']}", expanded=True):
+            with st.container(border=True): # Caixa visual para o Painel Físico
+                st.subheader(f"📦 {p_data['nome']}")
                 
                 c_nome_painel, c_ihm_painel = st.columns([2, 1])
-                p_data['nome'] = c_nome_painel.text_input("Identificação do Quadro Físico", value=p_data['nome'], key=f"n_p_{p_idx}")
-                p_data['ihm'] = c_ihm_painel.selectbox("IHM Geral do Quadro", list(PRECOS_IHM.keys()), index=list(PRECOS_IHM.keys()).index(p_data['ihm']), key=f"i_p_{p_idx}")
+                p_data['nome'] = c_nome_painel.text_input("Identificação do Quadro", value=p_data['nome'], key=f"n_p_{p_idx}")
+                p_data['ihm'] = c_ihm_painel.selectbox("IHM Geral", list(PRECOS_IHM.keys()), index=list(PRECOS_IHM.keys()).index(p_data['ihm']), key=f"i_p_{p_idx}")
                 
                 st.markdown("---")
-                total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
-
-                for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
-                    st.markdown(f"#### ⚙️ Grupo: {g_data['nome_grupo']}")
-                    
-                    cg_nome, cg_mult = st.columns([3, 1])
-                    g_data['nome_grupo'] = cg_nome.text_input("Nome do Equipamento/Ambiente", value=g_data['nome_grupo'], key=f"n_g_{p_idx}_{g_idx}")
-                    g_data['multiplicador'] = cg_mult.number_input("Qtd. de Equipamentos Iguais", min_value=1, value=g_data.get('multiplicador', 1), key=f"m_g_{p_idx}_{g_idx}")
-                    
-                    # ---------------------------------------------------------
-                    # 🤖 NOVO MÓDULO: LEITURA DE P&ID POR INTELIGÊNCIA ARTIFICIAL
-                    # ---------------------------------------------------------
-                    if ia_disponivel:
-                        with st.expander("🤖 Preenchimento Inteligente por IA (Upload de Fluxograma)", expanded=False):
-                            st.info("Envie a imagem ou o PDF do fluxograma P&ID. A IA do Google vai analisar as tags e contar as quantidades automaticamente para este grupo.")
-                            img_upload = st.file_uploader("Arquivo (PDF, PNG ou JPG)", type=["pdf", "png", "jpg", "jpeg"], key=f"file_ia_{p_idx}_{g_idx}")
-                            
-                            if img_upload and st.button("🔍 Extrair Quantidades", type="primary", key=f"btn_ia_{p_idx}_{g_idx}"):
-                                with st.spinner("A IA está analisando a engenharia do diagrama... (Isso pode levar alguns segundos)"):
-                                    try:
-                                        if img_upload.name.lower().endswith('.pdf'):
-                                            arquivo_ia = {"mime_type": "application/pdf", "data": img_upload.getvalue()}
-                                        else:
-                                            arquivo_ia = Image.open(img_upload)
-
-                                        lista_chaves = list(REGRA_IO.keys())
-                                        
-                                        prompt_ia = f"""
-                                        Você é um engenheiro de automação sênior e orçamentista experiente.
-                                        Analise cuidadosamente o diagrama P&ID (fluxograma de AVAC/HVAC) fornecido na imagem ou documento.
-                                        Sua tarefa é rastrear as linhas, identificar os círculos/balões de instrumentação e contar a quantidade total de válvulas de controle, sensores e pressostatos.
-
-                                        Você DEVE usar ESTRITAMENTE as chaves exatas abaixo para a sua resposta:
-                                        {json.dumps(lista_chaves, ensure_ascii=False)}
-
-                                        Regras de identificação baseadas nas tags do desenho:
-                                        - Se achar tag PDT ou PDIT em filtros = Transmissor de pressão
-                                        - Se achar tag PSH em filtros = Pressostato
-                                        - Se achar tag TT = Transmissor de temperatura
-                                        - Se achar tag TMT = Transmissor de temperatura e umidade
-                                        - Se achar tag TCV ou Válvula Proporcional = Válvula de controle (água/vapor)
-                                        - Se achar Resistência Elétrica = Resistência aquecimento (RAQ)
-
-                                        Devolva APENAS um objeto JSON válido. O nome da chave deve ser o nome exato da lista acima, e o valor deve ser um número inteiro indicando a quantidade encontrada na imagem. Não escreva NENHUM texto adicional fora do JSON (sem formatação markdown). Se não encontrar um item, defina como 0.
-                                        """
-                                        
-                                        resposta = model_ia.generate_content([prompt_ia, arquivo_ia])
-                                        texto_limpo = resposta.text.replace('```json', '').replace('```', '').strip()
-                                        dados_ia = json.loads(texto_limpo)
-                                        
-                                        itens_achados = 0
-                                        for k, v in dados_ia.items():
-                                            if k in g_data['instrumentos']:
-                                                g_data['instrumentos'][k] = int(v)
-                                                if int(v) > 0: itens_achados += int(v)
-                                                
-                                        st.success(f"✅ Análise concluída! A IA identificou {itens_achados} instrumento(s). Os valores foram preenchidos abaixo para sua revisão.")
-                                        st.rerun()
-                                    except Exception as e:
-                                        st.error(f"Erro na interpretação da IA: {e}")
-                    else:
-                        st.caption(f"*(⚠️ Integração IA desabilitada. {erro_ia})*")
-                    # ---------------------------------------------------------
-                    
-                    st.markdown("*(Selecione ou revise os instrumentos para APENAS 1 unidade deste grupo)*")
-                    total_ai_grupo = total_ao_grupo = total_di_grupo = total_do_grupo = 0
-                    
-                    for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
-                        st.markdown(f"**{grupo_nome}**")
-                        cols = st.columns(3)
-                        for i, inst in enumerate(lista_itens):
-                            if inst not in g_data['instrumentos']: g_data['instrumentos'][inst] = 0
-                            with cols[i % 3]:
-                                qtd = st.number_input(inst, min_value=0, step=1, value=g_data['instrumentos'][inst], key=f"inst_{p_idx}_{g_idx}_{inst}")
-                                g_data['instrumentos'][inst] = qtd
-                                total_ai_grupo += qtd * REGRA_IO[inst]["AI"]
-                                total_ao_grupo += qtd * REGRA_IO[inst]["AO"]
-                                total_di_grupo += qtd * REGRA_IO[inst]["DI"]
-                                total_do_grupo += qtd * REGRA_IO[inst]["DO"]
-                        st.write("")
-                    
-                    st.divider() 
-                    mult = g_data['multiplicador']
-                    total_ai_painel += total_ai_grupo * mult
-                    total_ao_painel += total_ao_grupo * mult
-                    total_di_painel += total_di_grupo * mult
-                    total_do_painel += total_do_grupo * mult
                 
                 # ---------------------------------------------------------
-                # 🆕 NOVO MÓDULO: ADIÇÃO DE KITS PADRÃO
+                # 🆕 ÁREA DE INSERÇÃO RÁPIDA (MOVIDA PARA O TOPO)
                 # ---------------------------------------------------------
-                st.markdown("#### ➕ Adicionar Novo Equipamento a este Quadro")
+                st.markdown("#### ➕ Adicionar Equipamento")
                 col_add_blank, col_add_kit = st.columns(2)
                 
                 with col_add_blank:
-                    if st.button(f"📄 Adicionar Grupo em Branco", key=f"add_grp_blank_{p_idx}", use_container_width=True):
+                    if st.button(f"📄 Adicionar Equipamento em Branco", key=f"add_grp_blank_{p_idx}", use_container_width=True):
                         p_data['grupos_equipamentos'].append({
                             "nome_grupo": f"Equipamento {len(p_data['grupos_equipamentos']) + 1}",
                             "multiplicador": 1,
@@ -663,9 +575,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                     kit_selecionado = c_sel.selectbox("Selecione um Kit Padrão:", ["Selecione..."] + list(KITS_PADRAO.keys()), key=f"sel_kit_{p_idx}", label_visibility="collapsed")
                     if c_btn.button("📦 Inserir Kit", key=f"add_grp_kit_{p_idx}", use_container_width=True):
                         if kit_selecionado != "Selecione...":
-                            # Cria dicionário zerado
                             novos_instrumentos = {k: 0 for k in REGRA_IO.keys()}
-                            # Preenche com os valores do Kit
                             for item_nome, qtd_padrao in KITS_PADRAO[kit_selecionado].items():
                                 if item_nome in novos_instrumentos:
                                     novos_instrumentos[item_nome] = qtd_padrao
@@ -677,12 +587,107 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                             })
                             st.rerun()
 
+                st.divider()
+
+                total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
+
+                # ---------------------------------------------------------
+                # 🆕 CRIAÇÃO DAS ABAS POR EQUIPAMENTO PARA LIMPAR O VISUAL
+                # ---------------------------------------------------------
+                if p_data['grupos_equipamentos']:
+                    nomes_abas = [g['nome_grupo'] for g in p_data['grupos_equipamentos']]
+                    abas_grupos = st.tabs(nomes_abas)
+                    
+                    for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
+                        with abas_grupos[g_idx]:
+                            
+                            cg_nome, cg_mult = st.columns([3, 1])
+                            g_data['nome_grupo'] = cg_nome.text_input("Identificação do Equipamento", value=g_data['nome_grupo'], key=f"n_g_{p_idx}_{g_idx}")
+                            g_data['multiplicador'] = cg_mult.number_input("Qtd. de Máquinas Iguais", min_value=1, value=g_data.get('multiplicador', 1), key=f"m_g_{p_idx}_{g_idx}")
+                            
+                            if ia_disponivel:
+                                with st.expander("🤖 Preenchimento Inteligente por IA (Upload de Fluxograma)", expanded=False):
+                                    st.info("Envie a imagem ou o PDF do fluxograma P&ID. A IA do Google vai analisar as tags e contar as quantidades automaticamente para este grupo.")
+                                    img_upload = st.file_uploader("Arquivo (PDF, PNG ou JPG)", type=["pdf", "png", "jpg", "jpeg"], key=f"file_ia_{p_idx}_{g_idx}")
+                                    
+                                    if img_upload and st.button("🔍 Extrair Quantidades", type="primary", key=f"btn_ia_{p_idx}_{g_idx}"):
+                                        with st.spinner("A IA está analisando a engenharia do diagrama... (Isso pode levar alguns segundos)"):
+                                            try:
+                                                if img_upload.name.lower().endswith('.pdf'):
+                                                    arquivo_ia = {"mime_type": "application/pdf", "data": img_upload.getvalue()}
+                                                else:
+                                                    arquivo_ia = Image.open(img_upload)
+
+                                                lista_chaves = list(REGRA_IO.keys())
+                                                
+                                                prompt_ia = f"""
+                                                Você é um engenheiro de automação sênior e orçamentista experiente.
+                                                Analise cuidadosamente o diagrama P&ID (fluxograma de AVAC/HVAC) fornecido na imagem ou documento.
+                                                Sua tarefa é rastrear as linhas, identificar os círculos/balões de instrumentação e contar a quantidade total de válvulas de controle, sensores e pressostatos.
+
+                                                Você DEVE usar ESTRITAMENTE as chaves exatas abaixo para a sua resposta:
+                                                {json.dumps(lista_chaves, ensure_ascii=False)}
+
+                                                Regras de identificação baseadas nas tags do desenho:
+                                                - Se achar tag PDT ou PDIT em filtros = Transmissor de pressão
+                                                - Se achar tag PSH em filtros = Pressostato
+                                                - Se achar tag TT = Transmissor de temperatura
+                                                - Se achar tag TMT = Transmissor de temperatura e umidade
+                                                - Se achar tag TCV ou Válvula Proporcional = Válvula de controle (água/vapor)
+                                                - Se achar Resistência Elétrica = Resistência aquecimento (RAQ)
+
+                                                Devolva APENAS um objeto JSON válido. O nome da chave deve ser o nome exato da lista acima, e o valor deve ser um número inteiro indicando a quantidade encontrada na imagem. Não escreva NENHUM texto adicional fora do JSON (sem formatação markdown). Se não encontrar um item, defina como 0.
+                                                """
+                                                
+                                                resposta = model_ia.generate_content([prompt_ia, arquivo_ia])
+                                                texto_limpo = resposta.text.replace('```json', '').replace('```', '').strip()
+                                                dados_ia = json.loads(texto_limpo)
+                                                
+                                                itens_achados = 0
+                                                for k, v in dados_ia.items():
+                                                    if k in g_data['instrumentos']:
+                                                        g_data['instrumentos'][k] = int(v)
+                                                        if int(v) > 0: itens_achados += int(v)
+                                                        
+                                                st.success(f"✅ Análise concluída! A IA identificou {itens_achados} instrumento(s). Os valores foram preenchidos abaixo para sua revisão.")
+                                                st.rerun()
+                                            except Exception as e:
+                                                st.error(f"Erro na interpretação da IA: {e}")
+                            
+                            st.markdown("*(Selecione os instrumentos para APENAS 1 unidade deste equipamento)*")
+                            total_ai_grupo = total_ao_grupo = total_di_grupo = total_do_grupo = 0
+                            
+                            # ---------------------------------------------------------
+                            # 🆕 CATEGORIAS DENTRO DE CAIXAS EXPANSÍVEIS (Deixa a tela limpa)
+                            # ---------------------------------------------------------
+                            for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
+                                # Apenas a caixa de Controle vem aberta, o resto vem fechada
+                                abrir_padrao = True if "Controle" in grupo_nome else False
+                                
+                                with st.expander(grupo_nome, expanded=abrir_padrao):
+                                    cols = st.columns(3)
+                                    for i, inst in enumerate(lista_itens):
+                                        if inst not in g_data['instrumentos']: g_data['instrumentos'][inst] = 0
+                                        with cols[i % 3]:
+                                            qtd = st.number_input(inst, min_value=0, step=1, value=g_data['instrumentos'][inst], key=f"inst_{p_idx}_{g_idx}_{inst}")
+                                            g_data['instrumentos'][inst] = qtd
+                                            total_ai_grupo += qtd * REGRA_IO[inst]["AI"]
+                                            total_ao_grupo += qtd * REGRA_IO[inst]["AO"]
+                                            total_di_grupo += qtd * REGRA_IO[inst]["DI"]
+                                            total_do_grupo += qtd * REGRA_IO[inst]["DO"]
+                            
+                            mult = g_data['multiplicador']
+                            total_ai_painel += total_ai_grupo * mult
+                            total_ao_painel += total_ao_grupo * mult
+                            total_di_painel += total_di_grupo * mult
+                            total_do_painel += total_do_grupo * mult
+
                 total_io_pontos = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
                 c36, c24, c18, c15 = dimensionar_controladores(total_io_pontos)
                 total_controladores = c36 + c24 + c18 + c15
                 nome_caixa, preco_caixa = calcular_painel_fisico(total_controladores)
 
-                st.markdown(f"### 📊 Resumo do {p_data['nome']}")
+                st.markdown(f"### 📊 Resumo Físico ({p_data['nome']})")
                 res_c1, res_c2, res_c3 = st.columns(3)
                 res_c1.info(f"**Pontos Físicos Totais ( {total_io_pontos} )**\n\nAI: {total_ai_painel} | AO: {total_ao_painel}\nDI: {total_di_painel} | DO: {total_do_painel}")
                 txt_controladores = ""
