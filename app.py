@@ -373,7 +373,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     # 1. DICIONÁRIO DE REGRAS DE ENGENHARIA E PREÇOS
     # ==========================================
     banco_padrao_precos = {
-        # -- ITENS ORIGINAIS --
         "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1490.00,
         "Transmissor de temperatura (TT) (Controle)": 800.00,
         "Transmissor de temperatura e umidade (TT/MT ou TMT) (Controle)": 2050.00,
@@ -394,8 +393,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "Transmissor de temperatura com display (TIT) (Ambiente)": 2650.00,
         "Transmissor de temperatura e umidade (TT/MT ou TMT) (Ambiente)": 2050.00,
         "Transmissor de temperatura e umidade com display (TT/MT ou TMT) (Ambiente)": 2650.00,
-        
-        # -- NOVOS ITENS DOS PADRÕES SIARCON --
         "PDIT – Vazão ventilador UTA": 1490.00,
         "TT/MT – Transmissor de temperatura e umidade para duto": 2050.00,
         "TCV – Válvula de controle proporcional": 2650.00,
@@ -408,8 +405,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "PSH – Proteção resistência": 349.00,
         "PDIT – Vazão ventilador ou exaustor (Inversor)": 1490.00,
         "PSH – Status de funcionamento ventilador ou exaustor (Partida Direta)": 349.00,
-
-        # -- CONTROLADORES E OUTROS --
         "MP-C-15A": 4649.49,
         "MP-C-18A": 5185.54,
         "MP-C-24A": 7290.75,
@@ -439,22 +434,19 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     if 'paineis_auto' not in st.session_state or (len(st.session_state.paineis_auto) > 0 and 'grupos_equipamentos' not in st.session_state.paineis_auto[0]):
         st.session_state.paineis_auto = []
     
+    # ---------------------------------------------------------
+    # 🆕 NOVA GESTÃO DE INSTRUMENTOS MESCLADA E LIMPA (SEM REPETIÇÕES)
+    # ---------------------------------------------------------
     GRUPOS_INSTRUMENTOS = {
-        "⚙️ Sensores da Máquina (Linha SIARCON)": [
+        "🔹 Controle": [
             "PDIT – Vazão ventilador UTA",
             "TT/MT – Transmissor de temperatura e umidade para duto",
             "TCV – Válvula de controle proporcional",
             "TC – Relé de corrente – Status Compressor 1",
             "TC - Relé de corrente – Status Compressor 2",
-            "PSH – Saturação filtro G4",
-            "PSH – Saturação filtro F9",
-            "PSH – Saturação filtro H13",
             "TSH – Termostato de segurança",
             "PSH – Proteção resistência",
             "PDIT – Vazão ventilador ou exaustor (Inversor)",
-            "PSH – Status de funcionamento ventilador ou exaustor (Partida Direta)"
-        ],
-        "🔹 Outros Sensores (Controle Antigo)": [
             "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)",
             "Transmissor de temperatura (TT) (Controle)",
             "Transmissor de temperatura e umidade (TT/MT ou TMT) (Controle)",
@@ -464,7 +456,11 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             "Válvula de água quente (TCV)",
             "Válvula de vapor (TCV)"
         ],
-        "🔸 Outros Sensores (Monitoramento Antigo)": [
+        "🔸 Monitoramento": [
+            "PSH – Saturação filtro G4",
+            "PSH – Saturação filtro F9",
+            "PSH – Saturação filtro H13",
+            "PSH – Status de funcionamento ventilador ou exaustor (Partida Direta)",
             "Transmissor pressão para filtro G4 (PDIT)",
             "Transmissor pressão Filtro F9 (PDIT)",
             "Transmissor pressão filtro H13 (PDIT)",
@@ -517,9 +513,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "PSH – Status de funcionamento ventilador ou exaustor (Partida Direta)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1}
     }
     
-    # ---------------------------------------------------------
-    # KITS COM NOMES VISUAIS E AMIGÁVEIS
-    # ---------------------------------------------------------
     KITS_PADRAO = {
         "❄️ UTA Padrão - Água Gelada": {
             "PDIT – Vazão ventilador UTA": 1,
@@ -586,7 +579,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         return c36, c24, c18, c15
 
     # ==========================================
-    # 3. INTERFACE DE ABAS
+    # INTERFACE DE ABAS
     # ==========================================
     aba_auto, aba_planilhas, aba_infra, aba_precos, aba_resumo = st.tabs([
         "🚀 Dimensionamento de Automação", 
@@ -597,8 +590,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     ])
 
     with aba_auto:
-        
-        # Botão principal gigante para criar o primeiro quadro
         col_btn, _ = st.columns([1, 2])
         if col_btn.button("➕ Criar Novo Quadro de Automação", type="primary", use_container_width=True):
             st.session_state.paineis_auto.append({
@@ -609,28 +600,21 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             })
             st.rerun()
             
-        st.write("") # Espaço em branco
+        st.write("") 
 
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
-            # Usando uma caixa com borda para simular um "Cartão" de Dashboard
             with st.container(border=True):
                 
-                # CABEÇALHO DO QUADRO
-                # CABEÇALHO DO QUADRO
                 c_icone, c_nome_painel, c_ihm_painel = st.columns([0.5, 4, 2])
                 c_icone.markdown("## 🎛️")
                 p_data['nome'] = c_nome_painel.text_input("Nome deste Quadro", value=p_data['nome'], key=f"n_p_{p_idx}", label_visibility="collapsed")
                 
-                # --- Trava de segurança para nomes antigos na memória ---
                 opcoes_ihm = list(PRECOS_IHM.keys())
                 ihm_salva = p_data.get('ihm', opcoes_ihm[0])
-                idx_ihm = opcoes_ihm.index(ihm_salva) if ihm_salva in opcoes_ihm else 2 # Força o index 2 (IHM Padrão 7") se o nome antigo não existir mais
-                
+                idx_ihm = opcoes_ihm.index(ihm_salva) if ihm_salva in opcoes_ihm else 2 
                 p_data['ihm'] = c_ihm_painel.selectbox("Tela/Supervisório", opcoes_ihm, index=idx_ihm, key=f"i_p_{p_idx}", label_visibility="collapsed")
                 
                 st.divider()
-                
-                # ÁREA LIMPA PARA ADICIONAR MÁQUINAS
                 st.markdown("#### 🚜 Máquinas que serão ligadas a este quadro:")
                 
                 c_kit, c_btn_kit, c_vazio = st.columns([3, 1, 1])
@@ -642,7 +626,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                         for item_nome, qtd_padrao in KITS_PADRAO[kit_selecionado].items():
                             if item_nome in novos_instrumentos:
                                 novos_instrumentos[item_nome] = qtd_padrao
-                        # Nome limpo (tira os emojis do título)
                         nome_limpo = kit_selecionado.split(" ", 1)[1] if " " in kit_selecionado else kit_selecionado        
                         p_data['grupos_equipamentos'].append({
                             "nome_grupo": f"{nome_limpo} {len(p_data['grupos_equipamentos']) + 1}",
@@ -661,15 +644,12 @@ elif menu_selecionado == "💰 Estimativa de Custos":
 
                 st.write("")
 
-                # LISTAGEM DAS MÁQUINAS ADICIONADAS (Design de "Cartão Fechado")
                 total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
 
                 if not p_data['grupos_equipamentos']:
                     st.info("Nenhuma máquina conectada. Escolha um tipo acima e clique em Adicionar.")
 
                 for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
-                    
-                    # Calcular pontos só desta máquina para mostrar no cartão
                     pts_maquina = sum(g_data['instrumentos'].values())
                     
                     with st.expander(f"📦 {g_data['nome_grupo']} (Qtd: {g_data.get('multiplicador', 1)}) — {pts_maquina} sensores configurados"):
@@ -678,26 +658,24 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                         g_data['nome_grupo'] = cg_nome.text_input("Identificação do Equipamento (Ex: UTA Térreo)", value=g_data['nome_grupo'], key=f"n_g_{p_idx}_{g_idx}")
                         g_data['multiplicador'] = cg_mult.number_input("Quantas máquinas iguais a esta?", min_value=1, value=g_data.get('multiplicador', 1), key=f"m_g_{p_idx}_{g_idx}")
                         
-                        # O SEGREDO DO LAYOUT LIMPO: Esconder a complexidade dentro de outro expander focado!
                         with st.expander("⚙️ Ajuste Fino de Instrumentos (Engenharia)", expanded=False):
                             st.caption("Altere as quantidades apenas se esta máquina fugir do padrão SIARCON.")
                             
-                            total_ai_grupo = total_ao_grupo = total_di_grupo = total_do_grupo = 0
-                            
                             for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
-                                st.markdown(f"**{grupo_nome}**")
-                                cols = st.columns(2) # 2 colunas é melhor para ler nomes compridos
-                                for i, inst in enumerate(lista_itens):
-                                    if inst not in g_data['instrumentos']: g_data['instrumentos'][inst] = 0
-                                    with cols[i % 2]:
-                                        qtd = st.number_input(inst, min_value=0, step=1, value=g_data['instrumentos'][inst], key=f"inst_{p_idx}_{g_idx}_{inst}")
-                                        g_data['instrumentos'][inst] = qtd
+                                abrir_padrao = True if "Controle" in grupo_nome else False
+                                
+                                with st.expander(grupo_nome, expanded=abrir_padrao):
+                                    cols = st.columns(2) 
+                                    for i, inst in enumerate(lista_itens):
+                                        if inst not in g_data['instrumentos']: g_data['instrumentos'][inst] = 0
+                                        with cols[i % 2]:
+                                            qtd = st.number_input(inst, min_value=0, step=1, value=g_data['instrumentos'][inst], key=f"inst_{p_idx}_{g_idx}_{inst}")
+                                            g_data['instrumentos'][inst] = qtd
                             
                             if st.button("🗑️ Remover esta Máquina", key=f"del_{p_idx}_{g_idx}"):
                                 p_data['grupos_equipamentos'].pop(g_idx)
                                 st.rerun()
 
-                    # Acumulando totais da máquina no quadro geral
                     total_ai_grupo = total_ao_grupo = total_di_grupo = total_do_grupo = 0
                     for inst, q in g_data['instrumentos'].items():
                         total_ai_grupo += q * REGRA_IO[inst]["AI"]
@@ -711,7 +689,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                     total_di_painel += total_di_grupo * mult
                     total_do_painel += total_do_grupo * mult
 
-                # RESUMO FÍSICO DO QUADRO (DASHBOARD VISUAL COM MÉTRICAS)
+                # RESUMO FÍSICO DO QUADRO
                 total_io_pontos = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
                 c36, c24, c18, c15 = dimensionar_controladores(total_io_pontos)
                 total_controladores = c36 + c24 + c18 + c15
@@ -720,7 +698,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 st.markdown("---")
                 st.markdown("#### 🧠 Inteligência e Estrutura do Quadro")
                 
-                # Linha de Métricas
                 m1, m2, m3, m4, m5 = st.columns(5)
                 m1.metric("Total I/O", f"{total_io_pontos} pts")
                 m2.metric("Sensores (AI)", total_ai_painel)
@@ -775,8 +752,8 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                         ws_hist.append_row(["Data/Hora", "Item Alterado", "Valor Antigo", "Novo Valor"])
                     
                     linhas_h = [[h["Data/Hora"], h["Item Alterado"], h["Valor Antigo"], h["Novo Valor"]] for h in novos_historicos]
-                    if linhas_h: ws_hist.append_rows(linhas_h)
-                    st.success("✅ Preços atualizados e gravados na nuvem com sucesso!")
+                    if lines_h: ws_hist.append_rows(linhas_h)
+                    st.success("✅ Preços updated e gravados na nuvem com sucesso!")
                 except Exception as e:
                     st.error(f"⚠️ Os preços foram atualizados nesta tela, mas houve um erro ao acessar o banco. Erro: {e}.")
             else: st.info("Nenhuma alteração foi feita na tabela.")
@@ -905,7 +882,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Digitais (DI/DO)", "Qtd": (total_di_painel + total_do_painel), "Custo_Total": custo_dig})
                 c36, c24, c18, c15 = dimensionar_controladores(tot_io_painel)
                 if c36 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-36A", "Qtd": c36, "Custo_Total": c36 * st.session_state.precos_banco["MP-C-36A"]})
-                if c24 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Qtd": c24, "Custo_Total": c24 * st.session_state.precos_banco["MP-C-24A"]})
+                if c24 > 0: lines_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Qtd": c24, "Custo_Total": c24 * st.session_state.precos_banco["MP-C-24A"]})
                 if c18 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-18A", "Qtd": c18, "Custo_Total": c18 * st.session_state.precos_banco["MP-C-18A"]})
                 if c15 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-15A", "Qtd": c15, "Custo_Total": c15 * st.session_state.precos_banco["MP-C-15A"]})
                 nome_caixa, preco_caixa = calcular_painel_fisico(c36 + c24 + c18 + c15)
