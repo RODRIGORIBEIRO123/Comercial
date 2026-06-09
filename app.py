@@ -520,7 +520,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     }
     
     # ---------------------------------------------------------
-    # 🆕 MÓDULO DE KITS PADRÃO SIARCON
+    # KITS PADRÃO SIARCON
     # ---------------------------------------------------------
     KITS_PADRAO = {
         "UTA Padrão - Água Gelada": {
@@ -560,12 +560,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             "PSH – Saturação filtro H13": 1,
             "TSH – Termostato de segurança": 1,
             "PSH – Proteção resistência": 1
-        },
-        "➕ Adicional: Ventilador/Exaustor (Inversor)": {
-            "PDIT – Vazão ventilador ou exaustor (Inversor)": 1
-        },
-        "➕ Adicional: Ventilador/Exaustor (Partida Direta)": {
-            "PSH – Status de funcionamento ventilador ou exaustor (Partida Direta)": 1
         }
     }
 
@@ -606,13 +600,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 "id": len(st.session_state.paineis_auto),
                 "nome": f"Quadro Automação {len(st.session_state.paineis_auto) + 1}",
                 "ihm": "Sem IHM",
-                "grupos_equipamentos": [
-                    {
-                        "nome_grupo": "Equipamento 1",
-                        "multiplicador": 1,
-                        "instrumentos": {k: 0 for k in REGRA_IO.keys()}
-                    }
-                ]
+                "grupos_equipamentos": []
             })
 
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
@@ -625,32 +613,102 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 
                 st.markdown("---")
                 
-                st.markdown("#### ➕ Adicionar Equipamento")
-                col_add_blank, col_add_kit = st.columns(2)
-                
-                with col_add_blank:
-                    if st.button(f"📄 Adicionar Equipamento em Branco", key=f"add_grp_blank_{p_idx}", use_container_width=True):
-                        p_data['grupos_equipamentos'].append({
-                            "nome_grupo": f"Equipamento {len(p_data['grupos_equipamentos']) + 1}",
-                            "multiplicador": 1,
-                            "instrumentos": {k: 0 for k in REGRA_IO.keys()}
-                        })
-                        st.rerun()
+                # ---------------------------------------------------------
+                # 🆕 INTERFACE LIMPA: SELETOR DE MODO DE ADIÇÃO
+                # ---------------------------------------------------------
+                with st.expander("➕ Adicionar Novo Equipamento ao Quadro", expanded=False):
+                    modo_add = st.radio("Como deseja adicionar o equipamento?", 
+                                        ["✨ Assistente Inteligente (Quiz)", "📦 Selecionar Kit Rápido", "📄 Adicionar em Branco"], 
+                                        horizontal=True, key=f"modo_add_{p_idx}")
+                    
+                    st.write("") # Espaçamento
+                    
+                    if modo_add == "✨ Assistente Inteligente (Quiz)":
+                        st.info("Responda às perguntas abaixo para gerar o escopo perfeito automaticamente.")
                         
-                with col_add_kit:
-                    c_sel, c_btn = st.columns([2, 1])
-                    kit_selecionado = c_sel.selectbox("Selecione um Kit Padrão:", ["Selecione..."] + list(KITS_PADRAO.keys()), key=f"sel_kit_{p_idx}", label_visibility="collapsed")
-                    if c_btn.button("📦 Inserir Kit", key=f"add_grp_kit_{p_idx}", use_container_width=True):
-                        if kit_selecionado != "Selecione...":
-                            novos_instrumentos = {k: 0 for k in REGRA_IO.keys()}
-                            for item_nome, qtd_padrao in KITS_PADRAO[kit_selecionado].items():
-                                if item_nome in novos_instrumentos:
-                                    novos_instrumentos[item_nome] = qtd_padrao
-                                    
+                        col_q1, col_q2 = st.columns(2)
+                        tipo_eq = col_q1.selectbox("Qual o tipo de equipamento?", ["Selecione...", "UTA", "FANCOIL", "VENTILADOR", "EXAUSTOR"], key=f"quiz_tipo_{p_idx}")
+                        
+                        # Iniciar dicionário zerado
+                        inst_quiz = {k: 0 for k in REGRA_IO.keys()}
+                        pode_gerar = False
+                        nome_gerado = ""
+                        
+                        if tipo_eq in ["UTA", "FANCOIL"]:
+                            serpentina = col_q2.radio("Tipo de Refrigeração:", ["Água Gelada", "Expansão Direta"], key=f"quiz_ref_{p_idx}")
+                            
+                            st.write("**Opções Adicionais:**")
+                            c_f1, c_f2, c_f3, c_f4 = st.columns(4)
+                            tem_g4 = c_f1.checkbox("Filtro G4", value=True, key=f"q_g4_{p_idx}")
+                            tem_f9 = c_f2.checkbox("Filtro M5 ou F7/F9", value=True, key=f"q_f9_{p_idx}")
+                            tem_h13 = c_f3.checkbox("Filtro H13/H14", value=False, key=f"q_h13_{p_idx}")
+                            tem_aq = c_f4.checkbox("Resistência Aquecimento", value=False, key=f"q_aq_{p_idx}")
+                            
+                            nome_gerado = f"{tipo_eq} {len(p_data['grupos_equipamentos']) + 1} ({serpentina})"
+                            
+                            # Regras de Negócio SIARCON
+                            inst_quiz["PDIT – Vazão ventilador UTA"] = 1
+                            inst_quiz["TT/MT – Transmissor de temperatura e umidade para duto"] = 1
+                            
+                            if serpentina == "Água Gelada":
+                                inst_quiz["TCV – Válvula de controle proporcional"] = 1
+                            else:
+                                inst_quiz["TC – Relé de corrente – Status Compressor 1"] = 1
+                                inst_quiz["TC - Relé de corrente – Status Compressor 2"] = 1
+                                
+                            if tem_g4: inst_quiz["PSH – Saturação filtro G4"] = 1
+                            if tem_f9: inst_quiz["PSH – Saturação filtro F9"] = 1
+                            if tem_h13: inst_quiz["PSH – Saturação filtro H13"] = 1
+                            
+                            if tem_aq:
+                                inst_quiz["TSH – Termostato de segurança"] = 1
+                                inst_quiz["PSH – Proteção resistência"] = 1
+                                
+                            pode_gerar = True
+                            
+                        elif tipo_eq in ["VENTILADOR", "EXAUSTOR"]:
+                            partida = col_q2.radio("Tipo de Partida:", ["Partida Direta", "Inversor de Frequência"], key=f"quiz_part_{p_idx}")
+                            nome_gerado = f"{tipo_eq} {len(p_data['grupos_equipamentos']) + 1} ({partida})"
+                            
+                            if partida == "Inversor de Frequência":
+                                inst_quiz["PDIT – Vazão ventilador ou exaustor (Inversor)"] = 1
+                            else:
+                                inst_quiz["PSH – Status de funcionamento ventilador ou exaustor (Partida Direta)"] = 1
+                                
+                            pode_gerar = True
+                            
+                        if pode_gerar:
+                            if st.button("🪄 Gerar e Inserir Equipamento", type="primary", key=f"btn_quiz_{p_idx}"):
+                                p_data['grupos_equipamentos'].append({
+                                    "nome_grupo": nome_gerado,
+                                    "multiplicador": 1,
+                                    "instrumentos": inst_quiz
+                                })
+                                st.rerun()
+
+                    elif modo_add == "📦 Selecionar Kit Rápido":
+                        c_sel, c_btn = st.columns([3, 1])
+                        kit_selecionado = c_sel.selectbox("Selecione um Kit Padrão:", ["Selecione..."] + list(KITS_PADRAO.keys()), key=f"sel_kit_{p_idx}", label_visibility="collapsed")
+                        if c_btn.button("📦 Inserir Kit", key=f"add_grp_kit_{p_idx}", use_container_width=True):
+                            if kit_selecionado != "Selecione...":
+                                novos_instrumentos = {k: 0 for k in REGRA_IO.keys()}
+                                for item_nome, qtd_padrao in KITS_PADRAO[kit_selecionado].items():
+                                    if item_nome in novos_instrumentos:
+                                        novos_instrumentos[item_nome] = qtd_padrao
+                                        
+                                p_data['grupos_equipamentos'].append({
+                                    "nome_grupo": f"{kit_selecionado} {len(p_data['grupos_equipamentos']) + 1}",
+                                    "multiplicador": 1,
+                                    "instrumentos": novos_instrumentos
+                                })
+                                st.rerun()
+
+                    elif modo_add == "📄 Adicionar em Branco":
+                        if st.button(f"Inserir Novo Equipamento em Branco", key=f"add_grp_blank_{p_idx}"):
                             p_data['grupos_equipamentos'].append({
-                                "nome_grupo": f"{kit_selecionado} {len(p_data['grupos_equipamentos']) + 1}",
+                                "nome_grupo": f"Equipamento {len(p_data['grupos_equipamentos']) + 1}",
                                 "multiplicador": 1,
-                                "instrumentos": novos_instrumentos
+                                "instrumentos": {k: 0 for k in REGRA_IO.keys()}
                             })
                             st.rerun()
 
@@ -658,6 +716,9 @@ elif menu_selecionado == "💰 Estimativa de Custos":
 
                 total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
 
+                # ---------------------------------------------------------
+                # ABAS PARA CADA MÁQUINA ADICIONADA
+                # ---------------------------------------------------------
                 if p_data['grupos_equipamentos']:
                     nomes_abas = [g['nome_grupo'] for g in p_data['grupos_equipamentos']]
                     abas_grupos = st.tabs(nomes_abas)
