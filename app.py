@@ -372,6 +372,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     # 1. DICIONÁRIO DE REGRAS DE ENGENHARIA E PREÇOS
     # ==========================================
     banco_padrao_precos = {
+        # -- ITENS ORIGINAIS --
         "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1490.00,
         "Transmissor de temperatura (TT) (Controle)": 800.00,
         "Transmissor de temperatura e umidade (TT/MT ou TMT) (Controle)": 2050.00,
@@ -392,6 +393,22 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "Transmissor de temperatura com display (TIT) (Ambiente)": 2650.00,
         "Transmissor de temperatura e umidade (TT/MT ou TMT) (Ambiente)": 2050.00,
         "Transmissor de temperatura e umidade com display (TT/MT ou TMT) (Ambiente)": 2650.00,
+        
+        # -- NOVOS ITENS DOS PADRÕES SIARCON --
+        "PDIT – Vazão ventilador UTA": 1490.00,
+        "TT/MT – Transmissor de temperatura e umidade para duto": 2050.00,
+        "TCV – Válvula de controle proporcional": 2650.00,
+        "TC – Relé de corrente – Status Compressor 1": 150.00,
+        "TC - Relé de corrente – Status Compressor 2": 150.00,
+        "PSH – Saturação filtro G4": 349.00,
+        "PSH – Saturação filtro F9": 349.00,
+        "PSH – Saturação filtro H13": 349.00,
+        "TSH – Termostato de segurança": 250.00,
+        "PSH – Proteção resistência": 349.00,
+        "PDIT – Vazão ventilador ou exaustor (Inversor)": 1490.00,
+        "PSH – Status de funcionamento ventilador ou exaustor (Partida Direta)": 349.00,
+
+        # -- CONTROLADORES E OUTROS --
         "MP-C-15A": 4649.49,
         "MP-C-18A": 5185.54,
         "MP-C-24A": 7290.75,
@@ -421,12 +438,22 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     if 'paineis_auto' not in st.session_state or (len(st.session_state.paineis_auto) > 0 and 'grupos_equipamentos' not in st.session_state.paineis_auto[0]):
         st.session_state.paineis_auto = []
     
-    if len(st.session_state.paineis_auto) > 0:
-        if "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)" not in st.session_state.paineis_auto[0]['grupos_equipamentos'][0]['instrumentos']:
-             st.session_state.paineis_auto = []
-
     GRUPOS_INSTRUMENTOS = {
-        "🔹 Equipamento (Controle)": [
+        "⚙️ UTAs e Exaustão (Kits SIARCON)": [
+            "PDIT – Vazão ventilador UTA",
+            "TT/MT – Transmissor de temperatura e umidade para duto",
+            "TCV – Válvula de controle proporcional",
+            "TC – Relé de corrente – Status Compressor 1",
+            "TC - Relé de corrente – Status Compressor 2",
+            "PSH – Saturação filtro G4",
+            "PSH – Saturação filtro F9",
+            "PSH – Saturação filtro H13",
+            "TSH – Termostato de segurança",
+            "PSH – Proteção resistência",
+            "PDIT – Vazão ventilador ou exaustor (Inversor)",
+            "PSH – Status de funcionamento ventilador ou exaustor (Partida Direta)"
+        ],
+        "🔹 Equipamento (Controle Antigo)": [
             "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)",
             "Transmissor de temperatura (TT) (Controle)",
             "Transmissor de temperatura e umidade (TT/MT ou TMT) (Controle)",
@@ -436,7 +463,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             "Válvula de água quente (TCV)",
             "Válvula de vapor (TCV)"
         ],
-        "🔸 Monitoramento (Equipamento)": [
+        "🔸 Monitoramento (Equipamento Antigo)": [
             "Transmissor pressão para filtro G4 (PDIT)",
             "Transmissor pressão Filtro F9 (PDIT)",
             "Transmissor pressão filtro H13 (PDIT)",
@@ -455,6 +482,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     }
 
     REGRA_IO = {
+        # REGRAS ORIGINAIS
         "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
         "Transmissor de temperatura (TT) (Controle)": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
         "Transmissor de temperatura e umidade (TT/MT ou TMT) (Controle)": {"AI": 2, "AO": 2, "DI": 0, "DO": 0},
@@ -475,27 +503,69 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "Transmissor de temperatura com display (TIT) (Ambiente)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de temperatura e umidade (TT/MT ou TMT) (Ambiente)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de temperatura e umidade com display (TT/MT ou TMT) (Ambiente)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
+        
+        # NOVAS REGRAS - KITS SIARCON
+        "PDIT – Vazão ventilador UTA": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
+        "TT/MT – Transmissor de temperatura e umidade para duto": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "TCV – Válvula de controle proporcional": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "TC – Relé de corrente – Status Compressor 1": {"AI": 0, "AO": 0, "DI": 1, "DO": 2},
+        "TC - Relé de corrente – Status Compressor 2": {"AI": 0, "AO": 0, "DI": 1, "DO": 2},
+        "PSH – Saturação filtro G4": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "PSH – Saturação filtro F9": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "PSH – Saturação filtro H13": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "TSH – Termostato de segurança": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
+        "PSH – Proteção resistência": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
+        "PDIT – Vazão ventilador ou exaustor (Inversor)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
+        "PSH – Status de funcionamento ventilador ou exaustor (Partida Direta)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1}
     }
     
     # ---------------------------------------------------------
-    # 🆕 MÓDULO DE KITS PADRÃO (PODE ME MANDAR OS SEUS PARA EU PREENCHER)
+    # 🆕 MÓDULO DE KITS PADRÃO SIARCON
     # ---------------------------------------------------------
     KITS_PADRAO = {
-        "CTA Padrão (Água Gelada)": {
-            "Transmissor de temperatura (TT) (Controle)": 1,
-            "Transmissor de temperatura (TT) (Ambiente)": 1,
-            "Válvula de água gelada (TCV)": 1,
-            "Pressostato para filtro G4 (PSH)": 1,
-            "Pressostato Filtro F9 (PSH)": 1,
-            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1
+        "UTA Padrão - Água Gelada": {
+            "PDIT – Vazão ventilador UTA": 1,
+            "TT/MT – Transmissor de temperatura e umidade para duto": 1,
+            "TCV – Válvula de controle proporcional": 1,
+            "PSH – Saturação filtro G4": 1,
+            "PSH – Saturação filtro F9": 1,
+            "PSH – Saturação filtro H13": 1
         },
-        "Exaustão (Ventilador Simples)": {
-            "Pressostato para filtro G4 (PSH)": 1,
-            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1
+        "UTA Padrão - Expansão Direta": {
+            "PDIT – Vazão ventilador UTA": 1,
+            "TT/MT – Transmissor de temperatura e umidade para duto": 1,
+            "TC – Relé de corrente – Status Compressor 1": 1,
+            "TC - Relé de corrente – Status Compressor 2": 1,
+            "PSH – Saturação filtro G4": 1,
+            "PSH – Saturação filtro F9": 1,
+            "PSH – Saturação filtro H13": 1
         },
-        "Sala Limpa (Monitoramento)": {
-            "Transmissor de pressão diferencial com display (Pressão entre salas) (PDIT)": 1,
-            "Transmissor de temperatura e umidade com display (TT/MT ou TMT) (Ambiente)": 1
+        "UTA Padrão - Água Gelada e Resistência": {
+            "PDIT – Vazão ventilador UTA": 1,
+            "TT/MT – Transmissor de temperatura e umidade para duto": 1,
+            "TCV – Válvula de controle proporcional": 1,
+            "PSH – Saturação filtro G4": 1,
+            "PSH – Saturação filtro F9": 1,
+            "PSH – Saturação filtro H13": 1,
+            "TSH – Termostato de segurança": 1,
+            "PSH – Proteção resistência": 1
+        },
+        "UTA Padrão - Expansão Direta e Resistência": {
+            "PDIT – Vazão ventilador UTA": 1,
+            "TT/MT – Transmissor de temperatura e umidade para duto": 1,
+            "TC – Relé de corrente – Status Compressor 1": 1,
+            "TC - Relé de corrente – Status Compressor 2": 1,
+            "PSH – Saturação filtro G4": 1,
+            "PSH – Saturação filtro F9": 1,
+            "PSH – Saturação filtro H13": 1,
+            "TSH – Termostato de segurança": 1,
+            "PSH – Proteção resistência": 1
+        },
+        "➕ Adicional: Ventilador/Exaustor (Inversor)": {
+            "PDIT – Vazão ventilador ou exaustor (Inversor)": 1
+        },
+        "➕ Adicional: Ventilador/Exaustor (Partida Direta)": {
+            "PSH – Status de funcionamento ventilador ou exaustor (Partida Direta)": 1
         }
     }
 
@@ -546,7 +616,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             })
 
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
-            with st.container(border=True): # Caixa visual para o Painel Físico
+            with st.container(border=True):
                 st.subheader(f"📦 {p_data['nome']}")
                 
                 c_nome_painel, c_ihm_painel = st.columns([2, 1])
@@ -555,9 +625,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 
                 st.markdown("---")
                 
-                # ---------------------------------------------------------
-                # 🆕 ÁREA DE INSERÇÃO RÁPIDA (MOVIDA PARA O TOPO)
-                # ---------------------------------------------------------
                 st.markdown("#### ➕ Adicionar Equipamento")
                 col_add_blank, col_add_kit = st.columns(2)
                 
@@ -591,9 +658,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
 
                 total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
 
-                # ---------------------------------------------------------
-                # 🆕 CRIAÇÃO DAS ABAS POR EQUIPAMENTO PARA LIMPAR O VISUAL
-                # ---------------------------------------------------------
                 if p_data['grupos_equipamentos']:
                     nomes_abas = [g['nome_grupo'] for g in p_data['grupos_equipamentos']]
                     abas_grupos = st.tabs(nomes_abas)
@@ -657,12 +721,8 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                             st.markdown("*(Selecione os instrumentos para APENAS 1 unidade deste equipamento)*")
                             total_ai_grupo = total_ao_grupo = total_di_grupo = total_do_grupo = 0
                             
-                            # ---------------------------------------------------------
-                            # 🆕 CATEGORIAS DENTRO DE CAIXAS EXPANSÍVEIS (Deixa a tela limpa)
-                            # ---------------------------------------------------------
                             for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
-                                # Apenas a caixa de Controle vem aberta, o resto vem fechada
-                                abrir_padrao = True if "Controle" in grupo_nome else False
+                                abrir_padrao = True if "SIARCON" in grupo_nome or "Controle" in grupo_nome else False
                                 
                                 with st.expander(grupo_nome, expanded=abrir_padrao):
                                     cols = st.columns(3)
