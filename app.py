@@ -42,9 +42,61 @@ except Exception as e:
 # Define o fuso horário de Brasília (UTC-3)
 fuso_br = timezone(timedelta(hours=-3))
 
+# ==========================================
+# 🔐 CONTROLE DE ACESSO E LOGIN POR PERFIL
+# ==========================================
+if "usuario_logado" not in st.session_state:
+    st.session_state.usuario_logado = None
+if "nome_exibicao" not in st.session_state:
+    st.session_state.nome_exibicao = ""
+
+if st.session_state.usuario_logado is None:
+    st.title("🔐 Módulo Comercial SIARCON - Login")
+    st.markdown("Insira suas credenciais para acessar suas propostas e dimensionamentos.")
+    
+    with st.container(border=True):
+        c_user = st.text_input("Usuário:")
+        c_pass = st.text_input("Senha:", type="password")
+        
+        if st.button("Entrar no Sistema", type="primary", use_container_width=True):
+            # Base de usuários cadastrados
+            usuarios_validos = {
+                "giovanna.ribeiro": "1234",
+                "aline.ferraz": "1234",
+                "janaina.dias": "1234",
+                "victor.hugo": "1234",
+                "rodrigo.ribeiro": "1234",
+                "engenharia": "1234",
+                "suprimentos": "1234",
+                "obras": "1234"
+            }
+            user_limpo = c_user.lower().strip()
+            
+            if user_limpo in usuarios_validos and c_pass == usuarios_validos[user_limpo]:
+                st.session_state.usuario_logado = user_limpo
+                # Extrai apenas o primeiro nome para a saudação visual
+                primeiro_nome = user_limpo.split('.')[0].capitalize()
+                st.session_state.nome_exibicao = primeiro_nome
+                
+                st.success(f"🔓 Acesso concedido! Bem-vindo(a), {primeiro_nome}.")
+                st.rerun()
+            else:
+                st.error("❌ Usuário ou senha incorretos. Tente novamente.")
+    st.stop()
+
 # === MENU LATERAL PRINCIPAL ===
 st.sidebar.image("https://via.placeholder.com/150x50.png?text=SIARCON", use_container_width=True)
 st.sidebar.title("Navegação Principal")
+
+st.sidebar.markdown(f"👤 Logado como: **{st.session_state.nome_exibicao}**")
+if st.sidebar.button("🚪 Sair do Perfil", type="secondary"):
+    st.session_state.usuario_logado = None
+    st.session_state.nome_exibicao = ""
+    st.session_state.paineis_auto = []
+    st.session_state.nome_projeto_orcamento = ""
+    st.rerun()
+
+st.sidebar.markdown("---")
 
 menu_selecionado = st.sidebar.radio(
     "Selecione o módulo:",
@@ -349,7 +401,7 @@ if menu_selecionado == "📄 Gerador de Propostas":
 
 
 # ==============================================================================
-# MÓDULO 2: SISTEMA DE AUTOMAÇÃO (REVISADO & INTERATIVO)
+# MÓDULO 2: SISTEMA DE AUTOMAÇÃO
 # ==============================================================================
 elif menu_selecionado == "🔌 Sistema de Automação":
     
@@ -363,6 +415,9 @@ elif menu_selecionado == "🔌 Sistema de Automação":
     if 'orcamento' not in st.session_state: st.session_state.orcamento = []
     if 'historico_precos' not in st.session_state: st.session_state.historico_precos = []
     if 'wizard_ativo' not in st.session_state: st.session_state.wizard_ativo = False
+    
+    if 'paineis_auto' not in st.session_state: 
+        st.session_state.paineis_auto = []
         
     nome_proj = st.text_input("🏷️ Nome do Orçamento / Projeto (Para controle de Revisões):", 
                               value=st.session_state.nome_projeto_orcamento,
@@ -374,7 +429,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
     # DATABASE DE PREÇOS E REGRAS SIARCON
     # ==========================================
     REGRA_IO = {
-        "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
+        "Transmissor de pressão Dif. Para ar (Vazão de ar)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
         "Transmissor de temperatura e umidade para duto": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Válvula de controle proporcional com atuador": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
         "Relé de Corrente - Status Compressor": {"AI": 0, "AO": 0, "DI": 1, "DO": 2},
@@ -459,29 +514,19 @@ elif menu_selecionado == "🔌 Sistema de Automação":
         "Licença Supervisório - Schneider EBO (Por Ponto I/O)": 110.00
     }
 
-    if 'banco_precos_carregado' not in st.session_state:
-        st.session_state.precos_banco = banco_padrao_precos.copy()
-        try:
-            sh = conectar_google_sheets()
-            try:
-                aba_p = sh.worksheet("Precos").get_all_values()
-                if len(aba_p) > 1:
-                    precos_bd = {linha[0]: float(linha[1]) for linha in aba_p[1:] if len(linha) > 1}
-                    st.session_state.precos_banco.update(precos_bd)
-            except: pass
-            try:
-                df_h = pd.DataFrame(sh.worksheet("Historico_Precos").get_all_records())
-                if not df_h.empty: st.session_state.historico_precos = df_h.to_dict('records')
-            except: pass
-        except: pass
-        st.session_state.banco_precos_carregado = True
+    OPCOES_SUPERVISAO = {
+        "Sem Supervisório": {"base": 0.0, "por_ponto": 0.0},
+        "Sistema supervisório SEM certificação CFR-21": {"base": 23000.0, "por_ponto": 100.0},
+        "Sistema supervisório COM certificação CFR-21": {"base": 23000.0, "por_ponto": 285.0},
+        "Sistema de monitoramento Schneider EBO": {"base": 13000.0, "por_ponto": 110.0}
+    }
 
     for k_n, v_n in banco_padrao_precos.items():
         if k_n not in st.session_state.precos_banco: st.session_state.precos_banco[k_n] = v_n
 
     GRUPOS_INSTRUMENTOS = {
         "🔹 Controle (HVAC e Máquinas)": [
-            "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)",
+            "Transmissor de pressão Dif. Para ar (Vazão de ar)",
             "Transmissor de temperatura e umidade para duto", "Transmissor de temperatura para duto",
             "Válvula de controle proporcional com atuador", "Válvula de controle de água gelada proporcional",
             "Válvula de controle de água quente proporcional", "Válvula de controle de vapor proporcional",
@@ -508,28 +553,28 @@ elif menu_selecionado == "🔌 Sistema de Automação":
     
     KITS_PADRAO = {
         "❄️ UTA Padrão - Água Gelada": {
-            "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)": 1,
+            "Transmissor de pressão Dif. Para ar (Vazão de ar)": 1,
             "Transmissor de temperatura e umidade para duto": 1, "Válvula de controle de água gelada proporcional": 1,
             "Pressostato - Filtro G4": 1, "Pressostato - Filtro F9": 1, "Pressostato - Filtro H13/H14": 1
         },
         "🌬️ UTA Padrão - Expansão Direta": {
-            "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)": 1,
+            "Transmissor de pressão Dif. Para ar (Vazão de ar)": 1,
             "Transmissor de temperatura e umidade para duto": 1, "Relé de Corrente - Status Compressor": 2,
             "Pressostato - Filtro G4": 1, "Pressostato - Filtro F9": 1, "Pressostato - Filtro H13/H14": 1
         },
         "🔥 UTA Padrão - Água Gelada + Resistência": {
-            "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)": 1,
+            "Transmissor de pressão Dif. Para ar (Vazão de ar)": 1,
             "Transmissor de temperatura e umidade para duto": 1, "Válvula de controle de água gelada proporcional": 1,
             "Pressostato - Filtro G4": 1, "Pressostato - Filtro F9": 1, "Pressostato - Filtro H13/H14": 1,
             "Termostato de segurança (Proteção da resistência)": 1, "Pressostato diferencial para ar (Proteção da resistência)": 1
         },
         "♨️ UTA Padrão - Expansão Direta + Resistência": {
-            "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)": 1,
+            "Transmissor de pressão Dif. Para ar (Vazão de ar)": 1,
             "Transmissor de temperatura e umidade para duto": 1, "Relé de Corrente - Status Compressor": 2,
             "Pressostato - Filtro G4": 1, "Pressostato - Filtro F9": 1, "Pressostato - Filtro H13/H14": 1,
             "Termostato de segurança (Proteção da resistência)": 1, "Pressostato diferencial para ar (Proteção da resistência)": 1
         },
-        "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)": 1 },
+        "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão Dif. Para ar (Vazão de ar)": 1 },
         "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta)": 1 }
     }
 
@@ -561,23 +606,16 @@ elif menu_selecionado == "🔌 Sistema de Automação":
     with aba_auto:
         st.subheader("Configuração Estrutural dos Painéis")
         
-        # BOTÃO INICIAL PARA CHAMAR O WIZARD SEQUENCIAL
+        # ASSISTENTE EM ETAPAS (SÓ ABRE SE SELECIONADO)
         if not st.session_state.wizard_ativo:
             if st.button("➕ Criar Novo Quadro de Automação", type="primary"):
                 st.session_state.wizard_ativo = True
                 st.rerun()
 
-        # ---------------------------------------------------------
-        # 🧙‍♂️ NOVO ASSISTENTE FLUXO SEQUENCIAL (PERGUNTAS DINÂMICAS)
-        # ---------------------------------------------------------
         if st.session_state.wizard_ativo:
             with st.container(border=True):
                 st.markdown("### 🧙‍♂️ Assistente de Configuração de Quadro")
-                
-                # Etapa 1: Tipo do Quadro
                 tipo_q = st.radio("1. Selecione o Tipo do Quadro:", ["Controle (HVAC/Máquinas)", "CAG (Central de Água Gelada)"], horizontal=True)
-                
-                # Etapa 2: Abre Condicional de Supervisório
                 sup_opt = st.radio("2. Este quadro fará parte de um Sistema de Supervisório?", ["Não", "Sim"], horizontal=True)
                 soft_sel = "Sem Supervisório"
                 if sup_opt == "Sim":
@@ -587,14 +625,10 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                         "Sistema de monitoramento Schneider EBO"
                     ])
                 
-                # Etapa 3: TAG
                 tag_q = st.text_input("3. Insira a TAG / Identificação do Quadro (Ex: QTA-01, QD-CAG):")
-                
-                # Etapa 4: Modo de Composição
                 config_opt = st.radio("4. Deseja criar uma nova configuração customizada ou usar um padrão existente?", 
                                       ["Usar Padrão Existente (Kits)", "Criar Nova Configuração Customizada (Em Branco)"], horizontal=True)
                 
-                # Etapa 5: Filtro Inteligente de Kits por Tipo de Quadro
                 kit_final_selecionado = None
                 if config_opt == "Usar Padrão Existente (Kits)":
                     opcoes_kits_filtrados = list(KITS_PADRAO.keys())
@@ -605,7 +639,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                     
                     kit_final_selecionado = st.selectbox("Selecione o Modelo Padrão SIARCON:", ["Selecione..."] + opcoes_kits_filtrados)
                 
-                # Confirmação Final
                 c_conf, c_canc = st.columns(2)
                 if c_conf.button("🚀 Confirmar e Montar Quadro", use_container_width=True):
                     if not tag_q:
@@ -642,7 +675,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
 
         st.write("")
 
-        # EXIBIÇÃO DOS QUADROS CRIADOS (Interface Limpa de Dashboard)
+        # EXIBIÇÃO DOS QUADROS CRIADOS (DASHBOARD)
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
             with st.container(border=True):
                 c_icone, c_nome_painel, c_ihm_painel = st.columns([0.5, 4, 2])
@@ -656,7 +689,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                 
                 st.caption(f"**Tipo:** {p_data.get('tipo', 'Controle')} | **Supervisão:** {p_data.get('supervisorio', 'Sem Supervisório')}")
                 
-                # Inserção de mais máquinas no quadro existente
                 with st.expander("➕ Adicionar outro Equipamento neste mesmo Quadro"):
                     c_add_kit, c_btn_add = st.columns([3, 1])
                     sub_kit = c_add_kit.selectbox("Escolha o Equipamento:", ["Selecione..."] + list(KITS_PADRAO.keys()), key=f"sub_kit_{p_idx}")
@@ -714,7 +746,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                 
                 st.markdown("##### 🧠 Estrutura de I/O do Quadro")
                 m1, m2, m3, m4, m5 = st.columns(5)
-                m1.metric("Total I/O", str(total_io_pontos)) # Removido o 'pts'
+                m1.metric("Total I/O", str(total_io_pontos)) 
                 m2.metric("AI", total_ai_painel)
                 m3.metric("AO", total_ao_painel)
                 m4.metric("DI", total_di_painel)
@@ -723,6 +755,46 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                 if st.button("🗑️ Deletar Todo este Quadro", key=f"del_quadro_{p_idx}"):
                     st.session_state.paineis_auto.pop(p_idx)
                     st.rerun()
+        
+        # ---------------------------------------------------------
+        # 🆕 NOVO BOTÃO: SALVAR RASCUNHO E SAIR DA TELA
+        # ---------------------------------------------------------
+        if st.session_state.paineis_auto:
+            st.markdown("---")
+            if st.button("💾 Salvar Rascunho e Sair (Retomar depois)", type="secondary", use_container_width=True):
+                if not st.session_state.nome_projeto_orcamento:
+                    st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento / Projeto' no topo da página antes de salvar o rascunho.")
+                else:
+                    try:
+                        sh = conectar_google_sheets()
+                        try: ws_hist_orc = sh.worksheet("Historico_Orcamentos")
+                        except:
+                            ws_hist_orc = sh.add_worksheet(title="Historico_Orcamentos", rows="1000", cols="8")
+                            ws_hist_orc.append_row(["Data/Hora", "Nome do Projeto", "Revisão", "Subtotal Hardware", "Serviços de Lógica", "Custo Total Estimado", "Configuracao_JSON", "Usuário"])
+                        
+                        todas_linhas_existentes = ws_hist_orc.get_all_values()
+                        contagem_revisoes = 0
+                        if len(todas_linhas_existentes) > 1:
+                            for r_row in todas_linhas_existentes[1:]:
+                                if r_row[1].strip().upper() == st.session_state.nome_projeto_orcamento.strip().upper():
+                                    contagem_revisoes += 1
+                        
+                        revisao_atual = f"R-{contagem_revisoes:02d}"
+                        agora = datetime.now(fuso_br).strftime("%d/%m/%Y %H:%M:%S")
+                        json_config = json.dumps(st.session_state.paineis_auto)
+                        
+                        nova_linha_banco = [
+                            agora, st.session_state.nome_projeto_orcamento, revisao_atual,
+                            "R$ 0,00", "R$ 0,00", "R$ 0,00 (Rascunho)", json_config, st.session_state.usuario_logado
+                        ]
+                        ws_hist_orc.append_row(nova_linha_banco)
+                        
+                        # Reseta as variáveis da tela limpa
+                        st.session_state.paineis_auto = []
+                        st.session_state.nome_projeto_orcamento = ""
+                        st.toast("📝 Rascunho salvo na nuvem com sucesso! Tela limpa.", icon="💾")
+                        st.rerun()
+                    except Exception as e: st.error(f"Erro ao salvar rascunho: {e}")
 
         st.markdown("---")
         st.info("💡 **Próximo Passo:** Vá até o topo e clique na aba **'📊 Orçamento Final'** para extrair a planilha de custos e gerenciar o histórico de revisões.")
@@ -886,7 +958,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                 linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": nome_caixa, "Qtd": 1, "Custo_Total": preco_caixa})
                 if PRECOS_IHM[p['ihm']] > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": p['ihm'], "Qtd": 1, "Custo_Total": PRECOS_IHM[p['ihm']]})
 
-                # Alocação matemática correta por ponto real de I/O de software
                 s_type = p.get('supervisorio', "Sem Supervisório")
                 if s_type != "Sem Supervisório":
                     if s_type not in softwares_incluidos: softwares_incluidos[s_type] = 0
@@ -895,7 +966,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
         for item in st.session_state.orcamento:
             linhas_resumo.append({"Categoria": item['Categoria'], "Item": item['Item'], "Qtd": item['Quantidade'], "Custo_Total": item['Custo_Total']})
 
-        # --- MATEMÁTICA CORRIGIDA: CUSTOS DE LICENÇAS E PONTOS REAL DE I/O ---
         for s_name, pts_total in softwares_incluidos.items():
             b_k, p_k = "", ""
             if "SEM certificação" in s_name:
@@ -941,8 +1011,8 @@ elif menu_selecionado == "🔌 Sistema de Automação":
             st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             st.markdown("---")
             
-            # --- MOTOR ATUALIZADO: DETECÇÃO E INCREMENTO DE REVISÕES NA NUVEM ---
-            if st.button("☁️ Salvar Levantamento e Gerar Revisão", type="primary", use_container_width=True):
+            # --- SALVAR ENGENHARIA COMPLETA ---
+            if st.button("☁️ Salvar Orçamento Final e Gerar Revisão", type="primary", use_container_width=True):
                 if not st.session_state.nome_projeto_orcamento: 
                     st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento / Projeto' antes de salvar.")
                 else:
@@ -950,8 +1020,8 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                         sh = conectar_google_sheets()
                         try: ws_hist_orc = sh.worksheet("Historico_Orcamentos")
                         except:
-                            ws_hist_orc = sh.add_worksheet(title="Historico_Orcamentos", rows="1000", cols="7")
-                            ws_hist_orc.append_row(["Data/Hora", "Nome do Projeto", "Revisão", "Subtotal Hardware", "Serviços de Lógica", "Custo Total Estimado", "Configuracao_JSON"])
+                            ws_hist_orc = sh.add_worksheet(title="Historico_Orcamentos", rows="1000", cols="8")
+                            ws_hist_orc.append_row(["Data/Hora", "Nome do Projeto", "Revisão", "Subtotal Hardware", "Serviços de Lógica", "Custo Total Estimado", "Configuracao_JSON", "Usuário"])
                         
                         todas_linhas_existentes = ws_hist_orc.get_all_values()
                         contagem_revisoes = 0
@@ -966,28 +1036,34 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                         
                         nova_linha_banco = [
                             agora, st.session_state.nome_projeto_orcamento, revisao_atual,
-                            f"R$ {subtotal_materiais:.2f}".replace('.', ','), f"R$ {custo_servicos_logica:.2f}".replace('.', ','), f"R$ {total_projeto:.2f}".replace('.', ','), json_config
+                            f"R$ {subtotal_materiais:.2f}".replace('.', ','), f"R$ {custo_servicos_logica:.2f}".replace('.', ','), f"R$ {total_projeto:.2f}".replace('.', ','), json_config, st.session_state.usuario_logado
                         ]
                         ws_hist_orc.append_row(nova_linha_banco)
-                        st.success(f"✅ Sucesso! Orcamento '{st.session_state.nome_projeto_orcamento}' gravado com a revisão {revisao_atual}!")
+                        st.success(f"✅ Sucesso! Orçamento para '{st.session_state.nome_projeto_orcamento}' salvo com a revisão {revisao_atual}!")
                     except Exception as e: st.error(f"Erro ao salvar: {e}")
 
-            # --- LEITURA DO HISTÓRICO COM EXIBIÇÃO DE REVISÃO ---
-            with st.expander("📂 Abrir Orçamento Existente (Consultar Histórico de Revisões)"):
+            # --- FILTRAGEM INTELIGENTE NO HISTÓRICO DE ACORDO COM O PERFIL LOGADO ---
+            with st.expander(f"📂 Abrir Orçamento Existente (Histórico de {st.session_state.nome_exibicao})"):
                 try:
                     sh = conectar_google_sheets()
                     todas_linhas = sh.worksheet("Historico_Orcamentos").get_all_values()
                     if len(todas_linhas) > 1:
                         dados_historico = todas_linhas[1:]
+                        
                         for idx_rev, linha in enumerate(dados_historico[::-1]):
                             idx_real = len(dados_historico) - 1 - idx_rev
+                            
+                            usuario_registro = linha[7] if len(linha) > 7 else "rodrigo.ribeiro"
+                            if usuario_registro.strip().lower() != st.session_state.usuario_logado.strip().lower():
+                                continue
+                                
                             with st.container():
                                 c1, c2, c3, c4 = st.columns([1.5, 3, 1.5, 1])
                                 d_h = linha[0]
                                 n_p = linha[1]
-                                rev = linha[2] if len(linha) == 7 else "R-00"
-                                tot_val = linha[5] if len(linha) == 7 else linha[4]
-                                j_salvo = linha[6] if len(linha) == 7 else linha[5]
+                                rev = linha[2] if len(linha) >= 7 else "R-00"
+                                tot_val = linha[5] if len(linha) >= 7 else linha[4]
+                                j_salvo = linha[6] if len(linha) >= 7 else linha[5]
                                 
                                 c1.write(f"📅 {d_h}")
                                 c2.write(f"**{n_p}** `({rev})`")
@@ -1006,8 +1082,8 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                                 st.session_state.nome_projeto_orcamento = d_a['nome']
                                 st.session_state.projeto_para_abrir = None
                                 st.rerun()
-                            if c_nao.button("❌ Cancelar", use_container_width=True):
+                            if c_nao.button("❌ Não, cancelar", use_container_width=True):
                                 st.session_state.projeto_para_abrir = None
                                 st.rerun()
-                    else: st.write("Nenhum levantamento salvo ainda.")
+                    else: st.write("Nenhum levantamento salvo neste perfil ainda.")
                 except Exception as e: st.write("A aba 'Historico_Orcamentos' está vazia ou aguardando dados.")
