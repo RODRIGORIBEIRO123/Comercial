@@ -8,9 +8,12 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import os
 import google.generativeai as genai
-from PIL import Image
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.utils import get_column_letter
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
+# --- CONFIGURAÇÃO DA TELA ---
 st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide", page_icon="📄")
 
 # ==========================================
@@ -68,22 +71,15 @@ if "menu_selecionado" not in st.session_state:
 if st.session_state.usuario_logado is None:
     st.markdown("""
         <style>
-        /* Puxa tudo o máximo para cima possível */
         .block-container {
             padding-top: 0rem !important;
             margin-top: -2rem !important;
         }
-        
-        /* Oculta os cabeçalhos nativos e EVITA bloqueio de clique com display:none */
         header {display: none !important;}
         [data-testid="collapsedControl"] {display: none !important;}
-        
-        /* Gradiente de fundo */
         .stApp {
             background: linear-gradient(135deg, #1C8590 0%, #8FD3B5 100%) !important;
         }
-        
-        /* Estiliza o Form do Streamlit para virar a "Caixa Branca" */
         [data-testid="stForm"] {
             background-color: white;
             border-radius: 12px;
@@ -93,8 +89,6 @@ if st.session_state.usuario_logado is None:
             position: relative;
             z-index: 100;
         }
-        
-        /* Ajuste dos botões dentro do Form */
         [data-testid="stFormSubmitButton"] button {
             background-color: #2b7bc4 !important;
             color: white !important;
@@ -107,8 +101,6 @@ if st.session_state.usuario_logado is None:
         [data-testid="stFormSubmitButton"] button:hover {
             background-color: #1a5c96 !important;
         }
-        
-        /* Estiliza os inputs de texto */
         input {
             border-bottom: 2px solid #ccc !important;
             border-top: none !important;
@@ -125,11 +117,9 @@ if st.session_state.usuario_logado is None:
         </style>
     """, unsafe_allow_html=True)
 
-    # Layout de 3 colunas para manter a caixa centralizada
     col1, col2, col3 = st.columns([1, 1.2, 1])
 
     with col2:
-        # Centraliza o logo fora do form
         st.write("")
         col_img1, col_img2, col_img3 = st.columns([1, 2, 1])
         with col_img2:
@@ -138,7 +128,6 @@ if st.session_state.usuario_logado is None:
             else:
                 st.markdown("<h2 style='text-align: center; color: white; margin-bottom:0;'>SIARCON</h2>", unsafe_allow_html=True)
         
-        # Caixa branca interativa e segura (Nativa do Streamlit)
         with st.form("form_login"):
             st.markdown("""
                 <div style="text-align: center; margin-bottom: 15px;">
@@ -158,31 +147,24 @@ if st.session_state.usuario_logado is None:
             
             if submit_login:
                 usuarios_validos = {
-                    "giovanna.ribeiro": "1234",
-                    "aline.ferraz": "1234",
-                    "janaina.dias": "1234",
-                    "victor.hugo": "1234",
-                    "rodrigo.ribeiro": "1234",
-                    "engenharia": "1234",
-                    "suprimentos": "1234",
-                    "obras": "1234"
+                    "giovanna.ribeiro": "1234", "aline.ferraz": "1234", "janaina.dias": "1234",
+                    "victor.hugo": "1234", "rodrigo.ribeiro": "1234", "engenharia": "1234",
+                    "suprimentos": "1234", "obras": "1234"
                 }
                 user_limpo = c_user.lower().strip()
                 
                 if user_limpo in usuarios_validos and c_pass == usuarios_validos[user_limpo]:
                     st.session_state.usuario_logado = user_limpo
                     st.session_state.nome_exibicao = user_limpo.split('.')[0].capitalize()
-                    
                     st.session_state.paineis_auto = []
                     st.session_state.nome_projeto_orcamento = ""
                     st.session_state.wizard_ativo = False
                     st.session_state.menu_selecionado = "🏠 Tela Inicial"
-                    
                     st.rerun()
                 else:
                     st.error("❌ Usuário ou senha incorretos.")
                     
-    st.stop() # Bloqueia o carregamento do resto do site enquanto não houver login
+    st.stop()
 
 # Restaura o padding normal e mostra o cabeçalho para a aplicação principal
 st.markdown("""
@@ -221,7 +203,6 @@ menu_ui = st.sidebar.radio(
 
 st.sidebar.markdown("---")
 
-# Atualiza a sessão de navegação de forma reativa
 if menu_ui != st.session_state.menu_selecionado:
     st.session_state.menu_selecionado = menu_ui
     st.rerun()
@@ -264,7 +245,6 @@ if st.session_state.menu_selecionado == "🏠 Tela Inicial":
         if st.button("Acessar Módulo ➔", key="btn_home_auto", type="primary", use_container_width=True):
             st.session_state.menu_selecionado = "🔌 Levantamento de Automação"
             st.rerun()
-
 
 # ==============================================================================
 # MÓDULO 1: GERADOR DE PROPOSTAS
@@ -562,7 +542,7 @@ elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
 
 
 # ==============================================================================
-# MÓDULO 2: SISTEMA DE AUTOMAÇÃO
+# MÓDULO 2: LEVANTAMENTO DE AUTOMAÇÃO
 # ==============================================================================
 elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     
@@ -585,99 +565,89 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     st.markdown("---")
 
     # ==========================================
-    # DATABASE DE PREÇOS E REGRAS SIARCON
+    # DATABASE DE PREÇOS E REGRAS SIARCON (COM TAGS)
     # ==========================================
     REGRA_IO = {
-        "Transmissor de pressão Dif. Para ar (Vazão de ar)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
-        "Transmissor de temperatura e umidade para duto": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Válvula de controle proporcional com atuador": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Relé de Corrente - Status Compressor": {"AI": 0, "AO": 0, "DI": 1, "DO": 2},
-        "Termostato de segurança (Proteção da resistência)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
-        "Pressostato diferencial para ar (Proteção da resistência)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
-        "Transmissor de temperatura para duto": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
-        "Resistência de aquecimento (Equipamento)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
-        "Resistência de aquecimento (Duto)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
-        "Válvula de controle de água gelada proporcional": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula de controle de água quente proporcional": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula de controle de vapor proporcional": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula motorizada Bypass Proporcional (até 2.1/2\")": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula motorizada Bypass Proporcional (3\" ou 4\")": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula motorizada Bypass Proporcional (5\")": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula motorizada Bypass Proporcional (6\")": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula motorizada Bypass Proporcional (8\")": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Transmissor de pressão para água": {"AI": 1, "AO": 2, "DI": 0, "DO": 0},
-        "Tranmissor de vazão para água": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula bloqueio motorizada": {"AI": 0, "AO": 0, "DI": 0, "DO": 1},
-        "Chave de fluxo": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
+        "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
+        "Transmissor de temperatura e umidade para duto (TT/MT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura para duto (TT)": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula de controle proporcional com atuador (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula de controle de água gelada proporcional (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula de controle de água quente proporcional (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula de controle de vapor proporcional (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Relé de Corrente - Status Compressor (TC)": {"AI": 0, "AO": 0, "DI": 1, "DO": 2},
+        "Termostato de segurança (TSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
+        "Pressostato diferencial para ar (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
+        "Resistência de aquecimento (Equipamento) (RAQ)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
+        "Resistência de aquecimento (Duto) (RAQ)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
+        "Válvula motorizada Bypass Proporcional (até 2.1/2\") (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula motorizada Bypass Proporcional (3\" ou 4\") (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula motorizada Bypass Proporcional (5\") (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula motorizada Bypass Proporcional (6\") (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula motorizada Bypass Proporcional (8\") (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Transmissor de pressão para água (PIT)": {"AI": 1, "AO": 2, "DI": 0, "DO": 0},
+        "Transmissor de vazão para água (FIT)": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula bloqueio motorizada (XV)": {"AI": 0, "AO": 0, "DI": 0, "DO": 1},
+        "Chave de fluxo (FS)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
         "Bombas (I/O para controlador)": {"AI": 0, "AO": 1, "DI": 1, "DO": 1},
         "Tanques (I/O para controlador)": {"AI": 1, "AO": 0, "DI": 1, "DO": 1},
-        "Pressostato - Filtro G4": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "Pressostato - Filtro F9": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "Pressostato - Filtro H13/H14": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "Status funcionamento ventilador ou exaustor (partida direta)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
-        "Transmissor de pressão diferencial - Filtro G4": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de pressão diferencial - Filtro F9": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Tranmissor de pressão diferencial - Filtro H13": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de pressão diferencial entre salas": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de pressão diferencial entre salas com display": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura Ambiente": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura ambiente com display": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura e umidade ambiente": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura e umidade ambiente com display": {"AI": 2, "AO": 0, "DI": 0, "DO": 0}
+        "Pressostato - Filtro G4 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Pressostato - Filtro F9 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Pressostato - Filtro H13/H14 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
+        "Transmissor de pressão diferencial - Filtro G4 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial - Filtro F9 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial - Filtro H13 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial entre salas (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial entre salas com display (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura Ambiente (TT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura ambiente com display (TIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura e umidade ambiente (TT/MT)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura e umidade ambiente com display (TT/MT)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0}
     }
 
     banco_padrao_precos = {
-        "Transmissor de pressão Dif. Para ar (Vazão de ar)": 1490.00,
-        "Transmissor de temperatura e umidade para duto": 2050.00,
-        "Válvula de controle proporcional com atuador": 0.00,
-        "Relé de Corrente - Status Compressor": 150.00,
-        "Termostato de segurança (Proteção da resistência)": 250.00,
-        "Pressostato diferencial para ar (Proteção da resistência)": 349.00,
-        "Transmissor de temperatura para duto": 800.00,
-        "Resistência de aquecimento (Equipamento)": 0.00,
-        "Resistência de aquecimento (Duto)": 0.00,
-        "Válvula de controle de água gelada proporcional": 0.00,
-        "Válvula de controle de água quente proporcional": 0.00,
-        "Válvula de controle de vapor proporcional": 0.00,
-        "Válvula motorizada Bypass Proporcional (até 2.1/2\")": 2690.00,
-        "Válvula motorizada Bypass Proporcional (3\" ou 4\")": 4950.00,
-        "Válvula motorizada Bypass Proporcional (5\")": 6450.00,
-        "Válvula motorizada Bypass Proporcional (6\")": 7900.00,
-        "Válvula motorizada Bypass Proporcional (8\")": 9200.00,
-        "Transmissor de pressão para água": 1359.00,
-        "Tranmissor de vazão para água": 3550.00,
-        "Válvula bloqueio motorizada": 0.00,
-        "Chave de fluxo": 349.00,
+        "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1490.00,
+        "Transmissor de temperatura e umidade para duto (TT/MT)": 2050.00,
+        "Transmissor de temperatura para duto (TT)": 800.00,
+        "Válvula de controle proporcional com atuador (TCV)": 0.00,
+        "Válvula de controle de água gelada proporcional (TCV)": 0.00,
+        "Válvula de controle de água quente proporcional (TCV)": 0.00,
+        "Válvula de controle de vapor proporcional (TCV)": 0.00,
+        "Relé de Corrente - Status Compressor (TC)": 150.00,
+        "Termostato de segurança (TSH)": 250.00,
+        "Pressostato diferencial para ar (PSH)": 349.00,
+        "Resistência de aquecimento (Equipamento) (RAQ)": 0.00,
+        "Resistência de aquecimento (Duto) (RAQ)": 0.00,
+        "Válvula motorizada Bypass Proporcional (hasta 2.1/2\") (TCV)": 2690.00,
+        "Válvula motorizada Bypass Proporcional (3\" ou 4\") (TCV)": 4950.00,
+        "Válvula motorizada Bypass Proporcional (5\") (TCV)": 6450.00,
+        "Válvula motorizada Bypass Proporcional (6\") (TCV)": 7900.00,
+        "Válvula motorizada Bypass Proporcional (8\") (TCV)": 9200.00,
+        "Transmissor de pressão para água (PIT)": 1359.00,
+        "Transmissor de vazão para água (FIT)": 3550.00,
+        "Válvula bloqueio motorizada (XV)": 0.00,
+        "Chave de fluxo (FS)": 349.00,
         "Bombas (I/O para controlador)": 0.00,
         "Tanques (I/O para controlador)": 0.00,
-        "Pressostato - Filtro G4": 349.00,
-        "Pressostato - Filtro F9": 349.00,
-        "Pressostato - Filtro H13/H14": 349.00,
-        "Status funcionamento ventilador ou exaustor (partida direta)": 349.00,
-        "Transmissor de pressão diferencial - Filtro G4": 1490.00,
-        "Transmissor de pressão diferencial - Filtro F9": 1490.00,
-        "Tranmissor de pressão diferencial - Filtro H13": 1490.00,
-        "Transmissor de pressão diferencial entre salas": 1490.00,
-        "Transmissor de pressão diferencial entre salas com display": 2110.00,
-        "Transmissor de temperatura Ambiente": 2050.00,
-        "Transmissor de temperatura ambiente com display": 2650.00,
-        "Transmissor de temperatura e umidade ambiente": 2050.00,
-        "Transmissor de temperatura e umidade ambiente com display": 2650.00,
+        "Pressostato - Filtro G4 (PSH)": 349.00,
+        "Pressostato - Filtro F9 (PSH)": 349.00,
+        "Pressostato - Filtro H13/H14 (PSH)": 349.00,
+        "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 349.00,
+        "Transmissor de pressão diferencial - Filtro G4 (PDIT)": 1490.00,
+        "Transmissor de pressão diferencial - Filtro F9 (PDIT)": 1490.00,
+        "Transmissor de pressão diferencial - Filtro H13 (PDIT)": 1490.00,
+        "Transmissor de pressão diferencial entre salas (PDT)": 1490.00,
+        "Transmissor de pressão diferencial entre salas com display (PDIT)": 2110.00,
+        "Transmissor de temperatura Ambiente (TT)": 2050.00,
+        "Transmissor de temperatura ambiente com display (TIT)": 2650.00,
+        "Transmissor de temperatura e umidade ambiente (TT/MT)": 2050.00,
+        "Transmissor de temperatura e umidade ambiente com display (TT/MT)": 2650.00,
         "MP-C-15A": 4649.49, "MP-C-18A": 5185.54, "MP-C-24A": 7290.75, "MP-C-36A": 9459.08,
         "Custo AI/AO": 565.00, "Custo DI/DO": 120.00,
-        "Licença Supervisório - SEM CFR-21 (Base)": 23000.00,
-        "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)": 100.00,
-        "Licença Supervisório - COM CFR-21 (Base)": 23000.00,
-        "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
-        "Licença Supervisório - Schneider EBO (Base)": 13000.00,
-        "Licença Supervisório - Schneider EBO (Por Ponto I/O)": 110.00
-    }
-
-    OPCOES_SUPERVISAO = {
-        "Sem Supervisório": {"base": 0.0, "por_ponto": 0.0},
-        "Sistema supervisório SEM certificação CFR-21": {"base": 23000.0, "por_ponto": 100.0},
-        "Sistema supervisório COM certificação CFR-21": {"base": 23000.0, "por_ponto": 285.0},
-        "Sistema de monitoramento Schneider EBO": {"base": 13000.0, "por_ponto": 110.0}
+        "Licença Supervisório - SEM CFR-21 (Base)": 23000.00, "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)": 100.00,
+        "Licença Supervisório - COM CFR-21 (Base)": 23000.00, "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
+        "Licença Supervisório - Schneider EBO (Base)": 13000.00, "Licença Supervisório - Schneider EBO (Por Ponto I/O)": 110.00
     }
 
     if 'banco_precos_carregado' not in st.session_state:
@@ -693,63 +663,62 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         except: pass
         st.session_state.banco_precos_carregado = True
 
-    # Trava de atualização de preços caso novos itens não existam na nuvem
     for k_n, v_n in banco_padrao_precos.items():
         if k_n not in st.session_state.precos_banco: 
             st.session_state.precos_banco[k_n] = v_n
 
     GRUPOS_INSTRUMENTOS = {
         "🔹 Controle (HVAC e Máquinas)": [
-            "Transmissor de pressão Dif. Para ar (Vazão de ar)",
-            "Transmissor de temperatura e umidade para duto", "Transmissor de temperatura para duto",
-            "Válvula de controle proporcional com atuador", "Válvula de controle de água gelada proporcional",
-            "Válvula de controle de água quente proporcional", "Válvula de controle de vapor proporcional",
-            "Relé de Corrente - Status Compressor", "Termostato de segurança (Proteção da resistência)",
-            "Pressostato diferencial para ar (Proteção da resistência)", "Resistência de aquecimento (Equipamento)", "Resistência de aquecimento (Duto)"
+            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)",
+            "Transmissor de temperatura e umidade para duto (TT/MT)", "Transmissor de temperatura para duto (TT)",
+            "Válvula de controle proporcional com atuador (TCV)", "Válvula de controle de água gelada proporcional (TCV)",
+            "Válvula de controle de água quente proporcional (TCV)", "Válvula de controle de vapor proporcional (TCV)",
+            "Relé de Corrente - Status Compressor (TC)", "Termostato de segurança (TSH)",
+            "Pressostato diferencial para ar (PSH)", "Resistência de aquecimento (Equipamento) (RAQ)", "Resistência de aquecimento (Duto) (RAQ)"
         ],
         "💧 Controle (Central de Água Gelada - CAG)": [
-            "Válvula motorizada Bypass Proporcional (até 2.1/2\")", "Válvula motorizada Bypass Proporcional (3\" ou 4\")",
-            "Válvula motorizada Bypass Proporcional (5\")", "Válvula motorizada Bypass Proporcional (6\")",
-            "Válvula motorizada Bypass Proporcional (8\")", "Transmissor de pressão para água",
-            "Tranmissor de vazão para água", "Válvula bloqueio motorizada", "Chave de fluxo", "Bombas (I/O para controlador)", "Tanques (I/O para controlador)"
+            "Válvula motorizada Bypass Proporcional (até 2.1/2\") (TCV)", "Válvula motorizada Bypass Proporcional (3\" ou 4\") (TCV)",
+            "Válvula motorizada Bypass Proporcional (5\") (TCV)", "Válvula motorizada Bypass Proporcional (6\") (TCV)",
+            "Válvula motorizada Bypass Proporcional (8\") (TCV)", "Transmissor de pressão para água (PIT)",
+            "Transmissor de vazão para água (FIT)", "Válvula bloqueio motorizada (XV)", "Chave de fluxo (FS)", "Bombas (I/O para controlador)", "Tanques (I/O para controlador)"
         ],
         "🔸 Monitoramento (Filtros e Status)": [
-            "Pressostato - Filtro G4", "Pressostato - Filtro F9", "Pressostato - Filtro H13/H14",
-            "Status funcionamento ventilador ou exaustor (partida direta)", "Transmissor de pressão diferencial - Filtro G4",
-            "Transmissor de pressão diferencial - Filtro F9", "Tranmissor de pressão diferencial - Filtro H13"
+            "Pressostato - Filtro G4 (PSH)", "Pressostato - Filtro F9 (PSH)", "Pressostato - Filtro H13/H14 (PSH)",
+            "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", "Transmissor de pressão diferencial - Filtro G4 (PDIT)",
+            "Transmissor de pressão diferencial - Filtro F9 (PDIT)", "Transmissor de pressão diferencial - Filtro H13 (PDIT)"
         ],
         "🟢 Monitoramento de Ambiente (Salas)": [
-            "Transmissor de pressão diferencial entre salas", "Transmissor de pressão diferencial entre salas com display",
-            "Transmissor de temperatura Ambiente", "Transmissor de temperatura ambiente com display",
-            "Transmissor de temperatura e umidade ambiente", "Transmissor de temperatura e umidade ambiente com display"
+            "Transmissor de pressão diferencial entre salas (PDT)", "Transmissor de pressão diferencial entre salas com display (PDIT)",
+            "Transmissor de temperatura Ambiente (TT)", "Transmissor de temperatura ambiente com display (TIT)",
+            "Transmissor de temperatura e umidade ambiente (TT/MT)", "Transmissor de temperatura e umidade ambiente com display (TT/MT)"
         ]
     }
     
     KITS_PADRAO = {
         "❄️ UTA Padrão - Água Gelada": {
-            "Transmissor de pressão Dif. Para ar (Vazão de ar)": 1,
-            "Transmissor de temperatura e umidade para duto": 1, "Válvula de controle de água gelada proporcional": 1,
-            "Pressostato - Filtro G4": 1, "Pressostato - Filtro F9": 1, "Pressostato - Filtro H13/H14": 1
+            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1,
+            "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Válvula de controle de água gelada proporcional (TCV)": 1,
+            "Pressostato - Filtro G4 (PSH)": 1, "Pressostato - Filtro F9 (PSH)": 1, "Pressostato - Filtro H13/H14 (PSH)": 1
         },
         "🌬️ UTA Padrão - Expansão Direta": {
-            "Transmissor de pressão Dif. Para ar (Vazão de ar)": 1,
-            "Transmissor de temperatura e umidade para duto": 1, "Relé de Corrente - Status Compressor": 2,
-            "Pressostato - Filtro G4": 1, "Pressostato - Filtro F9": 1, "Pressostato - Filtro H13/H14": 1
+            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1,
+            "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Relé de Corrente - Status Compressor (TC)": 2,
+            "Pressostato - Filtro G4 (PSH)": 1, "Pressostato - Filtro F9 (PSH)": 1, "Pressostato - Filtro H13/H14 (PSH)": 1
         },
         "🔥 UTA Padrão - Água Gelada + Resistência": {
-            "Transmissor de pressão Dif. Para ar (Vazão de ar)": 1,
-            "Transmissor de temperatura e umidade para duto": 1, "Válvula de controle de água gelada proporcional": 1,
-            "Pressostato - Filtro G4": 1, "Pressostato - Filtro F9": 1, "Pressostato - Filtro H13/H14": 1,
-            "Termostato de segurança (Proteção da resistência)": 1, "Pressostato diferencial para ar (Proteção da resistência)": 1
+            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1,
+            "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Válvula de controle de água gelada proporcional (TCV)": 1,
+            "Pressostato - Filtro G4 (PSH)": 1, "Pressostato - Filtro F9 (PSH)": 1, "Pressostato - Filtro H13/H14 (PSH)": 1,
+            "Termostato de segurança (TSH)": 1, "Pressostato diferencial para ar (PSH)": 1
         },
-        "♨️ UTA Padrão - Expansão Direta + Resistência": {
-            "Transmissor de pressão Dif. Para ar (Vazão de ar)": 1,
-            "Transmissor de temperatura e umidade para duto": 1, "Relé de Corrente - Status Compressor": 2,
-            "Pressostato - Filtro G4": 1, "Pressostato - Filtro F9": 1, "Pressostato - Filtro H13/H14": 1,
-            "Termostato de segurança (Proteção da resistência)": 1, "Pressostato diferencial para ar (Proteção da resistência)": 1
+        "ENTREGÁVEL EXP. DIRET + RESISTÊNCIA": {
+            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1,
+            "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Relé de Corrente - Status Compressor (TC)": 2,
+            "Pressostato - Filtro G4 (PSH)": 1, "Pressostato - Filtro F9 (PSH)": 1, "Pressostato - Filtro H13/H14 (PSH)": 1,
+            "Termostato de segurança (TSH)": 1, "Pressostato diferencial para ar (PSH)": 1
         },
-        "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão Dif. Para ar (Vazão de ar)": 1 },
-        "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta)": 1 }
+        "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1 },
+        "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 }
     }
 
     PRECOS_IHM = {"Sem Interface (Cego)": 0.0, "IHM Básica 4.3\"": 1700.00, "IHM Padrão 7\"": 3400.00, "IHM Premium 10\"": 8500.00}
@@ -778,8 +747,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     ])
 
     with aba_auto:
-        
-        # ASSISTENTE EM ETAPAS
         if not st.session_state.wizard_ativo:
             if st.button("➕ Criar Novo Quadro de Automação", type="primary"):
                 st.session_state.wizard_ativo = True
@@ -848,7 +815,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
         st.write("")
 
-        # EXIBIÇÃO DOS QUADROS CRIADOS (DASHBOARD)
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
             with st.container(border=True):
                 c_icone, c_nome_painel, c_ihm_painel = st.columns([0.5, 4, 2])
@@ -951,9 +917,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     st.session_state.paineis_auto.pop(p_idx)
                     st.rerun()
         
-        # ---------------------------------------------------------
-        # BOTÃO: SALVAR RASCUNHO E SAIR DA TELA
-        # ---------------------------------------------------------
         if st.session_state.paineis_auto:
             st.markdown("---")
             if st.button("💾 Salvar Rascunho e Sair (Retomar depois)", type="secondary", use_container_width=True):
@@ -990,7 +953,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         st.rerun()
                     except Exception as e: st.error(f"Erro ao salvar rascunho: {e}")
 
-        # --- FILTRAGEM INTELIGENTE NO HISTÓRICO ---
         st.markdown("---")
         with st.expander(f"📂 Abrir Orçamento Existente (Histórico de {st.session_state.nome_exibicao})"):
             try:
@@ -999,20 +961,20 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 if len(todas_linhas) > 1:
                     dados_historico = todas_linhas[1:]
                     
-                    for idx_rev, linha in enumerate(dados_historico[::-1]):
+                    for idx_rev, línea in enumerate(dados_historico[::-1]):
                         idx_real = len(dados_historico) - 1 - idx_rev
                         
-                        usuario_registro = linha[7] if len(linha) > 7 else "rodrigo.ribeiro"
+                        usuario_registro = línea[7] if len(línea) > 7 else "rodrigo.ribeiro"
                         if usuario_registro.strip().lower() != st.session_state.usuario_logado.strip().lower():
                             continue
                             
                         with st.container():
                             c1, c2, c3, c4 = st.columns([1.5, 3, 1.5, 1])
-                            d_h = linha[0]
-                            n_p = linha[1]
-                            rev = linha[2] if len(linha) >= 7 else "R-00"
-                            tot_val = linha[5] if len(linha) >= 7 else linha[4]
-                            j_salvo = linha[6] if len(linha) >= 7 else linha[5]
+                            d_h = línea[0]
+                            n_p = línea[1]
+                            rev = línea[2] if len(línea) >= 7 else "R-00"
+                            tot_val = línea[5] if len(línea) >= 7 else línea[4]
+                            j_salvo = línea[6] if len(línea) >= 7 else línea[5]
                             
                             c1.write(f"📅 {d_h}")
                             c2.write(f"**{n_p}** `({rev})`")
@@ -1179,7 +1141,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     if qtd > 0:
                         qtd_final = qtd * mult
                         preco_item = st.session_state.precos_banco.get(inst, 0.0)
-                        
                         io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
                         
                         total_ai_painel += qtd_final * io_vals["AI"]
@@ -1244,21 +1205,88 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             c2.warning(f"**Serviços de Lógica (25%):**\nR$ {custo_servicos_logica:,.2f}")
             c3.success(f"**CUSTO TOTAL ESTIMADO:**\nR$ {total_projeto:,.2f}")
             
+            # --- MOTOR DE EXPORTAÇÃO COMPLETO COM OPENPYXL ---
+            df_exportacao = pd.concat([
+                df_agrupado, 
+                pd.DataFrame([{'Categoria': 'Serviços', 'Item': 'Mão de Obra Lógica', 'Preço Unit.': custo_servicos_logica, 'Qtd': 1, 'Custo Total': custo_servicos_logica}]), 
+                pd.DataFrame([{'Categoria': 'TOTAL', 'Item': 'Geral', 'Preço Unit.': '-', 'Qtd': '-', 'Custo Total': total_projeto}])
+            ], ignore_index=True)
+
             df_pontos = pd.DataFrame(linhas_pontos)
             if not df_pontos.empty:
                 total_qtd = df_pontos['Quantidade Total'].sum()
                 linha_total = pd.DataFrame([{"Painel": "TOTAL GERAL", "Grupo/Equipamento": "-", "Instrumento": "-", "Quantidade Total": total_qtd, "Entrada Digital (DI)": df_pontos['Entrada Digital (DI)'].sum(), "Saída Digital (DO)": df_pontos['Saída Digital (DO)'].sum(), "Entrada Analógica (AI)": df_pontos['Entrada Analógica (AI)'].sum(), "Saída Analógica (AO)": df_pontos['Saída Analógica (AO)'].sum()}])
                 df_pontos = pd.concat([df_pontos, linha_total], ignore_index=True)
 
+            # Estrutura openpyxl customizada
             buffer = io.BytesIO()
-            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                df_exportacao = pd.concat([
-                    df_agrupado, 
-                    pd.DataFrame([{'Categoria': 'Serviços', 'Item': 'Mão de Obra Lógica', 'Preço Unit.': custo_servicos_logica, 'Qtd': 1, 'Custo Total': custo_servicos_logica}]), 
-                    pd.DataFrame([{'Categoria': 'TOTAL', 'Item': 'Geral', 'Preço Unit.': '-', 'Qtd': '-', 'Custo Total': total_projeto}])
-                ], ignore_index=True)
-                df_exportacao.to_excel(writer, index=False, sheet_name='Detalhamento Financeiro')
-                if not df_pontos.empty: df_pontos.to_excel(writer, index=False, sheet_name='Matriz de Pontos (IO)')
+            wb = openpyxl.Workbook()
+            
+            # Aba 1
+            ws1 = wb.active
+            ws1.title = "Detalhamento Financeiro"
+            ws1.views.sheetView[0].showGridLines = True
+            
+            start_row = 1
+            if ARQUIVO_LOGO:
+                try:
+                    from openpyxl.drawing.image import Image as OpenpyxlImage
+                    img = OpenpyxlImage(ARQUIVO_LOGO)
+                    img.width = 150
+                    img.height = 42
+                    ws1.add_image(img, "A1")
+                    start_row = 4
+                except: pass
+                
+            fill_header = PatternFill(start_color="1C8590", end_color="1C8590", fill_type="solid")
+            font_header = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+            border_thin = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
+            
+            for r_idx, row in enumerate(dataframe_to_rows(df_exportacao, index=False, header=True), start=start_row):
+                for c_idx, value in enumerate(row, start=1):
+                    cell = ws1.cell(row=r_idx, column=c_idx, value=value)
+                    cell.border = border_thin
+                    if r_idx == start_row:
+                        cell.fill = fill_header
+                        cell.font = font_header
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                    else:
+                        cell.font = Font(name="Arial", size=10)
+                        if c_idx in [3, 5]: # Preço Unit e Custo Total
+                            cell.number_format = 'R$ #,##0.00'
+                            cell.alignment = Alignment(horizontal="right")
+                        elif c_idx == 4:
+                            cell.alignment = Alignment(horizontal="center")
+                            
+            for col in ws1.columns:
+                max_len = max(len(str(cell.value or '')) for cell in col)
+                col_letter = get_column_letter(col[0].column)
+                ws1.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
+            # Aba 2
+            if not df_pontos.empty:
+                ws2 = wb.create_sheet(title="Matriz de Pontos (IO)")
+                ws2.views.sheetView[0].showGridLines = True
+                for r_idx, row in enumerate(dataframe_to_rows(df_pontos, index=False, header=True), start=1):
+                    for c_idx, value in enumerate(row, start=1):
+                        cell = ws2.cell(row=r_idx, column=c_idx, value=value)
+                        cell.border = border_thin
+                        if r_idx == 1:
+                            cell.fill = fill_header
+                            cell.font = font_header
+                            cell.alignment = Alignment(horizontal="center", vertical="center")
+                        else:
+                            cell.font = Font(name="Arial", size=10)
+                            if c_idx >= 4:
+                                cell.alignment = Alignment(horizontal="center")
+                                
+                for col in ws2.columns:
+                    max_len = max(len(str(cell.value or '')) for cell in col)
+                    col_letter = get_column_letter(col[0].column)
+                    ws2.column_dimensions[col_letter].width = max(max_len + 4, 12)
+            
+            wb.save(buffer)
+            buffer.seek(0)
             
             st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             st.markdown("---")
