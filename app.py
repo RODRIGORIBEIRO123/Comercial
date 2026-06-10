@@ -61,6 +61,8 @@ if "usuario_logado" not in st.session_state:
     st.session_state.usuario_logado = None
 if "nome_exibicao" not in st.session_state:
     st.session_state.nome_exibicao = ""
+if "menu_selecionado" not in st.session_state:
+    st.session_state.menu_selecionado = "🏠 Tela Inicial"
 
 # Se não estiver logado, exibe a tela de login
 if st.session_state.usuario_logado is None:
@@ -174,6 +176,7 @@ if st.session_state.usuario_logado is None:
                     st.session_state.paineis_auto = []
                     st.session_state.nome_projeto_orcamento = ""
                     st.session_state.wizard_ativo = False
+                    st.session_state.menu_selecionado = "🏠 Tela Inicial"
                     
                     st.rerun()
                 else:
@@ -204,21 +207,69 @@ if st.sidebar.button("🚪 Sair do Perfil", type="secondary"):
     st.session_state.nome_exibicao = ""
     st.session_state.paineis_auto = []
     st.session_state.nome_projeto_orcamento = ""
+    st.session_state.menu_selecionado = "🏠 Tela Inicial"
     st.rerun()
 
 st.sidebar.markdown("---")
 
-menu_selecionado = st.sidebar.radio(
-    "Selecione o módulo:",
-    ["📄 Gerador de Propostas", "🔌 Sistema de Automação"]
+opcoes_menu = ["🏠 Tela Inicial", "📄 Gerador de Propostas", "🔌 Levantamento de Automação"]
+menu_ui = st.sidebar.radio(
+    "Módulos do Sistema",
+    opcoes_menu,
+    index=opcoes_menu.index(st.session_state.menu_selecionado)
 )
 
 st.sidebar.markdown("---")
 
+# Atualiza a sessão de navegação de forma reativa
+if menu_ui != st.session_state.menu_selecionado:
+    st.session_state.menu_selecionado = menu_ui
+    st.rerun()
+
+# ==============================================================================
+# TELA 0: HOME / TELA INICIAL (DASHBOARD)
+# ==============================================================================
+if st.session_state.menu_selecionado == "🏠 Tela Inicial":
+    st.write("")
+    st.markdown(f"<h1 style='text-align: center; color: #178B96;'>Bem-vindo(a), {st.session_state.nome_exibicao}!</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; font-size: 18px; color: #666;'>Portal Comercial e de Engenharia SIARCON. Selecione o módulo desejado para iniciar:</p>", unsafe_allow_html=True)
+    
+    st.write("")
+    st.write("")
+    
+    col_vazia_esq, col_card1, col_vazia_meio, col_card2, col_vazia_dir = st.columns([1, 2.5, 0.5, 2.5, 1])
+    
+    with col_card1:
+        st.markdown("""
+        <div style='text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #1C8590;'>
+            <h1 style='font-size: 50px; margin-bottom: 10px;'>📄</h1>
+            <h3 style='color: #333;'>Gerador de Propostas</h3>
+            <p style='color: #666; font-size: 14px; height: 40px;'>Criação rápida e padronizada de escopos técnicos e comerciais em Word.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.write("")
+        if st.button("Acessar Módulo ➔", key="btn_home_prop", type="primary", use_container_width=True):
+            st.session_state.menu_selecionado = "📄 Gerador de Propostas"
+            st.rerun()
+
+    with col_card2:
+        st.markdown("""
+        <div style='text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #1C8590;'>
+            <h1 style='font-size: 50px; margin-bottom: 10px;'>🔌</h1>
+            <h3 style='color: #333;'>Levantamento de Automação</h3>
+            <p style='color: #666; font-size: 14px; height: 40px;'>Dimensionamento estrutural e financeiro de hardware, infraestrutura e supervisório.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.write("")
+        if st.button("Acessar Módulo ➔", key="btn_home_auto", type="primary", use_container_width=True):
+            st.session_state.menu_selecionado = "🔌 Levantamento de Automação"
+            st.rerun()
+
+
 # ==============================================================================
 # MÓDULO 1: GERADOR DE PROPOSTAS
 # ==============================================================================
-if menu_selecionado == "📄 Gerador de Propostas":
+elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
     
     st.sidebar.subheader("Opções da Proposta")
     modo_preenchimento = st.sidebar.radio(
@@ -513,7 +564,7 @@ if menu_selecionado == "📄 Gerador de Propostas":
 # ==============================================================================
 # MÓDULO 2: SISTEMA DE AUTOMAÇÃO
 # ==============================================================================
-elif menu_selecionado == "🔌 Sistema de Automação":
+elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     
     st.title("🔌 Engenharia e Custos - Automação e Infra")
     st.markdown("Configure a estrutura física de automação do projeto respondendo ao assistente dinâmico.")
@@ -642,6 +693,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
         except: pass
         st.session_state.banco_precos_carregado = True
 
+    # Trava de atualização de preços caso novos itens não existam na nuvem
     for k_n, v_n in banco_padrao_precos.items():
         if k_n not in st.session_state.precos_banco: 
             st.session_state.precos_banco[k_n] = v_n
@@ -727,6 +779,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
 
     with aba_auto:
         
+        # ASSISTENTE EM ETAPAS
         if not st.session_state.wizard_ativo:
             if st.button("➕ Criar Novo Quadro de Automação", type="primary"):
                 st.session_state.wizard_ativo = True
@@ -795,6 +848,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
 
         st.write("")
 
+        # EXIBIÇÃO DOS QUADROS CRIADOS (DASHBOARD)
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
             with st.container(border=True):
                 c_icone, c_nome_painel, c_ihm_painel = st.columns([0.5, 4, 2])
@@ -897,6 +951,9 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                     st.session_state.paineis_auto.pop(p_idx)
                     st.rerun()
         
+        # ---------------------------------------------------------
+        # BOTÃO: SALVAR RASCUNHO E SAIR DA TELA
+        # ---------------------------------------------------------
         if st.session_state.paineis_auto:
             st.markdown("---")
             if st.button("💾 Salvar Rascunho e Sair (Retomar depois)", type="secondary", use_container_width=True):
@@ -933,6 +990,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                         st.rerun()
                     except Exception as e: st.error(f"Erro ao salvar rascunho: {e}")
 
+        # --- FILTRAGEM INTELIGENTE NO HISTÓRICO ---
         st.markdown("---")
         with st.expander(f"📂 Abrir Orçamento Existente (Histórico de {st.session_state.nome_exibicao})"):
             try:
