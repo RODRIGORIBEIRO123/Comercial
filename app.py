@@ -88,14 +88,14 @@ if st.session_state.usuario_logado is None:
         st.markdown('<div class="login-box">', unsafe_allow_html=True)
         
         try:
-            st.image("SIARCON .png", width=250)
+            st.image("SIARCON.png", width=250)
         except:
             st.markdown("### SIARCON Engenharia")
             
         st.markdown('<p class="login-title">Módulo Comercial</p>', unsafe_allow_html=True)
         st.markdown('<p class="login-desc">Insira as suas credenciais para aceder.</p>', unsafe_allow_html=True)
         
-        c_user = st.text_input("Utilizador:", placeholder="giovanna.ribeiro", label_visibility="collapsed")
+        c_user = st.text_input("Utilizador:", placeholder="rodrigo.ribeiro", label_visibility="collapsed")
         st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
         c_pass = st.text_input("Senha:", type="password", placeholder="••••", label_visibility="collapsed")
         
@@ -117,6 +117,12 @@ if st.session_state.usuario_logado is None:
                 st.session_state.usuario_logado = user_limpo
                 primeiro_nome = user_limpo.split('.')[0].capitalize()
                 st.session_state.nome_exibicao = primeiro_nome
+                
+                # Zera e limpa o sistema para este novo usuário
+                st.session_state.paineis_auto = []
+                st.session_state.nome_projeto_orcamento = ""
+                st.session_state.wizard_ativo = False
+                
                 st.rerun()
             else:
                 st.error("❌ Utilizador ou senha incorretos.")
@@ -127,7 +133,7 @@ if st.session_state.usuario_logado is None:
 
 # === MENU LATERAL PRINCIPAL ===
 try:
-    st.sidebar.image("SIARCON .png", use_container_width=True)
+    st.sidebar.image("SIARCON.png", use_container_width=True)
 except:
     st.sidebar.markdown("### SIARCON")
     
@@ -460,9 +466,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
     if 'orcamento' not in st.session_state: st.session_state.orcamento = []
     if 'historico_precos' not in st.session_state: st.session_state.historico_precos = []
     if 'wizard_ativo' not in st.session_state: st.session_state.wizard_ativo = False
-    
-    if 'paineis_auto' not in st.session_state: 
-        st.session_state.paineis_auto = []
+    if 'paineis_auto' not in st.session_state: st.session_state.paineis_auto = []
         
     nome_proj = st.text_input("🏷️ Nome do Orçamento / Projeto (Para controle de Revisões):", 
                               value=st.session_state.nome_projeto_orcamento,
@@ -566,8 +570,23 @@ elif menu_selecionado == "🔌 Sistema de Automação":
         "Sistema de monitoramento Schneider EBO": {"base": 13000.0, "por_ponto": 110.0}
     }
 
+    if 'banco_precos_carregado' not in st.session_state:
+        st.session_state.precos_banco = banco_padrao_precos.copy()
+        try:
+            sh = conectar_google_sheets()
+            try:
+                aba_p = sh.worksheet("Precos").get_all_values()
+                if len(aba_p) > 1:
+                    precos_bd = {linha[0]: float(linha[1]) for linha in aba_p[1:] if len(linha) > 1}
+                    st.session_state.precos_banco.update(precos_bd)
+            except: pass
+        except: pass
+        st.session_state.banco_precos_carregado = True
+
+    # Trava de atualização de preços caso novos itens não existam na nuvem
     for k_n, v_n in banco_padrao_precos.items():
-        if k_n not in st.session_state.precos_banco: st.session_state.precos_banco[k_n] = v_n
+        if k_n not in st.session_state.precos_banco: 
+            st.session_state.precos_banco[k_n] = v_n
 
     GRUPOS_INSTRUMENTOS = {
         "🔹 Controle (HVAC e Máquinas)": [
@@ -774,10 +793,12 @@ elif menu_selecionado == "🔌 Sistema de Automação":
 
                     total_ai_g = total_ao_g = total_di_g = total_do_g = 0
                     for inst, q in g_data['instrumentos'].items():
-                        total_ai_g += q * REGRA_IO[inst]["AI"]
-                        total_ao_g += q * REGRA_IO[inst]["AO"]
-                        total_di_g += q * REGRA_IO[inst]["DI"]
-                        total_do_g += q * REGRA_IO[inst]["DO"]
+                        # Uso de .get() para segurança com orçamentos antigos
+                        io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
+                        total_ai_g += q * io_vals["AI"]
+                        total_ao_g += q * io_vals["AO"]
+                        total_di_g += q * io_vals["DI"]
+                        total_do_g += q * io_vals["DO"]
                     
                     m_mult = g_data['multiplicador']
                     total_ai_painel += total_ai_g * m_mult
@@ -980,12 +1001,16 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                     if qtd > 0:
                         qtd_final = qtd * mult
                         preco_item = st.session_state.precos_banco.get(inst, 0.0)
-                        total_ai_painel += qtd_final * REGRA_IO[inst]["AI"]
-                        total_ao_painel += qtd_final * REGRA_IO[inst]["AO"]
-                        total_di_painel += qtd_final * REGRA_IO[inst]["DI"]
-                        total_do_painel += qtd_final * REGRA_IO[inst]["DO"]
+                        
+                        # Uso de .get() para segurança com orçamentos antigos
+                        io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
+                        
+                        total_ai_painel += qtd_final * io_vals["AI"]
+                        total_ao_painel += qtd_final * io_vals["AO"]
+                        total_di_painel += qtd_final * io_vals["DI"]
+                        total_do_painel += qtd_final * io_vals["DO"]
                         linhas_resumo.append({"Categoria": f"{p['nome']} - Campo", "Item": f"{inst} ({g['nome_grupo']})", "Qtd": qtd_final, "Custo_Total": qtd_final * preco_item})
-                        linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": g['nome_grupo'], "Instrumento": inst, "Quantidade Total": qtd_final, "Entrada Digital (DI)": qtd_final * REGRA_IO[inst]["DI"], "Saída Digital (DO)": qtd_final * REGRA_IO[inst]["DO"], "Entrada Analógica (AI)": qtd_final * REGRA_IO[inst]["AI"], "Saída Analógica (AO)": qtd_final * REGRA_IO[inst]["AO"]})
+                        linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": g['nome_grupo'], "Instrumento": inst, "Quantidade Total": qtd_final, "Entrada Digital (DI)": qtd_final * io_vals["DI"], "Saída Digital (DO)": qtd_final * io_vals["DO"], "Entrada Analógica (AI)": qtd_final * io_vals["AI"], "Saída Analógica (AO)": qtd_final * io_vals["AO"]})
 
             tot_io_painel = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
             if tot_io_painel > 0:
