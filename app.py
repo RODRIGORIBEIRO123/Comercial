@@ -50,16 +50,57 @@ if "usuario_logado" not in st.session_state:
 if "nome_exibicao" not in st.session_state:
     st.session_state.nome_exibicao = ""
 
+# Se não estiver logado, exibe a tela de login centralizada e estilizada
 if st.session_state.usuario_logado is None:
-    st.title("🔐 Módulo Comercial SIARCON - Login")
-    st.markdown("Insira suas credenciais para acessar suas propostas e dimensionamentos.")
-    
-    with st.container(border=True):
-        c_user = st.text_input("Usuário:")
-        c_pass = st.text_input("Senha:", type="password")
+    st.markdown("""
+        <style>
+        .login-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            max-width: 450px; 
+            margin: 50px auto; 
+            padding: 40px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .login-title {
+            margin-top: 15px;
+            margin-bottom: 5px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        .login-desc {
+            margin-bottom: 25px;
+            font-size: 15px;
+            color: #666;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 1, 1])
+
+    with col2:
+        st.markdown('<div class="login-box">', unsafe_allow_html=True)
         
+        try:
+            st.image("SIARCON .png", width=250)
+        except:
+            st.markdown("### SIARCON Engenharia")
+            
+        st.markdown('<p class="login-title">Módulo Comercial</p>', unsafe_allow_html=True)
+        st.markdown('<p class="login-desc">Insira as suas credenciais para aceder.</p>', unsafe_allow_html=True)
+        
+        c_user = st.text_input("Utilizador:", placeholder="giovanna.ribeiro", label_visibility="collapsed")
+        st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
+        c_pass = st.text_input("Senha:", type="password", placeholder="••••", label_visibility="collapsed")
+        
+        st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
         if st.button("Entrar no Sistema", type="primary", use_container_width=True):
-            # Base de usuários cadastrados
             usuarios_validos = {
                 "giovanna.ribeiro": "1234",
                 "aline.ferraz": "1234",
@@ -74,18 +115,22 @@ if st.session_state.usuario_logado is None:
             
             if user_limpo in usuarios_validos and c_pass == usuarios_validos[user_limpo]:
                 st.session_state.usuario_logado = user_limpo
-                # Extrai apenas o primeiro nome para a saudação visual
                 primeiro_nome = user_limpo.split('.')[0].capitalize()
                 st.session_state.nome_exibicao = primeiro_nome
-                
-                st.success(f"🔓 Acesso concedido! Bem-vindo(a), {primeiro_nome}.")
                 st.rerun()
             else:
-                st.error("❌ Usuário ou senha incorretos. Tente novamente.")
+                st.error("❌ Utilizador ou senha incorretos.")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
     st.stop()
 
 # === MENU LATERAL PRINCIPAL ===
-st.sidebar.image("https://via.placeholder.com/150x50.png?text=SIARCON", use_container_width=True)
+try:
+    st.sidebar.image("SIARCON .png", use_container_width=True)
+except:
+    st.sidebar.markdown("### SIARCON")
+    
 st.sidebar.title("Navegação Principal")
 
 st.sidebar.markdown(f"👤 Logado como: **{st.session_state.nome_exibicao}**")
@@ -606,7 +651,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
     with aba_auto:
         st.subheader("Configuração Estrutural dos Painéis")
         
-        # ASSISTENTE EM ETAPAS (SÓ ABRE SE SELECIONADO)
+        # ASSISTENTE EM ETAPAS
         if not st.session_state.wizard_ativo:
             if st.button("➕ Criar Novo Quadro de Automação", type="primary"):
                 st.session_state.wizard_ativo = True
@@ -757,7 +802,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                     st.rerun()
         
         # ---------------------------------------------------------
-        # 🆕 NOVO BOTÃO: SALVAR RASCUNHO E SAIR DA TELA
+        # BOTÃO: SALVAR RASCUNHO E SAIR DA TELA
         # ---------------------------------------------------------
         if st.session_state.paineis_auto:
             st.markdown("---")
@@ -789,7 +834,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                         ]
                         ws_hist_orc.append_row(nova_linha_banco)
                         
-                        # Reseta as variáveis da tela limpa
                         st.session_state.paineis_auto = []
                         st.session_state.nome_projeto_orcamento = ""
                         st.toast("📝 Rascunho salvo na nuvem com sucesso! Tela limpa.", icon="💾")
@@ -1011,7 +1055,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
             st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             st.markdown("---")
             
-            # --- SALVAR ENGENHARIA COMPLETA ---
             if st.button("☁️ Salvar Orçamento Final e Gerar Revisão", type="primary", use_container_width=True):
                 if not st.session_state.nome_projeto_orcamento: 
                     st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento / Projeto' antes de salvar.")
@@ -1042,7 +1085,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                         st.success(f"✅ Sucesso! Orçamento para '{st.session_state.nome_projeto_orcamento}' salvo com a revisão {revisao_atual}!")
                     except Exception as e: st.error(f"Erro ao salvar: {e}")
 
-            # --- FILTRAGEM INTELIGENTE NO HISTÓRICO DE ACORDO COM O PERFIL LOGADO ---
             with st.expander(f"📂 Abrir Orçamento Existente (Histórico de {st.session_state.nome_exibicao})"):
                 try:
                     sh = conectar_google_sheets()
