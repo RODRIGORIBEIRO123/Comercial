@@ -455,19 +455,21 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "Transmissor de temperatura e umidade ambiente": 2050.00,
         "Transmissor de temperatura e umidade ambiente com display": 2650.00,
 
+        # -- CONTROLADORES --
         "MP-C-15A": 4649.49,
         "MP-C-18A": 5185.54,
         "MP-C-24A": 7290.75,
         "MP-C-36A": 9459.08,
         "Custo AI/AO": 565.00,
-        "Custo DI/DO": 120.00
-    }
+        "Custo DI/DO": 120.00,
 
-    OPCOES_SUPERVISAO = {
-        "Sem Supervisório": {"base": 0.0, "por_ponto": 0.0},
-        "Sistema supervisório SEM certificação CFR-21": {"base": 23000.0, "por_ponto": 100.0},
-        "Sistema supervisório COM certificação CFR-21": {"base": 23000.0, "por_ponto": 285.0},
-        "Sistema de monitoramento Schneider EBO": {"base": 13000.0, "por_ponto": 110.0}
+        # -- SUPERVISÓRIOS --
+        "Licença Supervisório - SEM CFR-21 (Base)": 23000.00,
+        "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)": 100.00,
+        "Licença Supervisório - COM CFR-21 (Base)": 23000.00,
+        "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
+        "Licença Supervisório - Schneider EBO (Base)": 13000.00,
+        "Licença Supervisório - Schneider EBO (Por Ponto I/O)": 110.00
     }
 
     if 'banco_precos_carregado' not in st.session_state:
@@ -620,7 +622,13 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         
         # MÓDULO DE SOFTWARE GLOBAL
         st.markdown("#### 🖥️ Sistema Supervisório do Projeto")
-        opcoes_software = list(OPCOES_SUPERVISAO.keys())
+        opcoes_software = [
+            "Sem Supervisório",
+            "Sistema supervisório SEM certificação CFR-21",
+            "Sistema supervisório COM certificação CFR-21",
+            "Sistema de monitoramento Schneider EBO"
+        ]
+        
         if 'software_selecionado' not in st.session_state:
             st.session_state.software_selecionado = opcoes_software[0]
             
@@ -743,7 +751,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 st.markdown("#### 🧠 Inteligência e Estrutura do Quadro")
                 
                 m1, m2, m3, m4, m5 = st.columns(5)
-                # Removido o 'pts'
                 m1.metric("Total I/O", str(total_io_pontos))
                 m2.metric("Sensores (AI)", total_ai_painel)
                 m3.metric("Válvulas/Inv (AO)", total_ao_painel)
@@ -941,13 +948,27 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         for item in st.session_state.orcamento:
             linhas_resumo.append({"Categoria": item['Categoria'], "Item": item['Item'], "Qtd": item['Quantidade'], "Custo_Total": item['Custo_Total']})
 
-        # --- CÁLCULO DE LICENCIAMENTO DE SUPERVISÓRIO ---
-        total_pontos_projeto = sum([p["Quantidade Total"] for p in linhas_pontos])
-        if st.session_state.software_selecionado != "Sem Supervisório":
-             regra_soft = OPCOES_SUPERVISAO[st.session_state.software_selecionado]
-             linhas_resumo.append({"Categoria": "🖥️ Software de Supervisão", "Item": f"Licença Base: {st.session_state.software_selecionado}", "Qtd": 1, "Custo_Total": regra_soft["base"]})
-             if regra_soft["por_ponto"] > 0 and total_pontos_projeto > 0:
-                  linhas_resumo.append({"Categoria": "🖥️ Software de Supervisão", "Item": f"Licenciamento por Ponto de I/O (R$ {regra_soft['por_ponto']}/pto)", "Qtd": total_pontos_projeto, "Custo_Total": total_pontos_projeto * regra_soft["por_ponto"]})
+        # --- CÁLCULO DE LICENCIAMENTO DE SUPERVISÓRIO CORRIGIDO ---
+        total_pontos_projeto = sum([int(p["Entrada Digital (DI)"]) + int(p["Saída Digital (DO)"]) + int(p["Entrada Analógica (AI)"]) + int(p["Saída Analógica (AO)"]) for p in linhas_pontos])
+        
+        soft_sel = st.session_state.software_selecionado
+        base_price = 0.0
+        pto_price = 0.0
+        
+        if soft_sel == "Sistema supervisório SEM certificação CFR-21":
+            base_price = st.session_state.precos_banco.get("Licença Supervisório - SEM CFR-21 (Base)", 23000.0)
+            pto_price = st.session_state.precos_banco.get("Licença Supervisório - SEM CFR-21 (Por Ponto I/O)", 100.0)
+        elif soft_sel == "Sistema supervisório COM certificação CFR-21":
+            base_price = st.session_state.precos_banco.get("Licença Supervisório - COM CFR-21 (Base)", 23000.0)
+            pto_price = st.session_state.precos_banco.get("Licença Supervisório - COM CFR-21 (Por Ponto I/O)", 285.0)
+        elif soft_sel == "Sistema de monitoramento Schneider EBO":
+            base_price = st.session_state.precos_banco.get("Licença Supervisório - Schneider EBO (Base)", 13000.0)
+            pto_price = st.session_state.precos_banco.get("Licença Supervisório - Schneider EBO (Por Ponto I/O)", 110.0)
+
+        if soft_sel != "Sem Supervisório":
+             linhas_resumo.append({"Categoria": "🖥️ Software de Supervisão", "Item": f"Licença Base: {soft_sel}", "Qtd": 1, "Custo_Total": base_price})
+             if pto_price > 0 and total_pontos_projeto > 0:
+                  linhas_resumo.append({"Categoria": "🖥️ Software de Supervisão", "Item": f"Licenciamento por Ponto de I/O (R$ {pto_price}/pto)", "Qtd": total_pontos_projeto, "Custo_Total": total_pontos_projeto * pto_price})
 
         if len(linhas_resumo) > 0:
             df_final = pd.DataFrame(linhas_resumo)
