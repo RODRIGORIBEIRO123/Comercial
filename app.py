@@ -14,6 +14,18 @@ from PIL import Image
 st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide", page_icon="📄")
 
 # ==========================================
+# FUNÇÃO CAÇA-LOGO (Evita erros de nome de arquivo)
+# ==========================================
+def buscar_logo():
+    nomes_possiveis = ["SIARCON.png", "SIARCON .png", "siarcon.png", "Siarcon.png", "logo.png"]
+    for nome in nomes_possiveis:
+        if os.path.exists(nome):
+            return nome
+    return None
+
+ARQUIVO_LOGO = buscar_logo()
+
+# ==========================================
 # 🟢 CONEXÃO COM O GOOGLE SHEETS E IA
 # ==========================================
 PLANILHA_URL = "https://docs.google.com/spreadsheets/d/1DgBxNqwUepO2RW6GdRwnFHxg7dLlWiRGZjdglkQ8Ls0/edit?gid=1169331401#gid=1169331401"
@@ -50,7 +62,7 @@ if "usuario_logado" not in st.session_state:
 if "nome_exibicao" not in st.session_state:
     st.session_state.nome_exibicao = ""
 
-# Se não estiver logado, exibe a tela de login centralizada e estilizada
+# Se não estiver logado, exibe a tela de login
 if st.session_state.usuario_logado is None:
     st.markdown("""
         <style>
@@ -87,9 +99,9 @@ if st.session_state.usuario_logado is None:
     with col2:
         st.markdown('<div class="login-box">', unsafe_allow_html=True)
         
-        try:
-            st.image("SIARCON.png", width=250)
-        except:
+        if ARQUIVO_LOGO:
+            st.image(ARQUIVO_LOGO, width=250)
+        else:
             st.markdown("### SIARCON Engenharia")
             
         st.markdown('<p class="login-title">Módulo Comercial</p>', unsafe_allow_html=True)
@@ -118,7 +130,6 @@ if st.session_state.usuario_logado is None:
                 primeiro_nome = user_limpo.split('.')[0].capitalize()
                 st.session_state.nome_exibicao = primeiro_nome
                 
-                # Zera e limpa o sistema para este novo usuário
                 st.session_state.paineis_auto = []
                 st.session_state.nome_projeto_orcamento = ""
                 st.session_state.wizard_ativo = False
@@ -132,9 +143,9 @@ if st.session_state.usuario_logado is None:
     st.stop()
 
 # === MENU LATERAL PRINCIPAL ===
-try:
-    st.sidebar.image("SIARCON.png", use_container_width=True)
-except:
+if ARQUIVO_LOGO:
+    st.sidebar.image(ARQUIVO_LOGO, use_container_width=True)
+else:
     st.sidebar.markdown("### SIARCON")
     
 st.sidebar.title("Navegação Principal")
@@ -583,7 +594,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
         except: pass
         st.session_state.banco_precos_carregado = True
 
-    # Trava de atualização de preços caso novos itens não existam na nuvem
     for k_n, v_n in banco_padrao_precos.items():
         if k_n not in st.session_state.precos_banco: 
             st.session_state.precos_banco[k_n] = v_n
@@ -644,7 +654,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
 
     PRECOS_IHM = {"Sem Interface (Cego)": 0.0, "IHM Básica 4.3\"": 1700.00, "IHM Padrão 7\"": 3400.00, "IHM Premium 10\"": 8500.00}
 
-    # CORREÇÃO DA REGRA DO PAINEL
     def calcular_painel_fisico(qtd_controladores):
         if qtd_controladores == 0: return "Sem Painel", 0.0
         elif qtd_controladores <= 4: return "Quadro 600x400mm", 4500.00
@@ -771,8 +780,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                 total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
 
                 for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
-                    
-                    with st.expander(f"📦 {g_data['nome_grupo']} (Qtd: {g_data.get('multiplicador', 1)})"):
+                    with st.expander(f"📦 {g_data['nome_grupo']}"):
                         
                         qtd_key = f"m_g_{p_idx}_{g_idx}"
                         qtd_atual = st.session_state.get(qtd_key, g_data.get('multiplicador', 1))
