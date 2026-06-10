@@ -505,16 +505,28 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         # SCHNEIDER
         "MP-C-15A": 4649.49, "MP-C-18A": 5185.54, "MP-C-24A": 7290.75, "MP-C-36A": 9459.08,
         
-        # SIEMENS
+        # SIEMENS S7-1200
         "Siemens - CPU 1214C DC/DC/DC": 2500.00,
+        "Siemens - CPU 1215C DC/DC/DC": 3200.00,
         "Siemens - SM 1231 AI 8x13Bit": 1900.00,
         "Siemens - SM 1232 AQ 4x14Bit": 2100.00,
         "Siemens - SM 1221 DI 16x24VDC": 1200.00,
         "Siemens - SM 1222 DQ 16x24VDC": 1300.00,
         "Siemens - Fonte 24VDC 2.5A": 800.00,
         "Siemens - Cartão de Memória 4MB": 400.00,
-        "Serviço Siemens - Custo AI/AO": 750.00,
-        "Serviço Siemens - Custo DI/DO": 180.00
+        
+        # SIEMENS S7-1500
+        "Siemens - CPU 1511-1 PN": 5500.00,
+        "Siemens - AI 8xU/I HS": 2800.00,
+        "Siemens - AQ 4xU/I ST": 3100.00,
+        "Siemens - DI 16x24VDC HF": 1800.00,
+        "Siemens - DQ 16x24VDC/0.5A": 1900.00,
+        "Siemens - Fonte PM 1507 24VDC 8A": 1500.00,
+        "Siemens - Cartão de Memória 12MB": 900.00,
+        
+        # SERVIÇOS SIEMENS GERAIS
+        "Siemens - Serviço Custo AI/AO": 750.00,
+        "Siemens - Serviço Custo DI/DO": 180.00
     }
 
     if 'banco_precos_carregado' not in st.session_state:
@@ -605,7 +617,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             else: c15 += 1; rem -= 15
         return c36, c24, c18, c15
 
-    def dimensionar_siemens(ai, ao, di, do):
+    def dimensionar_siemens_1200(ai, ao, di, do):
         hw = {}
         rem_ai = max(0, ai - 2)
         rem_ao = max(0, ao - 0)
@@ -623,6 +635,24 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         if rem_do > 0: hw["Siemens - SM 1222 DQ 16x24VDC"] = (rem_do + 15) // 16
         return hw
 
+    def dimensionar_siemens_1500(ai, ao, di, do):
+        hw = {}
+        rem_ai = max(0, ai - 0) # 1511-1 PN não possui onboard
+        rem_ao = max(0, ao - 0)
+        rem_di = max(0, di - 0)
+        rem_do = max(0, do - 0)
+        
+        if ai>0 or ao>0 or di>0 or do>0:
+            hw["Siemens - CPU 1511-1 PN"] = 1
+            hw["Siemens - Fonte PM 1507 24VDC 8A"] = 1
+            hw["Siemens - Cartão de Memória 12MB"] = 1
+
+        if rem_ai > 0: hw["Siemens - AI 8xU/I HS"] = (rem_ai + 7) // 8
+        if rem_ao > 0: hw["Siemens - AQ 4xU/I ST"] = (rem_ao + 3) // 4
+        if rem_di > 0: hw["Siemens - DI 16x24VDC HF"] = (rem_di + 15) // 16
+        if rem_do > 0: hw["Siemens - DQ 16x24VDC/0.5A"] = (rem_do + 15) // 16
+        return hw
+
     aba_auto, aba_infra, aba_precos, aba_resumo = st.tabs([
         "🚀 Dimensionamento de Automação", "🔌 Infraestrutura Lançamento", "💲 Base de Preços", "📊 Orçamento Final"
     ])
@@ -637,22 +667,16 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             with st.container(border=True):
                 st.markdown("### 🧙‍♂️ Assistente de Configuração de Quadro")
                 
-                # SELEÇÃO DA ARQUITETURA DE HARDWARE (Schneider vs Siemens)
-                arquitetura_opt = st.radio("1. Selecione a Arquitetura do Hardware do Quadro:", ["SpaceLogic (Schneider)", "S7-1200 (Siemens)"], horizontal=True)
-                
+                arquitetura_opt = st.radio("1. Selecione a Arquitetura do Hardware do Quadro:", ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "S7-1500 (Siemens)"], horizontal=True)
                 tipo_q = st.radio("2. Selecione o Tipo do Quadro:", ["Controle (HVAC/Máquinas)", "CAG (Central de Água Gelada)"], horizontal=True)
                 sup_opt = st.radio("3. Este quadro fará parte de um Sistema de Supervisório?", ["Não", "Sim"], horizontal=True)
+                
                 soft_sel = "Sem Supervisório"
                 if sup_opt == "Sim":
-                    soft_sel = st.selectbox("Selecione o Software de Supervisão:", [
-                        "Sistema supervisório SEM certificação CFR-21",
-                        "Sistema supervisório COM certificação CFR-21",
-                        "Sistema de monitoramento Schneider EBO"
-                    ])
+                    soft_sel = st.selectbox("Selecione o Software de Supervisão:", ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21", "Sistema de monitoramento Schneider EBO"])
                 
                 tag_q = st.text_input("4. Insira a TAG / Identificação do Quadro (Ex: QTA-01, QD-CAG):")
-                config_opt = st.radio("5. Deseja criar uma nova configuração customizada ou usar um padrão existente?", 
-                                      ["Usar Padrão Existente (Kits)", "Criar Nova Configuração Customizada (Em Branco)"], horizontal=True)
+                config_opt = st.radio("5. Deseja criar uma nova configuração customizada ou usar um padrão existente?", ["Usar Padrão Existente (Kits)", "Criar Nova Configuração Customizada (Em Branco)"], horizontal=True)
                 
                 kit_final_selecionado = None
                 if config_opt == "Usar Padrão Existente (Kits)":
@@ -841,15 +865,14 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         st.header("Gestão da Base de Preços")
         st.write("Altere os valores e salve na nuvem para manter toda a equipe comercial sincronizada.")
         
-        # Divisão da visualização para não misturar os hardwares na tela
         df_precos_total = pd.DataFrame(list(st.session_state.precos_banco.items()), columns=["Item / Equipamento", "Valor Atual (R$)"])
         
         st.subheader("Base Geral e Schneider")
-        df_geral = df_precos_total[~df_precos_total['Item / Equipamento'].str.contains('Siemens')].reset_index(drop=True)
+        df_geral = df_precos_total[~df_precos_total['Item / Equipamento'].str.contains('Siemens', case=False, na=False)].reset_index(drop=True)
         edited_geral = st.data_editor(df_geral, use_container_width=True, hide_index=True, key="ed_geral")
         
         st.subheader("Base Siemens")
-        df_siemens = df_precos_total[df_precos_total['Item / Equipamento'].str.contains('Siemens')].reset_index(drop=True)
+        df_siemens = df_precos_total[df_precos_total['Item / Equipamento'].str.contains('Siemens', case=False, na=False)].reset_index(drop=True)
         edited_siemens = st.data_editor(df_siemens, use_container_width=True, hide_index=True, key="ed_siem")
         
         if st.button("💾 Salvar Novos Preços no Banco de Dados", type="primary"):
@@ -894,7 +917,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         
         softwares_incluidos = {}
         
-        # Variáveis globais para separar o Custo e Serviços da Schneider e Siemens
         total_ai_schneider = total_ao_schneider = total_di_schneider = total_do_schneider = 0
         total_ai_siemens = total_ao_siemens = total_di_siemens = total_do_siemens = 0
         
@@ -902,7 +924,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         custo_base_siemens = 0.0
 
         for p in st.session_state.paineis_auto:
-            is_siemens = p.get('arquitetura', 'SpaceLogic (Schneider)') == 'S7-1200 (Siemens)'
+            arquitetura_atual = p.get('arquitetura', 'SpaceLogic (Schneider)')
+            is_siemens_1200 = (arquitetura_atual == 'S7-1200 (Siemens)')
+            is_siemens_1500 = (arquitetura_atual == 'S7-1500 (Siemens)')
+            is_siemens = is_siemens_1200 or is_siemens_1500
             
             total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
             
@@ -927,7 +952,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         linhas_inst_campo.append({"Categoria": "Instrumentação de Campo", "Item": f"{inst} ({nome_equip} - {p['nome']})", "Preço Unit.": preco_item, "Qtd": qtd_final, "Custo Total": custo_tot_inst})
                         linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": nome_equip, "Instrumento": inst, "Quantidade Total": qtd_final, "Entrada Digital (DI)": qtd_final * io_vals["DI"], "Saída Digital (DO)": qtd_final * io_vals["DO"], "Entrada Analógica (AI)": qtd_final * io_vals["AI"], "Saída Analógica (AO)": qtd_final * io_vals["AO"]})
                         
-                        # Aloca a base de cálculo da mão de obra
                         if is_siemens: custo_base_siemens += custo_tot_inst
                         else: custo_base_schneider += custo_tot_inst
 
@@ -950,7 +974,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 
                 if is_siemens:
                     custo_base_siemens += preco_caixa
-                    hw_s = dimensionar_siemens(total_ai_painel, total_ao_painel, total_di_painel, total_do_painel)
+                    if is_siemens_1200: hw_s = dimensionar_siemens_1200(total_ai_painel, total_ao_painel, total_di_painel, total_do_painel)
+                    else: hw_s = dimensionar_siemens_1500(total_ai_painel, total_ao_painel, total_di_painel, total_do_painel)
+                    
                     for i_hw, q_hw in hw_s.items():
                         if q_hw > 0:
                             p_hw = st.session_state.precos_banco.get(i_hw, 0.0)
@@ -998,10 +1024,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             if p_pto > 0 and pts_total > 0:
                 linhas_software.append({"Categoria": "Software de Supervisão", "Item": f"Pontos Licenciados no Software ({pts_total} canais)", "Preço Unit.": p_pto, "Qtd": pts_total, "Custo Total": pts_total * p_pto})
 
-        # Adicionar as infraestruturas avulsas na tabela
         for infra_avulsa in st.session_state.orcamento:
             linhas_inst_campo.append({"Categoria": "Instrumentação de Campo", "Item": infra_avulsa['Item'], "Preço Unit.": infra_avulsa['Custo_Total']/infra_avulsa['Quantidade'] if infra_avulsa['Quantidade'] > 0 else 0, "Qtd": infra_avulsa['Quantidade'], "Custo Total": infra_avulsa['Custo_Total']})
-            # A infraestrutura não foi adicionada no `custo_base_schneider` na linha original, mas se quiser que também some para os 25%, avise.
 
         df_inst = pd.DataFrame(linhas_inst_campo)
         df_hw = pd.DataFrame(linhas_hardware)
@@ -1013,7 +1037,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         
         linhas_servicos = []
         
-        # ALOCAÇÃO DOS SERVIÇOS (Separado por arquitetura)
+        # ALOCAÇÃO DOS SERVIÇOS
         if (total_ai_schneider + total_ao_schneider) > 0:
             pr_ai_sch = st.session_state.precos_banco.get("Custo AI/AO", 565.0)
             linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Serviços de lógica: Pontos Analógicos", "Preço Unit.": pr_ai_sch, "Qtd": (total_ai_schneider + total_ao_schneider), "Custo Total": (total_ai_schneider + total_ao_schneider) * pr_ai_sch})
@@ -1023,14 +1047,13 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Serviços de lógica: Pontos Digitais", "Preço Unit.": pr_di_sch, "Qtd": (total_di_schneider + total_do_schneider), "Custo Total": (total_di_schneider + total_do_schneider) * pr_di_sch})
             
         if (total_ai_siemens + total_ao_siemens) > 0:
-            pr_ai_siem = st.session_state.precos_banco.get("Serviço Siemens - Custo AI/AO", 750.0)
+            pr_ai_siem = st.session_state.precos_banco.get("Siemens - Serviço Custo AI/AO", 750.0)
             linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Serviços de lógica (Siemens): Pontos Analógicos", "Preço Unit.": pr_ai_siem, "Qtd": (total_ai_siemens + total_ao_siemens), "Custo Total": (total_ai_siemens + total_ao_siemens) * pr_ai_siem})
         
         if (total_di_siemens + total_do_siemens) > 0:
-            pr_di_siem = st.session_state.precos_banco.get("Serviço Siemens - Custo DI/DO", 180.0)
+            pr_di_siem = st.session_state.precos_banco.get("Siemens - Serviço Custo DI/DO", 180.0)
             linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Serviços de lógica (Siemens): Pontos Digitais", "Preço Unit.": pr_di_siem, "Qtd": (total_di_siemens + total_do_siemens), "Custo Total": (total_di_siemens + total_do_siemens) * pr_di_siem})
 
-        # Mão de obra global (25% Schneider + 35% Siemens)
         mao_de_obra_extra = (custo_base_schneider * 0.25) + (custo_base_siemens * 0.35)
         
         if mao_de_obra_extra > 0:
