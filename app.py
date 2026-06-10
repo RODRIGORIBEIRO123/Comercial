@@ -66,15 +66,15 @@ if "nome_exibicao" not in st.session_state:
 if st.session_state.usuario_logado is None:
     st.markdown("""
         <style>
-        /* Puxa tudo mais para cima */
+        /* Puxa tudo o máximo para cima possível */
         .block-container {
-            padding-top: 2rem !important;
-            padding-bottom: 2rem !important;
+            padding-top: 0rem !important;
+            margin-top: -2rem !important;
         }
         
-        /* Oculta os menus laterais e cabeçalhos nativos na tela de login */
-        header {visibility: hidden;}
-        [data-testid="collapsedControl"] {display: none;}
+        /* Oculta os cabeçalhos nativos e EVITA bloqueio de clique com display:none */
+        header {display: none !important;}
+        [data-testid="collapsedControl"] {display: none !important;}
         
         /* Gradiente de fundo */
         .stApp {
@@ -88,7 +88,8 @@ if st.session_state.usuario_logado is None:
             padding: 30px;
             box-shadow: 0 8px 24px rgba(0,0,0,0.15);
             border: none;
-            margin-top: 10px;
+            position: relative;
+            z-index: 100;
         }
         
         /* Ajuste dos botões dentro do Form */
@@ -114,6 +115,7 @@ if st.session_state.usuario_logado is None:
             border-radius: 0 !important;
             background-color: transparent !important;
             box-shadow: none !important;
+            padding-left: 0px !important;
         }
         input:focus {
             border-bottom: 2px solid #1C8590 !important;
@@ -126,25 +128,24 @@ if st.session_state.usuario_logado is None:
 
     with col2:
         # Centraliza o logo fora do form
+        st.write("")
         col_img1, col_img2, col_img3 = st.columns([1, 2, 1])
         with col_img2:
             if ARQUIVO_LOGO:
                 st.image(ARQUIVO_LOGO, use_container_width=True)
             else:
-                st.markdown("<h2 style='text-align: center; color: white;'>SIARCON</h2>", unsafe_allow_html=True)
-        
-        st.write("") # Pequeno espaço
+                st.markdown("<h2 style='text-align: center; color: white; margin-bottom:0;'>SIARCON</h2>", unsafe_allow_html=True)
         
         # Caixa branca interativa e segura (Nativa do Streamlit)
         with st.form("form_login"):
             st.markdown("""
-                <div style="text-align: center; margin-bottom: 25px;">
-                    <div style="width: 70px; height: 70px; background-color: #4A5568; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 15px;">
-                        <svg viewBox="0 0 24 24" width="40" height="40" fill="white">
+                <div style="text-align: center; margin-bottom: 15px;">
+                    <div style="width: 60px; height: 60px; background-color: #4A5568; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 10px;">
+                        <svg viewBox="0 0 24 24" width="35" height="35" fill="white">
                             <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                         </svg>
                     </div>
-                    <h3 style="color: #333; margin: 0; font-size: 20px;">Bem-Vindo a plataforma comercial da SIARCON</h3>
+                    <h3 style="color: #333; margin: 0; font-size: 18px;">Bem-Vindo a plataforma comercial da SIARCON</h3>
                 </div>
             """, unsafe_allow_html=True)
             
@@ -180,10 +181,12 @@ if st.session_state.usuario_logado is None:
                     
     st.stop() # Bloqueia o carregamento do resto do site enquanto não houver login
 
-# Restaura o padding normal para a aplicação principal
+# Restaura o padding normal e mostra o cabeçalho para a aplicação principal
 st.markdown("""
     <style>
     .block-container { padding-top: 3rem !important; }
+    header {display: flex !important;}
+    [data-testid="collapsedControl"] {display: flex !important;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -639,7 +642,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
         except: pass
         st.session_state.banco_precos_carregado = True
 
-    # Trava de atualização de preços caso novos itens não existam na nuvem
     for k_n, v_n in banco_padrao_precos.items():
         if k_n not in st.session_state.precos_banco: 
             st.session_state.precos_banco[k_n] = v_n
@@ -725,7 +727,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
 
     with aba_auto:
         
-        # ASSISTENTE EM ETAPAS (SÓ ABRE SE SELECIONADO)
         if not st.session_state.wizard_ativo:
             if st.button("➕ Criar Novo Quadro de Automação", type="primary"):
                 st.session_state.wizard_ativo = True
@@ -794,7 +795,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
 
         st.write("")
 
-        # EXIBIÇÃO DOS QUADROS CRIADOS (DASHBOARD)
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
             with st.container(border=True):
                 c_icone, c_nome_painel, c_ihm_painel = st.columns([0.5, 4, 2])
@@ -897,9 +897,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                     st.session_state.paineis_auto.pop(p_idx)
                     st.rerun()
         
-        # ---------------------------------------------------------
-        # BOTÃO: SALVAR RASCUNHO E SAIR DA TELA
-        # ---------------------------------------------------------
         if st.session_state.paineis_auto:
             st.markdown("---")
             if st.button("💾 Salvar Rascunho e Sair (Retomar depois)", type="secondary", use_container_width=True):
@@ -936,7 +933,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                         st.rerun()
                     except Exception as e: st.error(f"Erro ao salvar rascunho: {e}")
 
-        # --- FILTRAGEM INTELIGENTE NO HISTÓRICO ---
         st.markdown("---")
         with st.expander(f"📂 Abrir Orçamento Existente (Histórico de {st.session_state.nome_exibicao})"):
             try:
@@ -1209,7 +1205,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
             st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             st.markdown("---")
             
-            # --- SALVAR ENGENHARIA COMPLETA ---
             if st.button("☁️ Salvar Orçamento Final e Gerar Revisão", type="primary", use_container_width=True):
                 if not st.session_state.nome_projeto_orcamento: 
                     st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento / Projeto' antes de salvar.")
