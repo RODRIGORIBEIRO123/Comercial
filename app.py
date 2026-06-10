@@ -8,6 +8,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import os
 import google.generativeai as genai
+from PIL import Image
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide", page_icon="📄")
@@ -23,31 +24,6 @@ def buscar_logo():
     return None
 
 ARQUIVO_LOGO = buscar_logo()
-
-# ==========================================
-# 🎨 ESTILIZAÇÃO GLOBAL (SIDEBAR)
-# ==========================================
-st.markdown("""
-    <style>
-    /* Cor de fundo da Sidebar - Cinza Escuro */
-    [data-testid="stSidebar"] {
-        background-color: #7F7F7F !important;
-    }
-    /* Cor do texto e ícones na Sidebar - Branco */
-    [data-testid="stSidebarNav"] span {
-        color: white !important;
-        font-weight: 500;
-        font-size: 16px;
-    }
-    /* Estilo do texto de usuário logado */
-    .sidebar-user {
-        color: white;
-        padding: 10px 0;
-        font-size: 15px;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 
 # ==========================================
 # 🟢 CONEXÃO COM O GOOGLE SHEETS E IA
@@ -66,6 +42,7 @@ def conectar_google_sheets():
         st.error(f"Erro na conexão com Google Sheets: {e}. Verifique o link da planilha.")
         st.stop()
 
+# Configuração da Inteligência Artificial (Google Gemini)
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model_ia = genai.GenerativeModel('gemini-1.5-flash')
@@ -74,115 +51,109 @@ except Exception as e:
     ia_disponivel = False
     erro_ia = e
 
+# Define o fuso horário de Brasília (UTC-3)
 fuso_br = timezone(timedelta(hours=-3))
 
 # ==========================================
-# 🔐 CONTROLE DE ACESSO E TELA DE LOGIN IDENTICA AO LAYOUT
+# 🔐 CONTROLE DE ACESSO E LOGIN POR PERFIL
 # ==========================================
 if "usuario_logado" not in st.session_state:
     st.session_state.usuario_logado = None
 if "nome_exibicao" not in st.session_state:
     st.session_state.nome_exibicao = ""
 
+# Se não estiver logado, exibe a tela de login
 if st.session_state.usuario_logado is None:
-    # CSS EXCLUSIVO DA TELA DE LOGIN
     st.markdown("""
         <style>
-        /* Esconde o cabeçalho superior padrão do Streamlit */
-        header {visibility: hidden;}
+        /* Puxa tudo mais para cima */
+        .block-container {
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
+        }
         
-        /* Fundo Gradiente Turquesa da tela principal */
+        /* Oculta os menus laterais e cabeçalhos nativos na tela de login */
+        header {visibility: hidden;}
+        [data-testid="collapsedControl"] {display: none;}
+        
+        /* Gradiente de fundo */
         .stApp {
             background: linear-gradient(135deg, #1C8590 0%, #8FD3B5 100%) !important;
         }
         
-        /* Box/Card Branco Flutuante */
+        /* Estiliza o Form do Streamlit para virar a "Caixa Branca" */
         [data-testid="stForm"] {
             background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
             border: none;
-            padding: 30px 40px;
+            margin-top: 10px;
         }
         
-        /* Modifica os inputs do Streamlit para parecerem apenas uma linha inferior */
-        div[data-baseweb="input"] {
-            border-top: none !important;
-            border-left: none !important;
-            border-right: none !important;
-            border-bottom: 1.5px solid #ccc !important;
-            border-radius: 0 !important;
-            background-color: transparent !important;
-        }
-        div[data-baseweb="input"]:focus-within {
-            border-bottom: 2px solid #1C8590 !important;
-        }
-        div[data-baseweb="input"] > div {
-            background-color: transparent !important;
-        }
-        
-        /* Botão Azul */
+        /* Ajuste dos botões dentro do Form */
         [data-testid="stFormSubmitButton"] button {
             background-color: #2b7bc4 !important;
             color: white !important;
-            border: none !important;
-            border-radius: 5px !important;
-            font-size: 16px !important;
+            font-weight: bold !important;
+            border-radius: 6px !important;
             height: 45px !important;
+            border: none !important;
             margin-top: 15px !important;
-            font-weight: 500;
         }
         [data-testid="stFormSubmitButton"] button:hover {
             background-color: #1a5c96 !important;
         }
+        
+        /* Estiliza os inputs de texto */
+        input {
+            border-bottom: 2px solid #ccc !important;
+            border-top: none !important;
+            border-left: none !important;
+            border-right: none !important;
+            border-radius: 0 !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+        }
+        input:focus {
+            border-bottom: 2px solid #1C8590 !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
-    # Layout de colunas para centralizar
-    col_vazia_esq, col_central, col_vazia_dir = st.columns([1, 1.3, 1])
+    # Layout de 3 colunas para manter a caixa centralizada
+    col1, col2, col3 = st.columns([1, 1.2, 1])
 
-    with col_central:
-        st.write("")
-        st.write("")
-        
-        # Logo SIARCON centralizado acima do Box
-        if ARQUIVO_LOGO:
-            c_logo1, c_logo2, c_logo3 = st.columns([1, 2, 1])
-            with c_logo2:
+    with col2:
+        # Centraliza o logo fora do form
+        col_img1, col_img2, col_img3 = st.columns([1, 2, 1])
+        with col_img2:
+            if ARQUIVO_LOGO:
                 st.image(ARQUIVO_LOGO, use_container_width=True)
-        else:
-            st.markdown("<h1 style='text-align: center; color: white; font-weight: 800; font-size: 45px;'>SIARCON</h1>", unsafe_allow_html=True)
-            
-        st.write("") 
+            else:
+                st.markdown("<h2 style='text-align: center; color: white;'>SIARCON</h2>", unsafe_allow_html=True)
         
-        # Caixa de Login (Form)
-        with st.form("login_form"):
-            # HTML Injetado para a faixa verde superior e o Avatar redondo
+        st.write("") # Pequeno espaço
+        
+        # Caixa branca interativa e segura (Nativa do Streamlit)
+        with st.form("form_login"):
             st.markdown("""
-                <div style="background-color: #178B96; height: 90px; margin: -30px -40px 0 -40px; border-radius: 10px 10px 0 0;"></div>
-                
-                <div style="width: 80px; height: 80px; background-color: #4A5568; border-radius: 50%; margin: -40px auto 10px auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); position: relative; z-index: 10; border: 4px solid white;">
-                    <svg viewBox="0 0 24 24" width="45" height="45" fill="white">
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
+                <div style="text-align: center; margin-bottom: 25px;">
+                    <div style="width: 70px; height: 70px; background-color: #4A5568; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 15px;">
+                        <svg viewBox="0 0 24 24" width="40" height="40" fill="white">
+                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                    </div>
+                    <h3 style="color: #333; margin: 0; font-size: 20px;">Bem-Vindo a plataforma comercial da SIARCON</h3>
                 </div>
-                
-                <h3 style="text-align: center; color: black; font-size: 22px; margin-bottom: 30px; font-weight: 500;">Bem-Vindo a plataforma<br>comercial da SIARCON</h3>
             """, unsafe_allow_html=True)
             
-            # Campos de Texto Customizados
-            st.markdown("<p style='font-size:14px; margin-bottom: 2px; color: #333;'>Usuário:</p>", unsafe_allow_html=True)
-            c_user = st.text_input("user", label_visibility="collapsed")
+            c_user = st.text_input("Usuário:", placeholder="Ex: rodrigo.ribeiro")
+            c_pass = st.text_input("Senha:", type="password", placeholder="••••")
             
-            st.write("") # Quebra de linha sutil
+            submit_login = st.form_submit_button("Entrar no Sistema", use_container_width=True)
             
-            st.markdown("<p style='font-size:14px; margin-bottom: 2px; color: #333;'>Senha:</p>", unsafe_allow_html=True)
-            c_pass = st.text_input("pass", type="password", label_visibility="collapsed")
-            
-            submit = st.form_submit_button("Entrar", use_container_width=True)
-            
-            # Validação
-            if submit:
+            if submit_login:
                 usuarios_validos = {
                     "giovanna.ribeiro": "1234",
                     "aline.ferraz": "1234",
@@ -202,19 +173,29 @@ if st.session_state.usuario_logado is None:
                     st.session_state.paineis_auto = []
                     st.session_state.nome_projeto_orcamento = ""
                     st.session_state.wizard_ativo = False
+                    
                     st.rerun()
                 else:
                     st.error("❌ Usuário ou senha incorretos.")
+                    
+    st.stop() # Bloqueia o carregamento do resto do site enquanto não houver login
 
-    st.stop() # Congela o app aqui enquanto não fizer o login
+# Restaura o padding normal para a aplicação principal
+st.markdown("""
+    <style>
+    .block-container { padding-top: 3rem !important; }
+    </style>
+""", unsafe_allow_html=True)
 
 # === MENU LATERAL PRINCIPAL ===
 if ARQUIVO_LOGO:
     st.sidebar.image(ARQUIVO_LOGO, use_container_width=True)
 else:
-    st.sidebar.markdown("<h3 style='color: white;'>SIARCON</h3>", unsafe_allow_html=True)
+    st.sidebar.markdown("### SIARCON")
     
-st.sidebar.markdown(f"<div class='sidebar-user'>👤 Logado como: <b>{st.session_state.nome_exibicao}</b></div>", unsafe_allow_html=True)
+st.sidebar.title("Navegação Principal")
+
+st.sidebar.markdown(f"👤 Logado como: **{st.session_state.nome_exibicao}**")
 if st.sidebar.button("🚪 Sair do Perfil", type="secondary"):
     st.session_state.usuario_logado = None
     st.session_state.nome_exibicao = ""
@@ -225,7 +206,7 @@ if st.sidebar.button("🚪 Sair do Perfil", type="secondary"):
 st.sidebar.markdown("---")
 
 menu_selecionado = st.sidebar.radio(
-    "Navegação Principal",
+    "Selecione o módulo:",
     ["📄 Gerador de Propostas", "🔌 Sistema de Automação"]
 )
 
@@ -658,7 +639,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
         except: pass
         st.session_state.banco_precos_carregado = True
 
-    # Trava de atualização de preços
+    # Trava de atualização de preços caso novos itens não existam na nuvem
     for k_n, v_n in banco_padrao_precos.items():
         if k_n not in st.session_state.precos_banco: 
             st.session_state.precos_banco[k_n] = v_n
@@ -744,7 +725,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
 
     with aba_auto:
         
-        # ASSISTENTE EM ETAPAS
+        # ASSISTENTE EM ETAPAS (SÓ ABRE SE SELECIONADO)
         if not st.session_state.wizard_ativo:
             if st.button("➕ Criar Novo Quadro de Automação", type="primary"):
                 st.session_state.wizard_ativo = True
@@ -1136,7 +1117,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
             for g in p['grupos_equipamentos']:
                 mult = g.get('multiplicador', 1)
                 
-                # Monta as TAGs no nome para o Resumo
                 lista_tags = [t for t in g.get('tags_lista', []) if t.strip() != ""]
                 str_tags = f" (TAGs: {', '.join(lista_tags)})" if len(lista_tags) > 0 else ""
                 nome_equip = f"{g['nome_grupo']}{str_tags}"
