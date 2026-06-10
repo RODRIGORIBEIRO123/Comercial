@@ -663,7 +663,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         except: pass
         st.session_state.banco_precos_carregado = True
 
-    # Trava de atualização de preços caso novos itens não existam na nuvem
     for k_n, v_n in banco_padrao_precos.items():
         if k_n not in st.session_state.precos_banco: 
             st.session_state.precos_banco[k_n] = v_n
@@ -712,7 +711,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             "Pressostato - Filtro G4 (PSH)": 1, "Pressostato - Filtro F9 (PSH)": 1, "Pressostato - Filtro H13/H14 (PSH)": 1,
             "Termostato de segurança (TSH)": 1, "Pressostato diferencial para ar (PSH)": 1
         },
-        "♨️ UTA Padrão - Expansão Direta + Resistência": {
+        "ENTREGÁVEL EXP. DIRET + RESISTÊNCIA": {
             "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1,
             "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Relé de Corrente - Status Compressor (TC)": 2,
             "Pressostato - Filtro G4 (PSH)": 1, "Pressostato - Filtro F9 (PSH)": 1, "Pressostato - Filtro H13/H14 (PSH)": 1,
@@ -1153,21 +1152,18 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         total_di_painel += qtd_final * io_vals["DI"]
                         total_do_painel += qtd_final * io_vals["DO"]
                         
-                        # ALOCAÇÃO ESTRATÉGICA 1: Instrumentação de Campo
                         linhas_inst_campo.append({"Categoria": "Instrumentação de Campo", "Item": f"{inst} ({nome_equip} - {p['nome']})", "Preço Unit.": preco_item, "Qtd": qtd_final, "Custo Total": qtd_final * preco_item})
                         linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": nome_equip, "Instrumento": inst, "Quantidade Total": qtd_final, "Entrada Digital (DI)": qtd_final * io_vals["DI"], "Saída Digital (DO)": qtd_final * io_vals["DO"], "Entrada Analógica (AI)": qtd_final * io_vals["AI"], "Saída Analógica (AO)": qtd_final * io_vals["AO"]})
 
             tot_io_painel = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
             
-            # Acumula para os serviços de lógica globais
             total_ai += total_ai_painel
             total_ao += total_ao_painel
             total_di += total_di_painel
             total_do += total_do_painel
             
             if tot_io_painel > 0:
-                # ALOCAÇÃO ESTRATÉGICA 2: Hardware
-                nome_caixa, preco_caixa = calcular_painel_fisico(tot_io_painel/15) # Simplificação segura de espaço
+                nome_caixa, preco_caixa = calcular_painel_fisico(tot_io_painel/15)
                 linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Estrutura Física: {nome_caixa} ({p['nome']})", "Preço Unit.": preco_caixa, "Qtd": 1, "Custo Total": preco_caixa})
                 
                 c36, c24, c18, c15 = dimensionar_controladores(tot_io_painel)
@@ -1200,7 +1196,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             if p_pto > 0 and pts_total > 0:
                 linhas_software.append({"Categoria": "Software de Supervisão", "Item": f"Pontos Licenciados no Software ({pts_total} canais)", "Preço Unit.": p_pto, "Qtd": pts_total, "Custo Total": pts_total * p_pto})
 
-        # Processamento Final das Listas Organizadas
         df_inst = pd.DataFrame(linhas_inst_campo)
         df_hw = pd.DataFrame(linhas_hardware)
         df_sw = pd.DataFrame(linhas_software)
@@ -1209,7 +1204,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         subtotal_hw = df_hw['Custo Total'].sum() if not df_hw.empty else 0
         subtotal_sw = df_sw['Custo Total'].sum() if not df_sw.empty else 0
         
-        # ALOCAÇÃO ESTRATÉGICA 3: Serviços de Lógica e Mão de Obra
         linhas_servicos = []
         custo_ana = (total_ai + total_ao) * st.session_state.precos_banco.get("Custo AI/AO", 565.0)
         custo_dig = (total_di + total_do) * st.session_state.precos_banco.get("Custo DI/DO", 120.0)
@@ -1228,7 +1222,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         
         total_geral = subtotal_inst + subtotal_hw + subtotal_sw + subtotal_serv
         
-        # Exibição Visual (Streamlit)
         if total_geral > 0:
             st.markdown("### Resumo Estruturado")
             
@@ -1237,19 +1230,18 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             c2.warning(f"**Subtotal Hardware:**\nR$ {subtotal_hw:,.2f}")
             c3.success(f"**CUSTO TOTAL ESTIMADO:**\nR$ {total_geral:,.2f}")
 
-            # Montagem do DataFrame Final para o Excel
             df_export_list = []
             
             if not df_inst.empty:
-                df_export_list.append(df_inst.groupby(['Categoria', 'Item', 'Preço Unit.'], as_index=False).agg({'Qtd': 'sum', 'Custo Total': 'sum'}))
+                df_export_list.append(df_inst.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
                 df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "INSTRUMENTAÇÃO DE CAMPO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_inst}]))
                 
             if not df_hw.empty:
-                df_export_list.append(df_hw.groupby(['Categoria', 'Item', 'Preço Unit.'], as_index=False).agg({'Qtd': 'sum', 'Custo Total': 'sum'}))
+                df_export_list.append(df_hw.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
                 df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "HARDWARE E PAINÉIS", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_hw}]))
                 
             if not df_sw.empty:
-                df_export_list.append(df_sw.groupby(['Categoria', 'Item', 'Preço Unit.'], as_index=False).agg({'Qtd': 'sum', 'Custo Total': 'sum'}))
+                df_export_list.append(df_sw.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
                 df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "SOFTWARE", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_sw}]))
                 
             if not df_serv.empty:
@@ -1259,7 +1251,20 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             df_export_list.append(pd.DataFrame([{"Categoria": "TOTAL GERAL", "Item": "ORÇAMENTO COMPLETO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": total_geral}]))
             
             df_exportacao = pd.concat(df_export_list, ignore_index=True)
-            st.dataframe(df_exportacao.style.format({'Preço Unit.': 'R$ {:.2f}', 'Custo Total': 'R$ {:.2f}'}), use_container_width=True)
+            
+            # Formatting function safe against strings like "-"
+            def format_currency(val):
+                try:
+                    return f"R$ {float(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                except:
+                    return val
+
+            # Formata diretamente o DataFrame para exibição limpa no Streamlit
+            df_display = df_exportacao.copy()
+            df_display['Preço Unit.'] = df_display['Preço Unit.'].apply(format_currency)
+            df_display['Custo Total'] = df_display['Custo Total'].apply(format_currency)
+            
+            st.dataframe(df_display, use_container_width=True)
             
             df_pontos = pd.DataFrame(linhas_pontos)
             if not df_pontos.empty:
@@ -1267,7 +1272,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 linha_total = pd.DataFrame([{"Painel": "TOTAL GERAL", "Grupo/Equipamento": "-", "Instrumento": "-", "Quantidade Total": total_qtd, "Entrada Digital (DI)": df_pontos['Entrada Digital (DI)'].sum(), "Saída Digital (DO)": df_pontos['Saída Digital (DO)'].sum(), "Entrada Analógica (AI)": df_pontos['Entrada Analógica (AI)'].sum(), "Saída Analógica (AO)": df_pontos['Saída Analógica (AO)'].sum()}])
                 df_pontos = pd.concat([df_pontos, linha_total], ignore_index=True)
 
-            # Motor OpenPyXL
             buffer = io.BytesIO()
             wb = openpyxl.Workbook()
             ws1 = wb.active
@@ -1303,7 +1307,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         if is_subtotal: cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
                         
                         if c_idx in [3, 5]: 
-                            if value != "-": cell.number_format = 'R$ #,##0.00'
+                            if str(value).strip() != "-": 
+                                try:
+                                    cell.value = float(value)
+                                    cell.number_format = '"R$" #,##0.00'
+                                except: pass
                             cell.alignment = Alignment(horizontal="right")
                         elif c_idx == 4:
                             cell.alignment = Alignment(horizontal="center")
