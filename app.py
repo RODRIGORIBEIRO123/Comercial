@@ -93,9 +93,9 @@ if st.session_state.usuario_logado is None:
             st.markdown("### SIARCON Engenharia")
             
         st.markdown('<p class="login-title">Módulo Comercial</p>', unsafe_allow_html=True)
-        st.markdown('<p class="login-desc">Insira as suas credenciais para aceder.</p>', unsafe_allow_html=True)
+        st.markdown('<p class="login-desc">Insira as suas credenciais para acessar.</p>', unsafe_allow_html=True)
         
-        c_user = st.text_input("Utilizador:", placeholder="rodrigo.ribeiro", label_visibility="collapsed")
+        c_user = st.text_input("Usuário:", placeholder="Ex: rodrigo.ribeiro", label_visibility="collapsed")
         st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
         c_pass = st.text_input("Senha:", type="password", placeholder="••••", label_visibility="collapsed")
         
@@ -125,7 +125,7 @@ if st.session_state.usuario_logado is None:
                 
                 st.rerun()
             else:
-                st.error("❌ Utilizador ou senha incorretos.")
+                st.error("❌ Usuário ou senha incorretos.")
         
         st.markdown('</div>', unsafe_allow_html=True)
         
@@ -459,7 +459,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
     st.title("🔌 Engenharia e Custos - Automação e Infra")
     st.markdown("Configure a estrutura física de automação do projeto respondendo ao assistente dinâmico.")
     
-    # === INICIALIZAÇÃO DE VARIÁVEIS ===
+    # === INICIALIZAÇÃO SEGURA DE VARIÁVEIS ===
     if 'nome_projeto_orcamento' not in st.session_state: st.session_state.nome_projeto_orcamento = ""
     if 'projeto_para_abrir' not in st.session_state: st.session_state.projeto_para_abrir = None
     if 'dados_projeto_abrir' not in st.session_state: st.session_state.dados_projeto_abrir = {}
@@ -668,9 +668,9 @@ elif menu_selecionado == "🔌 Sistema de Automação":
     ])
 
     with aba_auto:
-        st.subheader("Configuração Estrutural dos Painéis")
+        # A TELA FICA COMPLETAMENTE LIMPA INICIALMENTE, SEM BLOCOS GLOBAIS.
         
-        # ASSISTENTE EM ETAPAS
+        # ASSISTENTE EM ETAPAS (SÓ ABRE SE SELECIONADO)
         if not st.session_state.wizard_ativo:
             if st.button("➕ Criar Novo Quadro de Automação", type="primary"):
                 st.session_state.wizard_ativo = True
@@ -793,7 +793,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
 
                     total_ai_g = total_ao_g = total_di_g = total_do_g = 0
                     for inst, q in g_data['instrumentos'].items():
-                        # Uso de .get() para segurança com orçamentos antigos
+                        # TRAVA DE SEGURANÇA para leitura de arquivos antigos!
                         io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
                         total_ai_g += q * io_vals["AI"]
                         total_ao_g += q * io_vals["AO"]
@@ -861,8 +861,53 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                         st.rerun()
                     except Exception as e: st.error(f"Erro ao salvar rascunho: {e}")
 
+        # --- FILTRAGEM INTELIGENTE NO HISTÓRICO ---
+        # Removi daqui e deixei visível SEMPRE caso a tela esteja vazia
         st.markdown("---")
-        st.info("💡 **Próximo Passo:** Vá até o topo e clique na aba **'📊 Orçamento Final'** para extrair a planilha de custos e gerenciar o histórico de revisões.")
+        with st.expander(f"📂 Abrir Orçamento Existente (Histórico de {st.session_state.nome_exibicao})"):
+            try:
+                sh = conectar_google_sheets()
+                todas_linhas = sh.worksheet("Historico_Orcamentos").get_all_values()
+                if len(todas_linhas) > 1:
+                    dados_historico = todas_linhas[1:]
+                    
+                    for idx_rev, linha in enumerate(dados_historico[::-1]):
+                        idx_real = len(dados_historico) - 1 - idx_rev
+                        
+                        usuario_registro = linha[7] if len(linha) > 7 else "rodrigo.ribeiro"
+                        if usuario_registro.strip().lower() != st.session_state.usuario_logado.strip().lower():
+                            continue
+                            
+                        with st.container():
+                            c1, c2, c3, c4 = st.columns([1.5, 3, 1.5, 1])
+                            d_h = linha[0]
+                            n_p = linha[1]
+                            rev = linha[2] if len(linha) >= 7 else "R-00"
+                            tot_val = linha[5] if len(linha) >= 7 else linha[4]
+                            j_salvo = linha[6] if len(linha) >= 7 else linha[5]
+                            
+                            c1.write(f"📅 {d_h}")
+                            c2.write(f"**{n_p}** `({rev})`")
+                            c3.write(tot_val)
+                            if c4.button("📂 Carregar", key=f"btn_abrir_{idx_real}"):
+                                st.session_state.projeto_para_abrir = idx_real
+                                st.session_state.dados_projeto_abrir = {'nome': n_p, 'json': j_salvo}
+                            st.markdown("---")
+                            
+                    if st.session_state.get('projeto_para_abrir') is not None:
+                        d_a = st.session_state.get('dados_projeto_abrir', {})
+                        st.warning(f"⚠️ Atenção: Carregar os dados de '{d_a['nome']}' irá substituir as configurações atuais da sua tela.")
+                        c_sim, c_nao = st.columns(2)
+                        if c_sim.button("✔️ Sim, substituir tela", use_container_width=True):
+                            st.session_state.paineis_auto = json.loads(d_a['json'])
+                            st.session_state.nome_projeto_orcamento = d_a['nome']
+                            st.session_state.projeto_para_abrir = None
+                            st.rerun()
+                        if c_nao.button("❌ Não, cancelar", use_container_width=True):
+                            st.session_state.projeto_para_abrir = None
+                            st.rerun()
+                else: st.write("Nenhum levantamento salvo neste perfil ainda.")
+            except Exception as e: st.write("A aba 'Historico_Orcamentos' está vazia ou aguardando dados.")
 
     with aba_precos:
         st.header("Gestão da Base de Preços")
@@ -1002,7 +1047,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                         qtd_final = qtd * mult
                         preco_item = st.session_state.precos_banco.get(inst, 0.0)
                         
-                        # Uso de .get() para segurança com orçamentos antigos
                         io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
                         
                         total_ai_painel += qtd_final * io_vals["AI"]
@@ -1014,15 +1058,15 @@ elif menu_selecionado == "🔌 Sistema de Automação":
 
             tot_io_painel = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
             if tot_io_painel > 0:
-                custo_ana = (total_ai_painel + total_ao_painel) * st.session_state.precos_banco["Custo AI/AO"]
-                custo_dig = (total_di_painel + total_do_painel) * st.session_state.precos_banco["Custo DI/DO"]
+                custo_ana = (total_ai_painel + total_ao_painel) * st.session_state.precos_banco.get("Custo AI/AO", 565.0)
+                custo_dig = (total_di_painel + total_do_painel) * st.session_state.precos_banco.get("Custo DI/DO", 120.0)
                 linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Analógicos (AI/AO)", "Qtd": (total_ai_painel + total_ao_painel), "Custo_Total": custo_ana})
                 linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Digitais (DI/DO)", "Qtd": (total_di_painel + total_do_painel), "Custo_Total": custo_dig})
                 c36, c24, c18, c15 = dimensionar_controladores(tot_io_painel)
-                if c36 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-36A", "Qtd": c36, "Custo_Total": c36 * st.session_state.precos_banco["MP-C-36A"]})
-                if c24 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Qtd": c24, "Custo_Total": c24 * st.session_state.precos_banco["MP-C-24A"]})
-                if c18 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-18A", "Qtd": c18, "Custo_Total": c18 * st.session_state.precos_banco["MP-C-18A"]})
-                if c15 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-15A", "Qtd": c15, "Custo_Total": c15 * st.session_state.precos_banco["MP-C-15A"]})
+                if c36 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-36A", "Qtd": c36, "Custo_Total": c36 * st.session_state.precos_banco.get("MP-C-36A", 9459.0)})
+                if c24 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Qtd": c24, "Custo_Total": c24 * st.session_state.precos_banco.get("MP-C-24A", 7290.0)})
+                if c18 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-18A", "Qtd": c18, "Custo_Total": c18 * st.session_state.precos_banco.get("MP-C-18A", 5185.0)})
+                if c15 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-15A", "Qtd": c15, "Custo_Total": c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0)})
                 nome_caixa, preco_caixa = calcular_painel_fisico(c36 + c24 + c18 + c15)
                 linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": nome_caixa, "Qtd": 1, "Custo_Total": preco_caixa})
                 if PRECOS_IHM[p['ihm']] > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": p['ihm'], "Qtd": 1, "Custo_Total": PRECOS_IHM[p['ihm']]})
@@ -1080,6 +1124,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
             st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             st.markdown("---")
             
+            # --- SALVAR ENGENHARIA COMPLETA ---
             if st.button("☁️ Salvar Orçamento Final e Gerar Revisão", type="primary", use_container_width=True):
                 if not st.session_state.nome_projeto_orcamento: 
                     st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento / Projeto' antes de salvar.")
@@ -1109,48 +1154,3 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                         ws_hist_orc.append_row(nova_linha_banco)
                         st.success(f"✅ Sucesso! Orçamento para '{st.session_state.nome_projeto_orcamento}' salvo com a revisão {revisao_atual}!")
                     except Exception as e: st.error(f"Erro ao salvar: {e}")
-
-            with st.expander(f"📂 Abrir Orçamento Existente (Histórico de {st.session_state.nome_exibicao})"):
-                try:
-                    sh = conectar_google_sheets()
-                    todas_linhas = sh.worksheet("Historico_Orcamentos").get_all_values()
-                    if len(todas_linhas) > 1:
-                        dados_historico = todas_linhas[1:]
-                        
-                        for idx_rev, linha in enumerate(dados_historico[::-1]):
-                            idx_real = len(dados_historico) - 1 - idx_rev
-                            
-                            usuario_registro = linha[7] if len(linha) > 7 else "rodrigo.ribeiro"
-                            if usuario_registro.strip().lower() != st.session_state.usuario_logado.strip().lower():
-                                continue
-                                
-                            with st.container():
-                                c1, c2, c3, c4 = st.columns([1.5, 3, 1.5, 1])
-                                d_h = linha[0]
-                                n_p = linha[1]
-                                rev = linha[2] if len(linha) >= 7 else "R-00"
-                                tot_val = linha[5] if len(linha) >= 7 else linha[4]
-                                j_salvo = linha[6] if len(linha) >= 7 else linha[5]
-                                
-                                c1.write(f"📅 {d_h}")
-                                c2.write(f"**{n_p}** `({rev})`")
-                                c3.write(tot_val)
-                                if c4.button("📂 Carregar", key=f"btn_abrir_{idx_real}"):
-                                    st.session_state.projeto_para_abrir = idx_real
-                                    st.session_state.dados_projeto_abrir = {'nome': n_p, 'json': j_salvo}
-                                st.markdown("---")
-                                
-                        if st.session_state.get('projeto_para_abrir') is not None:
-                            d_a = st.session_state.get('dados_projeto_abrir', {})
-                            st.warning(f"⚠️ Atenção: Carregar os dados de '{d_a['nome']}' irá substituir as configurações atuais da sua tela.")
-                            c_sim, c_nao = st.columns(2)
-                            if c_sim.button("✔️ Sim, substituir tela", use_container_width=True):
-                                st.session_state.paineis_auto = json.loads(d_a['json'])
-                                st.session_state.nome_projeto_orcamento = d_a['nome']
-                                st.session_state.projeto_para_abrir = None
-                                st.rerun()
-                            if c_nao.button("❌ Não, cancelar", use_container_width=True):
-                                st.session_state.projeto_para_abrir = None
-                                st.rerun()
-                    else: st.write("Nenhum levantamento salvo neste perfil ainda.")
-                except Exception as e: st.write("A aba 'Historico_Orcamentos' está vazia ou aguardando dados.")
