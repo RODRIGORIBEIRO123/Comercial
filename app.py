@@ -349,7 +349,7 @@ if menu_selecionado == "📄 Gerador de Propostas":
 
 
 # ==============================================================================
-# MÓDULO 2: ESTIMATIVA DE CUSTOS (NOVO & INTELIGENTE)
+# MÓDULO 2: ESTIMATIVA DE CUSTOS (REVISADO SIARCON)
 # ==============================================================================
 elif menu_selecionado == "💰 Estimativa de Custos":
     
@@ -455,7 +455,6 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "Transmissor de temperatura e umidade ambiente": 2050.00,
         "Transmissor de temperatura e umidade ambiente com display": 2650.00,
 
-        # -- CONTROLADORES --
         "MP-C-15A": 4649.49,
         "MP-C-18A": 5185.54,
         "MP-C-24A": 7290.75,
@@ -470,6 +469,13 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
         "Licença Supervisório - Schneider EBO (Base)": 13000.00,
         "Licença Supervisório - Schneider EBO (Por Ponto I/O)": 110.00
+    }
+
+    OPCOES_SUPERVISAO = {
+        "Sem Supervisório": {"base": 0.0, "por_ponto": 0.0},
+        "Sistema supervisório SEM certificação CFR-21": {"base": 23000.0, "por_ponto": 100.0},
+        "Sistema supervisório COM certificação CFR-21": {"base": 23000.0, "por_ponto": 285.0},
+        "Sistema de monitoramento Schneider EBO": {"base": 13000.0, "por_ponto": 110.0}
     }
 
     if 'banco_precos_carregado' not in st.session_state:
@@ -490,11 +496,16 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         except: pass
         st.session_state.banco_precos_carregado = True
 
+    # --- TRAVA DE ATUALIZAÇÃO ---
+    for item_novo, preco_novo in banco_padrao_precos.items():
+        if item_novo not in st.session_state.precos_banco:
+            st.session_state.precos_banco[item_novo] = preco_novo
+
     if 'paineis_auto' not in st.session_state or (len(st.session_state.paineis_auto) > 0 and 'grupos_equipamentos' not in st.session_state.paineis_auto[0]):
         st.session_state.paineis_auto = []
     
     # ---------------------------------------------------------
-    # NOVA ORGANIZAÇÃO DE GRUPOS E KITS LIMPOS
+    # ORGANIZAÇÃO DOS GRUPOS NA INTERFACE DE REVISÃO
     # ---------------------------------------------------------
     GRUPOS_INSTRUMENTOS = {
         "🔹 Controle (HVAC e Máquinas)": [
@@ -966,9 +977,9 @@ elif menu_selecionado == "💰 Estimativa de Custos":
             pto_price = st.session_state.precos_banco.get("Licença Supervisório - Schneider EBO (Por Ponto I/O)", 110.0)
 
         if soft_sel != "Sem Supervisório":
-             linhas_resumo.append({"Categoria": "🖥️ Software de Supervisão", "Item": f"Licença Base: {soft_sel}", "Qtd": 1, "Custo_Total": base_price})
+             linhas_resumo.append({"Categoria": "🖥️ Software de Supervision", "Item": f"Licença Base: {soft_sel}", "Qtd": 1, "Custo_Total": base_price})
              if pto_price > 0 and total_pontos_projeto > 0:
-                  linhas_resumo.append({"Categoria": "🖥️ Software de Supervisão", "Item": f"Licenciamento por Ponto de I/O (R$ {pto_price}/pto)", "Qtd": total_pontos_projeto, "Custo_Total": total_pontos_projeto * pto_price})
+                  linhas_resumo.append({"Categoria": "🖥️ Software de Supervision", "Item": f"Licenciamento por Ponto de I/O (R$ {pto_price}/pto)", "Qtd": total_pontos_projeto, "Custo_Total": total_pontos_projeto * pto_price})
 
         if len(linhas_resumo) > 0:
             df_final = pd.DataFrame(linhas_resumo)
