@@ -54,7 +54,7 @@ menu_selecionado = st.sidebar.radio(
 st.sidebar.markdown("---")
 
 # ==============================================================================
-# MÓDULO 1: GERADOR DE PROPOSTAS (Mantido sem alterações)
+# MÓDULO 1: GERADOR DE PROPOSTAS
 # ==============================================================================
 if menu_selecionado == "📄 Gerador de Propostas":
     
@@ -743,7 +743,8 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 st.markdown("#### 🧠 Inteligência e Estrutura do Quadro")
                 
                 m1, m2, m3, m4, m5 = st.columns(5)
-                m1.metric("Total I/O", f"{total_io_pontos} pts")
+                # Removido o 'pts'
+                m1.metric("Total I/O", str(total_io_pontos))
                 m2.metric("Sensores (AI)", total_ai_painel)
                 m3.metric("Válvulas/Inv (AO)", total_ao_painel)
                 m4.metric("Status/Filtro (DI)", total_di_painel)
@@ -759,6 +760,10 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 c_hardware, c_caixa = st.columns(2)
                 c_hardware.success(f"**Controladores Otimizados:**\n\n{txt_controladores}")
                 c_caixa.warning(f"**Montagem Física:**\n\n• 1x {nome_caixa}\n• 1x {p_data['ihm']}")
+        
+        # AVISO VISUAL DE PRÓXIMO PASSO
+        st.markdown("---")
+        st.info("💡 **Próximo Passo:** Role a página para cima e clique na aba **'📊 Orçamento Final'** para ver a consolidação financeira, exportar para Excel e salvar no Banco de Dados.")
 
     with aba_precos:
         st.header("Gestão da Base de Preços")
@@ -936,7 +941,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         for item in st.session_state.orcamento:
             linhas_resumo.append({"Categoria": item['Categoria'], "Item": item['Item'], "Qtd": item['Quantidade'], "Custo_Total": item['Custo_Total']})
 
-        # --- NOVO: CÁLCULO DE LICENCIAMENTO DE SUPERVISÓRIO ---
+        # --- CÁLCULO DE LICENCIAMENTO DE SUPERVISÓRIO ---
         total_pontos_projeto = sum([p["Quantidade Total"] for p in linhas_pontos])
         if st.session_state.software_selecionado != "Sem Supervisório":
              regra_soft = OPCOES_SUPERVISAO[st.session_state.software_selecionado]
