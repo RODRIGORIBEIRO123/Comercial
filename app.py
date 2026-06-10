@@ -8,7 +8,6 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import os
 import google.generativeai as genai
-from PIL import Image
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide", page_icon="📄")
@@ -24,6 +23,31 @@ def buscar_logo():
     return None
 
 ARQUIVO_LOGO = buscar_logo()
+
+# ==========================================
+# 🎨 ESTILIZAÇÃO GLOBAL (SIDEBAR)
+# ==========================================
+st.markdown("""
+    <style>
+    /* Cor de fundo da Sidebar - Cinza Escuro */
+    [data-testid="stSidebar"] {
+        background-color: #7F7F7F !important;
+    }
+    /* Cor do texto e ícones na Sidebar - Branco */
+    [data-testid="stSidebarNav"] span {
+        color: white !important;
+        font-weight: 500;
+        font-size: 16px;
+    }
+    /* Estilo do texto de usuário logado */
+    .sidebar-user {
+        color: white;
+        padding: 10px 0;
+        font-size: 15px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 
 # ==========================================
 # 🟢 CONEXÃO COM O GOOGLE SHEETS E IA
@@ -42,7 +66,6 @@ def conectar_google_sheets():
         st.error(f"Erro na conexão com Google Sheets: {e}. Verifique o link da planilha.")
         st.stop()
 
-# Configuração da Inteligência Artificial (Google Gemini)
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model_ia = genai.GenerativeModel('gemini-1.5-flash')
@@ -51,106 +74,147 @@ except Exception as e:
     ia_disponivel = False
     erro_ia = e
 
-# Define o fuso horário de Brasília (UTC-3)
 fuso_br = timezone(timedelta(hours=-3))
 
 # ==========================================
-# 🔐 CONTROLE DE ACESSO E LOGIN POR PERFIL
+# 🔐 CONTROLE DE ACESSO E TELA DE LOGIN IDENTICA AO LAYOUT
 # ==========================================
 if "usuario_logado" not in st.session_state:
     st.session_state.usuario_logado = None
 if "nome_exibicao" not in st.session_state:
     st.session_state.nome_exibicao = ""
 
-# Se não estiver logado, exibe a tela de login
 if st.session_state.usuario_logado is None:
+    # CSS EXCLUSIVO DA TELA DE LOGIN
     st.markdown("""
         <style>
-        .login-box {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            max-width: 450px; 
-            margin: 50px auto; 
-            padding: 40px;
+        /* Esconde o cabeçalho superior padrão do Streamlit */
+        header {visibility: hidden;}
+        
+        /* Fundo Gradiente Turquesa da tela principal */
+        .stApp {
+            background: linear-gradient(135deg, #1C8590 0%, #8FD3B5 100%) !important;
+        }
+        
+        /* Box/Card Branco Flutuante */
+        [data-testid="stForm"] {
             background-color: white;
-            border: 1px solid #ddd;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: none;
+            padding: 30px 40px;
         }
-        .login-title {
-            margin-top: 15px;
-            margin-bottom: 5px;
-            font-size: 24px;
-            font-weight: bold;
-            color: #333;
+        
+        /* Modifica os inputs do Streamlit para parecerem apenas uma linha inferior */
+        div[data-baseweb="input"] {
+            border-top: none !important;
+            border-left: none !important;
+            border-right: none !important;
+            border-bottom: 1.5px solid #ccc !important;
+            border-radius: 0 !important;
+            background-color: transparent !important;
         }
-        .login-desc {
-            margin-bottom: 25px;
-            font-size: 15px;
-            color: #666;
+        div[data-baseweb="input"]:focus-within {
+            border-bottom: 2px solid #1C8590 !important;
+        }
+        div[data-baseweb="input"] > div {
+            background-color: transparent !important;
+        }
+        
+        /* Botão Azul */
+        [data-testid="stFormSubmitButton"] button {
+            background-color: #2b7bc4 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 5px !important;
+            font-size: 16px !important;
+            height: 45px !important;
+            margin-top: 15px !important;
+            font-weight: 500;
+        }
+        [data-testid="stFormSubmitButton"] button:hover {
+            background-color: #1a5c96 !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 1, 1])
+    # Layout de colunas para centralizar
+    col_vazia_esq, col_central, col_vazia_dir = st.columns([1, 1.3, 1])
 
-    with col2:
-        st.markdown('<div class="login-box">', unsafe_allow_html=True)
+    with col_central:
+        st.write("")
+        st.write("")
         
+        # Logo SIARCON centralizado acima do Box
         if ARQUIVO_LOGO:
-            st.image(ARQUIVO_LOGO, width=250)
+            c_logo1, c_logo2, c_logo3 = st.columns([1, 2, 1])
+            with c_logo2:
+                st.image(ARQUIVO_LOGO, use_container_width=True)
         else:
-            st.markdown("### SIARCON Engenharia")
+            st.markdown("<h1 style='text-align: center; color: white; font-weight: 800; font-size: 45px;'>SIARCON</h1>", unsafe_allow_html=True)
             
-        st.markdown('<p class="login-title">Módulo Comercial</p>', unsafe_allow_html=True)
-        st.markdown('<p class="login-desc">Insira as suas credenciais para acessar.</p>', unsafe_allow_html=True)
+        st.write("") 
         
-        c_user = st.text_input("Usuário:", placeholder="Ex: rodrigo.ribeiro", label_visibility="collapsed")
-        st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
-        c_pass = st.text_input("Senha:", type="password", placeholder="••••", label_visibility="collapsed")
-        
-        st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
-        if st.button("Entrar no Sistema", type="primary", use_container_width=True):
-            usuarios_validos = {
-                "giovanna.ribeiro": "1234",
-                "aline.ferraz": "1234",
-                "janaina.dias": "1234",
-                "victor.hugo": "1234",
-                "rodrigo.ribeiro": "1234",
-                "engenharia": "1234",
-                "suprimentos": "1234",
-                "obras": "1234"
-            }
-            user_limpo = c_user.lower().strip()
+        # Caixa de Login (Form)
+        with st.form("login_form"):
+            # HTML Injetado para a faixa verde superior e o Avatar redondo
+            st.markdown("""
+                <div style="background-color: #178B96; height: 90px; margin: -30px -40px 0 -40px; border-radius: 10px 10px 0 0;"></div>
+                
+                <div style="width: 80px; height: 80px; background-color: #4A5568; border-radius: 50%; margin: -40px auto 10px auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); position: relative; z-index: 10; border: 4px solid white;">
+                    <svg viewBox="0 0 24 24" width="45" height="45" fill="white">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                </div>
+                
+                <h3 style="text-align: center; color: black; font-size: 22px; margin-bottom: 30px; font-weight: 500;">Bem-Vindo a plataforma<br>comercial da SIARCON</h3>
+            """, unsafe_allow_html=True)
             
-            if user_limpo in usuarios_validos and c_pass == usuarios_validos[user_limpo]:
-                st.session_state.usuario_logado = user_limpo
-                primeiro_nome = user_limpo.split('.')[0].capitalize()
-                st.session_state.nome_exibicao = primeiro_nome
+            # Campos de Texto Customizados
+            st.markdown("<p style='font-size:14px; margin-bottom: 2px; color: #333;'>Usuário:</p>", unsafe_allow_html=True)
+            c_user = st.text_input("user", label_visibility="collapsed")
+            
+            st.write("") # Quebra de linha sutil
+            
+            st.markdown("<p style='font-size:14px; margin-bottom: 2px; color: #333;'>Senha:</p>", unsafe_allow_html=True)
+            c_pass = st.text_input("pass", type="password", label_visibility="collapsed")
+            
+            submit = st.form_submit_button("Entrar", use_container_width=True)
+            
+            # Validação
+            if submit:
+                usuarios_validos = {
+                    "giovanna.ribeiro": "1234",
+                    "aline.ferraz": "1234",
+                    "janaina.dias": "1234",
+                    "victor.hugo": "1234",
+                    "rodrigo.ribeiro": "1234",
+                    "engenharia": "1234",
+                    "suprimentos": "1234",
+                    "obras": "1234"
+                }
+                user_limpo = c_user.lower().strip()
                 
-                st.session_state.paineis_auto = []
-                st.session_state.nome_projeto_orcamento = ""
-                st.session_state.wizard_ativo = False
-                
-                st.rerun()
-            else:
-                st.error("❌ Usuário ou senha incorretos.")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-    st.stop()
+                if user_limpo in usuarios_validos and c_pass == usuarios_validos[user_limpo]:
+                    st.session_state.usuario_logado = user_limpo
+                    st.session_state.nome_exibicao = user_limpo.split('.')[0].capitalize()
+                    
+                    st.session_state.paineis_auto = []
+                    st.session_state.nome_projeto_orcamento = ""
+                    st.session_state.wizard_ativo = False
+                    st.rerun()
+                else:
+                    st.error("❌ Usuário ou senha incorretos.")
+
+    st.stop() # Congela o app aqui enquanto não fizer o login
 
 # === MENU LATERAL PRINCIPAL ===
 if ARQUIVO_LOGO:
     st.sidebar.image(ARQUIVO_LOGO, use_container_width=True)
 else:
-    st.sidebar.markdown("### SIARCON")
+    st.sidebar.markdown("<h3 style='color: white;'>SIARCON</h3>", unsafe_allow_html=True)
     
-st.sidebar.title("Navegação Principal")
-
-st.sidebar.markdown(f"👤 Logado como: **{st.session_state.nome_exibicao}**")
+st.sidebar.markdown(f"<div class='sidebar-user'>👤 Logado como: <b>{st.session_state.nome_exibicao}</b></div>", unsafe_allow_html=True)
 if st.sidebar.button("🚪 Sair do Perfil", type="secondary"):
     st.session_state.usuario_logado = None
     st.session_state.nome_exibicao = ""
@@ -161,7 +225,7 @@ if st.sidebar.button("🚪 Sair do Perfil", type="secondary"):
 st.sidebar.markdown("---")
 
 menu_selecionado = st.sidebar.radio(
-    "Selecione o módulo:",
+    "Navegação Principal",
     ["📄 Gerador de Propostas", "🔌 Sistema de Automação"]
 )
 
@@ -594,6 +658,7 @@ elif menu_selecionado == "🔌 Sistema de Automação":
         except: pass
         st.session_state.banco_precos_carregado = True
 
+    # Trava de atualização de preços
     for k_n, v_n in banco_padrao_precos.items():
         if k_n not in st.session_state.precos_banco: 
             st.session_state.precos_banco[k_n] = v_n
@@ -678,7 +743,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
     ])
 
     with aba_auto:
-        # A TELA FICA COMPLETAMENTE LIMPA INICIALMENTE
         
         # ASSISTENTE EM ETAPAS
         if not st.session_state.wizard_ativo:
@@ -1055,143 +1119,4 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                 st.write(f"**{tipo_inst}** (Cabo: R${custo_cabo:.2f}/m | Infra: R${custo_infra:.2f}/m)")
                 c1, c2 = st.columns(2)
                 qtd_inst = c1.number_input("Qtd. de Instrumentos", min_value=0, value=0, key=f"infra_qtd_{index}")
-                dist_media = c2.number_input("Distância Média (m)", min_value=0.0, value=0.0, step=1.0, key=f"infra_dist_{index}")
-                if qtd_inst > 0 and dist_media > 0:
-                    metragem = qtd_inst * dist_media
-                    st.session_state.orcamento.append({"Categoria": "Infraestrutura", "Item": f"Cabo ({tipo_inst})", "Quantidade": metragem, "Custo_Total": metragem * custo_cabo})
-                    st.session_state.orcamento.append({"Categoria": "Infraestrutura", "Item": f"Infra ({tipo_inst})", "Quantidade": metragem, "Custo_Total": metragem * custo_infra})
-
-    with aba_resumo:
-        st.header("Consolidação Financeira do Orçamento")
-        linhas_resumo = []
-        linhas_pontos = []
-        softwares_incluidos = {}
-
-        for p in st.session_state.paineis_auto:
-            total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
-            for g in p['grupos_equipamentos']:
-                mult = g.get('multiplicador', 1)
-                
-                # Monta as TAGs no nome para o Resumo
-                lista_tags = [t for t in g.get('tags_lista', []) if t.strip() != ""]
-                str_tags = f" (TAGs: {', '.join(lista_tags)})" if len(lista_tags) > 0 else ""
-                nome_equip = f"{g['nome_grupo']}{str_tags}"
-                
-                for inst, qtd in g['instrumentos'].items():
-                    if qtd > 0:
-                        qtd_final = qtd * mult
-                        preco_item = st.session_state.precos_banco.get(inst, 0.0)
-                        
-                        io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
-                        
-                        total_ai_painel += qtd_final * io_vals["AI"]
-                        total_ao_painel += qtd_final * io_vals["AO"]
-                        total_di_painel += qtd_final * io_vals["DI"]
-                        total_do_painel += qtd_final * io_vals["DO"]
-                        linhas_resumo.append({"Categoria": f"{p['nome']} - Campo", "Item": f"{inst} ({nome_equip})", "Preço Unit.": preco_item, "Qtd": qtd_final, "Custo Total": qtd_final * preco_item})
-                        linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": nome_equip, "Instrumento": inst, "Quantidade Total": qtd_final, "Entrada Digital (DI)": qtd_final * io_vals["DI"], "Saída Digital (DO)": qtd_final * io_vals["DO"], "Entrada Analógica (AI)": qtd_final * io_vals["AI"], "Saída Analógica (AO)": qtd_final * io_vals["AO"]})
-
-            tot_io_painel = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
-            if tot_io_painel > 0:
-                custo_ana = (total_ai_painel + total_ao_painel) * st.session_state.precos_banco.get("Custo AI/AO", 565.0)
-                custo_dig = (total_di_painel + total_do_painel) * st.session_state.precos_banco.get("Custo DI/DO", 120.0)
-                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Analógicos (AI/AO)", "Preço Unit.": st.session_state.precos_banco.get("Custo AI/AO", 565.0), "Qtd": (total_ai_painel + total_ao_painel), "Custo Total": custo_ana})
-                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Digitais (DI/DO)", "Preço Unit.": st.session_state.precos_banco.get("Custo DI/DO", 120.0), "Qtd": (total_di_painel + total_do_painel), "Custo Total": custo_dig})
-                
-                c36, c24, c18, c15 = dimensionar_controladores(tot_io_painel)
-                if c36 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-36A", "Preço Unit.": st.session_state.precos_banco.get("MP-C-36A", 9459.0), "Qtd": c36, "Custo Total": c36 * st.session_state.precos_banco.get("MP-C-36A", 9459.0)})
-                if c24 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Preço Unit.": st.session_state.precos_banco.get("MP-C-24A", 7290.0), "Qtd": c24, "Custo Total": c24 * st.session_state.precos_banco.get("MP-C-24A", 7290.0)})
-                if c18 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-18A", "Preço Unit.": st.session_state.precos_banco.get("MP-C-18A", 5185.0), "Qtd": c18, "Custo Total": c18 * st.session_state.precos_banco.get("MP-C-18A", 5185.0)})
-                if c15 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-15A", "Preço Unit.": st.session_state.precos_banco.get("MP-C-15A", 4649.0), "Qtd": c15, "Custo Total": c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0)})
-                
-                nome_caixa, preco_caixa = calcular_painel_fisico(c36 + c24 + c18 + c15)
-                linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": nome_caixa, "Preço Unit.": preco_caixa, "Qtd": 1, "Custo Total": preco_caixa})
-                if PRECOS_IHM[p['ihm']] > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": p['ihm'], "Preço Unit.": PRECOS_IHM[p['ihm']], "Qtd": 1, "Custo Total": PRECOS_IHM[p['ihm']]})
-
-                s_type = p.get('supervisorio', "Sem Supervisório")
-                if s_type != "Sem Supervisório":
-                    if s_type not in softwares_incluidos: softwares_incluidos[s_type] = 0
-                    softwares_incluidos[s_type] += tot_io_painel
-
-        for item in st.session_state.orcamento:
-            linhas_resumo.append({"Categoria": item['Categoria'], "Item": item['Item'], "Preço Unit.": item['Custo_Total']/item['Quantidade'] if item['Quantidade'] > 0 else 0, "Qtd": item['Quantidade'], "Custo Total": item['Custo_Total']})
-
-        for s_name, pts_total in softwares_incluidos.items():
-            b_k, p_k = "", ""
-            if "SEM certificação" in s_name:
-                b_k, p_k = "Licença Supervisório - SEM CFR-21 (Base)", "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)"
-            elif "COM certificação" in s_name:
-                b_k, p_k = "Licença Supervisório - COM CFR-21 (Base)", "Licença Supervisório - COM CFR-21 (Por Ponto I/O)"
-            else:
-                b_k, p_k = "Licença Supervisório - Schneider EBO (Base)", "Licença Supervisório - Schneider EBO (Por Ponto I/O)"
-            
-            p_base = st.session_state.precos_banco.get(b_k, 23000.0)
-            p_pto = st.session_state.precos_banco.get(p_k, 100.0)
-            
-            linhas_resumo.append({"Categoria": "🖥️ Software de Supervisão", "Item": f"Licença Base: {s_name}", "Preço Unit.": p_base, "Qtd": 1, "Custo Total": p_base})
-            if p_pto > 0 and pts_total > 0:
-                linhas_resumo.append({"Categoria": "🖥️ Software de Supervisão", "Item": f"Pontos Licenciados no Software ({pts_total} canais)", "Preço Unit.": p_pto, "Qtd": pts_total, "Custo Total": pts_total * p_pto})
-
-        if len(linhas_resumo) > 0:
-            df_final = pd.DataFrame(linhas_resumo)
-            df_agrupado = df_final.groupby(['Categoria', 'Item', 'Preço Unit.'], as_index=False).agg({'Qtd': 'sum', 'Custo Total': 'sum'})
-            subtotal_materiais = df_agrupado['Custo Total'].sum()
-            custo_servicos_logica = subtotal_materiais * 0.25  
-            total_projeto = subtotal_materiais + custo_servicos_logica
-            
-            st.dataframe(df_agrupado.style.format({'Preço Unit.': 'R$ {:.2f}', 'Custo Total': 'R$ {:.2f}'}), use_container_width=True)
-            st.markdown("---")
-            c1, c2, c3 = st.columns(3)
-            c1.info(f"**Subtotal Materiais/Hardware:**\nR$ {subtotal_materiais:,.2f}")
-            c2.warning(f"**Serviços de Lógica (25%):**\nR$ {custo_servicos_logica:,.2f}")
-            c3.success(f"**CUSTO TOTAL ESTIMADO:**\nR$ {total_projeto:,.2f}")
-            
-            df_pontos = pd.DataFrame(linhas_pontos)
-            if not df_pontos.empty:
-                total_qtd = df_pontos['Quantidade Total'].sum()
-                linha_total = pd.DataFrame([{"Painel": "TOTAL GERAL", "Grupo/Equipamento": "-", "Instrumento": "-", "Quantidade Total": total_qtd, "Entrada Digital (DI)": df_pontos['Entrada Digital (DI)'].sum(), "Saída Digital (DO)": df_pontos['Saída Digital (DO)'].sum(), "Entrada Analógica (AI)": df_pontos['Entrada Analógica (AI)'].sum(), "Saída Analógica (AO)": df_pontos['Saída Analógica (AO)'].sum()}])
-                df_pontos = pd.concat([df_pontos, linha_total], ignore_index=True)
-
-            buffer = io.BytesIO()
-            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                df_exportacao = pd.concat([
-                    df_agrupado, 
-                    pd.DataFrame([{'Categoria': 'Serviços', 'Item': 'Mão de Obra Lógica', 'Preço Unit.': custo_servicos_logica, 'Qtd': 1, 'Custo Total': custo_servicos_logica}]), 
-                    pd.DataFrame([{'Categoria': 'TOTAL', 'Item': 'Geral', 'Preço Unit.': '-', 'Qtd': '-', 'Custo Total': total_projeto}])
-                ], ignore_index=True)
-                df_exportacao.to_excel(writer, index=False, sheet_name='Detalhamento Financeiro')
-                if not df_pontos.empty: df_pontos.to_excel(writer, index=False, sheet_name='Matriz de Pontos (IO)')
-            
-            st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-            st.markdown("---")
-            
-            # --- SALVAR ENGENHARIA COMPLETA ---
-            if st.button("☁️ Salvar Orçamento Final e Gerar Revisão", type="primary", use_container_width=True):
-                if not st.session_state.nome_projeto_orcamento: 
-                    st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento / Projeto' antes de salvar.")
-                else:
-                    try:
-                        sh = conectar_google_sheets()
-                        try: ws_hist_orc = sh.worksheet("Historico_Orcamentos")
-                        except:
-                            ws_hist_orc = sh.add_worksheet(title="Historico_Orcamentos", rows="1000", cols="8")
-                            ws_hist_orc.append_row(["Data/Hora", "Nome do Projeto", "Revisão", "Subtotal Hardware", "Serviços de Lógica", "Custo Total Estimado", "Configuracao_JSON", "Usuário"])
-                        
-                        todas_linhas_existentes = ws_hist_orc.get_all_values()
-                        contagem_revisoes = 0
-                        if len(todas_linhas_existentes) > 1:
-                            for r_row in todas_linhas_existentes[1:]:
-                                if r_row[1].strip().upper() == st.session_state.nome_projeto_orcamento.strip().upper():
-                                    contagem_revisoes += 1
-                        
-                        revisao_atual = f"R-{contagem_revisoes:02d}"
-                        agora = datetime.now(fuso_br).strftime("%d/%m/%Y %H:%M:%S")
-                        json_config = json.dumps(st.session_state.paineis_auto)
-                        
-                        nova_linha_banco = [
-                            agora, st.session_state.nome_projeto_orcamento, revisao_atual,
-                            f"R$ {subtotal_materiais:.2f}".replace('.', ','), f"R$ {custo_servicos_logica:.2f}".replace('.', ','), f"R$ {total_projeto:.2f}".replace('.', ','), json_config, st.session_state.usuario_logado
-                        ]
-                        ws_hist_orc.append_row(nova_linha_banco)
-                        st.success(f"✅ Sucesso! Orçamento para '{st.session_state.nome_projeto_orcamento}' salvo com a revisão {revisao_atual}!")
-                    except Exception as e: st.error(f"Erro ao salvar: {e}")
+                dist_media = c2.number_input("Distância Média (m)", min_value=0.0, value=0.0, step=1.0, key=f
