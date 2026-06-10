@@ -54,7 +54,7 @@ menu_selecionado = st.sidebar.radio(
 st.sidebar.markdown("---")
 
 # ==============================================================================
-# MÓDULO 1: GERADOR DE PROPOSTAS
+# MÓDULO 1: GERADOR DE PROPOSTAS (Mantido sem alterações)
 # ==============================================================================
 if menu_selecionado == "📄 Gerador de Propostas":
     
@@ -370,47 +370,104 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     st.markdown("---")
 
     # ==========================================
-    # 1. DICIONÁRIO DE REGRAS DE ENGENHARIA E PREÇOS
+    # 1. REGRAS E PREÇOS PADRONIZADOS SIARCON
     # ==========================================
+    REGRA_IO = {
+        "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
+        "Transmissor de temperatura e umidade para duto": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Válvula de controle proporcional com atuador": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Relé de Corrente - Status Compressor": {"AI": 0, "AO": 0, "DI": 1, "DO": 2},
+        "Termostato de segurança (Proteção da resistência)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
+        "Pressostato diferencial para ar (Proteção da resistência)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
+        "Transmissor de temperatura para duto": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
+        "Resistência de aquecimento (Equipamento)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
+        "Resistência de aquecimento (Duto)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
+        "Válvula de controle de água gelada proporcional": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula de controle de água quente proporcional": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula de controle de vapor proporcional": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+
+        "Válvula motorizada Bypass Proporcional (até 2.1/2\")": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula motorizada Bypass Proporcional (3\" ou 4\")": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula motorizada Bypass Proporcional (5\")": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula motorizada Bypass Proporcional (6\")": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula motorizada Bypass Proporcional (8\")": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+        "Transmissor de pressão para água": {"AI": 1, "AO": 2, "DI": 0, "DO": 0},
+        "Tranmissor de vazão para água": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
+        "Válvula bloqueio motorizada": {"AI": 0, "AO": 0, "DI": 0, "DO": 1},
+        "Chave de fluxo": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
+        "Bombas (I/O para controlador)": {"AI": 0, "AO": 1, "DI": 1, "DO": 1},
+        "Tanques (I/O para controlador)": {"AI": 1, "AO": 0, "DI": 1, "DO": 1},
+
+        "Pressostato - Filtro G4": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Pressostato - Filtro F9": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Pressostato - Filtro H13/H14": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Status funcionamento ventilador ou exaustor (partida direta)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
+        "Transmissor de pressão diferencial - Filtro G4": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial - Filtro F9": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Tranmissor de pressão diferencial - Filtro H13": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+
+        "Transmissor de pressão diferencial entre salas": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial entre salas com display": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura Ambiente": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura ambiente com display": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura e umidade ambiente": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura e umidade ambiente com display": {"AI": 2, "AO": 0, "DI": 0, "DO": 0}
+    }
+
     banco_padrao_precos = {
-        "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1490.00,
-        "Transmissor de temperatura (TT) (Controle)": 800.00,
-        "Transmissor de temperatura e umidade (TT/MT ou TMT) (Controle)": 2050.00,
-        "Resistência aquecimento (RAQ) (Equipamento)": 0.0,
-        "Resistência de aquecimento (RAQ) (Duto)": 0.0,
-        "Válvula de água gelada (TCV)": 2650.00,
-        "Válvula de água quente (TCV)": 3210.00,
-        "Válvula de vapor (TCV)": 0.0,
-        "Transmissor pressão para filtro G4 (PDIT)": 1490.00,
-        "Transmissor pressão Filtro F9 (PDIT)": 1490.00,
-        "Transmissor pressão filtro H13 (PDIT)": 1490.00,
-        "Pressostato para filtro G4 (PSH)": 349.00,
-        "Pressostato Filtro F9 (PSH)": 349.00,
-        "Pressostato filtro H13 (PSH)": 349.00,
-        "Transmissor de pressão diferencial (Pressão entre salas) (PDT)": 1490.00,
-        "Transmissor de pressão diferencial com display (Pressão entre salas) (PDIT)": 2110.00,
-        "Transmissor de temperatura (TT) (Ambiente)": 2050.00,
-        "Transmissor de temperatura com display (TIT) (Ambiente)": 2650.00,
-        "Transmissor de temperatura e umidade (TT/MT ou TMT) (Ambiente)": 2050.00,
-        "Transmissor de temperatura e umidade com display (TT/MT ou TMT) (Ambiente)": 2650.00,
-        "PDIT – Vazão ventilador UTA": 1490.00,
-        "TT/MT – Transmissor de temperatura e umidade para duto": 2050.00,
-        "TCV – Válvula de controle proporcional": 2650.00,
-        "TC – Relé de corrente – Status Compressor 1": 150.00,
-        "TC - Relé de corrente – Status Compressor 2": 150.00,
-        "PSH – Saturação filtro G4": 349.00,
-        "PSH – Saturação filtro F9": 349.00,
-        "PSH – Saturação filtro H13": 349.00,
-        "TSH – Termostato de segurança": 250.00,
-        "PSH – Proteção resistência": 349.00,
-        "PDIT – Vazão ventilador ou exaustor (Inversor)": 1490.00,
-        "PSH – Status de funcionamento ventilador ou exaustor (Partida Direta)": 349.00,
+        "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)": 1490.00,
+        "Transmissor de temperatura e umidade para duto": 2050.00,
+        "Válvula de controle proporcional com atuador": 0.00,
+        "Relé de Corrente - Status Compressor": 150.00,
+        "Termostato de segurança (Proteção da resistência)": 250.00,
+        "Pressostato diferencial para ar (Proteção da resistência)": 349.00,
+        "Transmissor de temperatura para duto": 800.00,
+        "Resistência de aquecimento (Equipamento)": 0.00,
+        "Resistência de aquecimento (Duto)": 0.00,
+        "Válvula de controle de água gelada proporcional": 0.00,
+        "Válvula de controle de água quente proporcional": 0.00,
+        "Válvula de controle de vapor proporcional": 0.00,
+
+        "Válvula motorizada Bypass Proporcional (até 2.1/2\")": 2690.00,
+        "Válvula motorizada Bypass Proporcional (3\" ou 4\")": 4950.00,
+        "Válvula motorizada Bypass Proporcional (5\")": 6450.00,
+        "Válvula motorizada Bypass Proporcional (6\")": 7900.00,
+        "Válvula motorizada Bypass Proporcional (8\")": 9200.00,
+        "Transmissor de pressão para água": 1359.00,
+        "Tranmissor de vazão para água": 3550.00,
+        "Válvula bloqueio motorizada": 0.00,
+        "Chave de fluxo": 349.00,
+        "Bombas (I/O para controlador)": 0.00,
+        "Tanques (I/O para controlador)": 0.00,
+
+        "Pressostato - Filtro G4": 349.00,
+        "Pressostato - Filtro F9": 349.00,
+        "Pressostato - Filtro H13/H14": 349.00,
+        "Status funcionamento ventilador ou exaustor (partida direta)": 349.00,
+        "Transmissor de pressão diferencial - Filtro G4": 1490.00,
+        "Transmissor de pressão diferencial - Filtro F9": 1490.00,
+        "Tranmissor de pressão diferencial - Filtro H13": 1490.00,
+
+        "Transmissor de pressão diferencial entre salas": 1490.00,
+        "Transmissor de pressão diferencial entre salas com display": 2110.00,
+        "Transmissor de temperatura Ambiente": 2050.00,
+        "Transmissor de temperatura ambiente com display": 2650.00,
+        "Transmissor de temperatura e umidade ambiente": 2050.00,
+        "Transmissor de temperatura e umidade ambiente com display": 2650.00,
+
         "MP-C-15A": 4649.49,
         "MP-C-18A": 5185.54,
         "MP-C-24A": 7290.75,
         "MP-C-36A": 9459.08,
         "Custo AI/AO": 565.00,
         "Custo DI/DO": 120.00
+    }
+
+    OPCOES_SUPERVISAO = {
+        "Sem Supervisório": {"base": 0.0, "por_ponto": 0.0},
+        "Sistema supervisório SEM certificação CFR-21": {"base": 23000.0, "por_ponto": 100.0},
+        "Sistema supervisório COM certificação CFR-21": {"base": 23000.0, "por_ponto": 285.0},
+        "Sistema de monitoramento Schneider EBO": {"base": 13000.0, "por_ponto": 110.0}
     }
 
     if 'banco_precos_carregado' not in st.session_state:
@@ -435,128 +492,97 @@ elif menu_selecionado == "💰 Estimativa de Custos":
         st.session_state.paineis_auto = []
     
     # ---------------------------------------------------------
-    # 🆕 NOVA GESTÃO DE INSTRUMENTOS MESCLADA E LIMPA (SEM REPETIÇÕES)
+    # NOVA ORGANIZAÇÃO DE GRUPOS E KITS LIMPOS
     # ---------------------------------------------------------
     GRUPOS_INSTRUMENTOS = {
-        "🔹 Controle": [
-            "PDIT – Vazão ventilador UTA",
-            "TT/MT – Transmissor de temperatura e umidade para duto",
-            "TCV – Válvula de controle proporcional",
-            "TC – Relé de corrente – Status Compressor 1",
-            "TC - Relé de corrente – Status Compressor 2",
-            "TSH – Termostato de segurança",
-            "PSH – Proteção resistência",
-            "PDIT – Vazão ventilador ou exaustor (Inversor)",
-            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)",
-            "Transmissor de temperatura (TT) (Controle)",
-            "Transmissor de temperatura e umidade (TT/MT ou TMT) (Controle)",
-            "Resistência aquecimento (RAQ) (Equipamento)",
-            "Resistência de aquecimento (RAQ) (Duto)",
-            "Válvula de água gelada (TCV)",
-            "Válvula de água quente (TCV)",
-            "Válvula de vapor (TCV)"
+        "🔹 Controle (HVAC e Máquinas)": [
+            "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)",
+            "Transmissor de temperatura e umidade para duto",
+            "Transmissor de temperatura para duto",
+            "Válvula de controle proporcional com atuador",
+            "Válvula de controle de água gelada proporcional",
+            "Válvula de controle de água quente proporcional",
+            "Válvula de controle de vapor proporcional",
+            "Relé de Corrente - Status Compressor",
+            "Termostato de segurança (Proteção da resistência)",
+            "Pressostato diferencial para ar (Proteção da resistência)",
+            "Resistência de aquecimento (Equipamento)",
+            "Resistência de aquecimento (Duto)"
         ],
-        "🔸 Monitoramento": [
-            "PSH – Saturação filtro G4",
-            "PSH – Saturação filtro F9",
-            "PSH – Saturação filtro H13",
-            "PSH – Status de funcionamento ventilador ou exaustor (Partida Direta)",
-            "Transmissor pressão para filtro G4 (PDIT)",
-            "Transmissor pressão Filtro F9 (PDIT)",
-            "Transmissor pressão filtro H13 (PDIT)",
-            "Pressostato para filtro G4 (PSH)",
-            "Pressostato Filtro F9 (PSH)",
-            "Pressostato filtro H13 (PSH)"
+        "💧 Controle (Central de Água Gelada - CAG)": [
+            "Válvula motorizada Bypass Proporcional (até 2.1/2\")",
+            "Válvula motorizada Bypass Proporcional (3\" ou 4\")",
+            "Válvula motorizada Bypass Proporcional (5\")",
+            "Válvula motorizada Bypass Proporcional (6\")",
+            "Válvula motorizada Bypass Proporcional (8\")",
+            "Transmissor de pressão para água",
+            "Tranmissor de vazão para água",
+            "Válvula bloqueio motorizada",
+            "Chave de fluxo",
+            "Bombas (I/O para controlador)",
+            "Tanques (I/O para controlador)"
         ],
-        "🟢 Monitoramento de Ambiente": [
-            "Transmissor de pressão diferencial (Pressão entre salas) (PDT)",
-            "Transmissor de pressão diferencial com display (Pressão entre salas) (PDIT)",
-            "Transmissor de temperatura (TT) (Ambiente)",
-            "Transmissor de temperatura com display (TIT) (Ambiente)",
-            "Transmissor de temperatura e umidade (TT/MT ou TMT) (Ambiente)",
-            "Transmissor de temperatura e umidade com display (TT/MT ou TMT) (Ambiente)"
+        "🔸 Monitoramento (Filtros e Status)": [
+            "Pressostato - Filtro G4",
+            "Pressostato - Filtro F9",
+            "Pressostato - Filtro H13/H14",
+            "Status funcionamento ventilador ou exaustor (partida direta)",
+            "Transmissor de pressão diferencial - Filtro G4",
+            "Transmissor de pressão diferencial - Filtro F9",
+            "Tranmissor de pressão diferencial - Filtro H13"
+        ],
+        "🟢 Monitoramento de Ambiente (Salas)": [
+            "Transmissor de pressão diferencial entre salas",
+            "Transmissor de pressão diferencial entre salas com display",
+            "Transmissor de temperatura Ambiente",
+            "Transmissor de temperatura ambiente com display",
+            "Transmissor de temperatura e umidade ambiente",
+            "Transmissor de temperatura e umidade ambiente com display"
         ]
-    }
-
-    REGRA_IO = {
-        "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
-        "Transmissor de temperatura (TT) (Controle)": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
-        "Transmissor de temperatura e umidade (TT/MT ou TMT) (Controle)": {"AI": 2, "AO": 2, "DI": 0, "DO": 0},
-        "Resistência aquecimento (RAQ) (Equipamento)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
-        "Resistência de aquecimento (RAQ) (Duto)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
-        "Válvula de água gelada (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula de água quente (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Válvula de vapor (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "Transmissor pressão para filtro G4 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor pressão Filtro F9 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor pressão filtro H13 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Pressostato para filtro G4 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "Pressostato Filtro F9 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "Pressostato filtro H13 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "Transmissor de pressão diferencial (Pressão entre salas) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de pressão diferencial com display (Pressão entre salas) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura (TT) (Ambiente)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura com display (TIT) (Ambiente)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura e umidade (TT/MT ou TMT) (Ambiente)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura e umidade com display (TT/MT ou TMT) (Ambiente)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
-        "PDIT – Vazão ventilador UTA": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
-        "TT/MT – Transmissor de temperatura e umidade para duto": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "TCV – Válvula de controle proporcional": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-        "TC – Relé de corrente – Status Compressor 1": {"AI": 0, "AO": 0, "DI": 1, "DO": 2},
-        "TC - Relé de corrente – Status Compressor 2": {"AI": 0, "AO": 0, "DI": 1, "DO": 2},
-        "PSH – Saturação filtro G4": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "PSH – Saturação filtro F9": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "PSH – Saturação filtro H13": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "TSH – Termostato de segurança": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
-        "PSH – Proteção resistência": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
-        "PDIT – Vazão ventilador ou exaustor (Inversor)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
-        "PSH – Status de funcionamento ventilador ou exaustor (Partida Direta)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1}
     }
     
     KITS_PADRAO = {
         "❄️ UTA Padrão - Água Gelada": {
-            "PDIT – Vazão ventilador UTA": 1,
-            "TT/MT – Transmissor de temperatura e umidade para duto": 1,
-            "TCV – Válvula de controle proporcional": 1,
-            "PSH – Saturação filtro G4": 1,
-            "PSH – Saturação filtro F9": 1,
-            "PSH – Saturação filtro H13": 1
+            "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)": 1,
+            "Transmissor de temperatura e umidade para duto": 1,
+            "Válvula de controle de água gelada proporcional": 1,
+            "Pressostato - Filtro G4": 1,
+            "Pressostato - Filtro F9": 1,
+            "Pressostato - Filtro H13/H14": 1
         },
         "🌬️ UTA Padrão - Expansão Direta": {
-            "PDIT – Vazão ventilador UTA": 1,
-            "TT/MT – Transmissor de temperatura e umidade para duto": 1,
-            "TC – Relé de corrente – Status Compressor 1": 1,
-            "TC - Relé de corrente – Status Compressor 2": 1,
-            "PSH – Saturação filtro G4": 1,
-            "PSH – Saturação filtro F9": 1,
-            "PSH – Saturação filtro H13": 1
+            "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)": 1,
+            "Transmissor de temperatura e umidade para duto": 1,
+            "Relé de Corrente - Status Compressor": 2,
+            "Pressostato - Filtro G4": 1,
+            "Pressostato - Filtro F9": 1,
+            "Pressostato - Filtro H13/H14": 1
         },
         "🔥 UTA Padrão - Água Gelada + Resistência": {
-            "PDIT – Vazão ventilador UTA": 1,
-            "TT/MT – Transmissor de temperatura e umidade para duto": 1,
-            "TCV – Válvula de controle proporcional": 1,
-            "PSH – Saturação filtro G4": 1,
-            "PSH – Saturação filtro F9": 1,
-            "PSH – Saturação filtro H13": 1,
-            "TSH – Termostato de segurança": 1,
-            "PSH – Proteção resistência": 1
+            "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)": 1,
+            "Transmissor de temperatura e umidade para duto": 1,
+            "Válvula de controle de água gelada proporcional": 1,
+            "Pressostato - Filtro G4": 1,
+            "Pressostato - Filtro F9": 1,
+            "Pressostato - Filtro H13/H14": 1,
+            "Termostato de segurança (Proteção da resistência)": 1,
+            "Pressostato diferencial para ar (Proteção da resistência)": 1
         },
         "♨️ UTA Padrão - Expansão Direta + Resistência": {
-            "PDIT – Vazão ventilador UTA": 1,
-            "TT/MT – Transmissor de temperatura e umidade para duto": 1,
-            "TC – Relé de corrente – Status Compressor 1": 1,
-            "TC - Relé de corrente – Status Compressor 2": 1,
-            "PSH – Saturação filtro G4": 1,
-            "PSH – Saturação filtro F9": 1,
-            "PSH – Saturação filtro H13": 1,
-            "TSH – Termostato de segurança": 1,
-            "PSH – Proteção resistência": 1
+            "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)": 1,
+            "Transmissor de temperatura e umidade para duto": 1,
+            "Relé de Corrente - Status Compressor": 2,
+            "Pressostato - Filtro G4": 1,
+            "Pressostato - Filtro F9": 1,
+            "Pressostato - Filtro H13/H14": 1,
+            "Termostato de segurança (Proteção da resistência)": 1,
+            "Pressostato diferencial para ar (Proteção da resistência)": 1
         },
         "💨 Adicional: Ventilador/Exaustor (Inversor)": {
-            "PDIT – Vazão ventilador ou exaustor (Inversor)": 1
+            "Transmissor de pressão Dif. Para ar (Vazão de ar UTA/FANCOIL/SPLITÃO/VE/EX)": 1
         },
         "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": {
-            "PSH – Status de funcionamento ventilador ou exaustor (Partida Direta)": 1
+            "Status funcionamento ventilador ou exaustor (partida direta)": 1
         }
     }
 
@@ -590,6 +616,21 @@ elif menu_selecionado == "💰 Estimativa de Custos":
     ])
 
     with aba_auto:
+        st.header("Motor de Dimensionamento SIARCON")
+        
+        # MÓDULO DE SOFTWARE GLOBAL
+        st.markdown("#### 🖥️ Sistema Supervisório do Projeto")
+        opcoes_software = list(OPCOES_SUPERVISAO.keys())
+        if 'software_selecionado' not in st.session_state:
+            st.session_state.software_selecionado = opcoes_software[0]
+            
+        st.session_state.software_selecionado = st.selectbox(
+            "Selecione a licença e tipo de supervisório que irá gerenciar todos os pontos:", 
+            opcoes_software, 
+            index=opcoes_software.index(st.session_state.software_selecionado)
+        )
+        st.divider()
+
         col_btn, _ = st.columns([1, 2])
         if col_btn.button("➕ Criar Novo Quadro de Automação", type="primary", use_container_width=True):
             st.session_state.paineis_auto.append({
@@ -620,7 +661,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 c_kit, c_btn_kit, c_vazio = st.columns([3, 1, 1])
                 kit_selecionado = c_kit.selectbox("Tipo de Máquina:", ["Selecione um sistema..."] + list(KITS_PADRAO.keys()), key=f"sel_kit_{p_idx}", label_visibility="collapsed")
                 
-                if c_btn_kit.button("➕ Adicionar", key=f"add_grp_kit_{p_idx}", use_container_width=True):
+                if c_btn_kit.button("➕ Adicionar Kit", key=f"add_grp_kit_{p_idx}", use_container_width=True):
                     if kit_selecionado != "Selecione um sistema...":
                         novos_instrumentos = {k: 0 for k in REGRA_IO.keys()}
                         for item_nome, qtd_padrao in KITS_PADRAO[kit_selecionado].items():
@@ -665,6 +706,9 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                                 abrir_padrao = True if "Controle" in grupo_nome else False
                                 
                                 with st.expander(grupo_nome, expanded=abrir_padrao):
+                                    if "CAG" in grupo_nome:
+                                        st.caption("💡 *Dica de Engenharia: Para baratear o custo do Bypass, você pode usar mais de uma válvula menor para dividir a vazão, diminuindo o tamanho exigido.*")
+                                    
                                     cols = st.columns(2) 
                                     for i, inst in enumerate(lista_itens):
                                         if inst not in g_data['instrumentos']: g_data['instrumentos'][inst] = 0
@@ -752,8 +796,8 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                         ws_hist.append_row(["Data/Hora", "Item Alterado", "Valor Antigo", "Novo Valor"])
                     
                     linhas_h = [[h["Data/Hora"], h["Item Alterado"], h["Valor Antigo"], h["Novo Valor"]] for h in novos_historicos]
-                    if lines_h: ws_hist.append_rows(linhas_h)
-                    st.success("✅ Preços updated e gravados na nuvem com sucesso!")
+                    if linhas_h: ws_hist.append_rows(linhas_h)
+                    st.success("✅ Preços atualizados e gravados na nuvem com sucesso!")
                 except Exception as e:
                     st.error(f"⚠️ Os preços foram atualizados nesta tela, mas houve um erro ao acessar o banco. Erro: {e}.")
             else: st.info("Nenhuma alteração foi feita na tabela.")
@@ -882,7 +926,7 @@ elif menu_selecionado == "💰 Estimativa de Custos":
                 linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Digitais (DI/DO)", "Qtd": (total_di_painel + total_do_painel), "Custo_Total": custo_dig})
                 c36, c24, c18, c15 = dimensionar_controladores(tot_io_painel)
                 if c36 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-36A", "Qtd": c36, "Custo_Total": c36 * st.session_state.precos_banco["MP-C-36A"]})
-                if c24 > 0: lines_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Qtd": c24, "Custo_Total": c24 * st.session_state.precos_banco["MP-C-24A"]})
+                if c24 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Qtd": c24, "Custo_Total": c24 * st.session_state.precos_banco["MP-C-24A"]})
                 if c18 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-18A", "Qtd": c18, "Custo_Total": c18 * st.session_state.precos_banco["MP-C-18A"]})
                 if c15 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-15A", "Qtd": c15, "Custo_Total": c15 * st.session_state.precos_banco["MP-C-15A"]})
                 nome_caixa, preco_caixa = calcular_painel_fisico(c36 + c24 + c18 + c15)
@@ -891,6 +935,14 @@ elif menu_selecionado == "💰 Estimativa de Custos":
 
         for item in st.session_state.orcamento:
             linhas_resumo.append({"Categoria": item['Categoria'], "Item": item['Item'], "Qtd": item['Quantidade'], "Custo_Total": item['Custo_Total']})
+
+        # --- NOVO: CÁLCULO DE LICENCIAMENTO DE SUPERVISÓRIO ---
+        total_pontos_projeto = sum([p["Quantidade Total"] for p in linhas_pontos])
+        if st.session_state.software_selecionado != "Sem Supervisório":
+             regra_soft = OPCOES_SUPERVISAO[st.session_state.software_selecionado]
+             linhas_resumo.append({"Categoria": "🖥️ Software de Supervisão", "Item": f"Licença Base: {st.session_state.software_selecionado}", "Qtd": 1, "Custo_Total": regra_soft["base"]})
+             if regra_soft["por_ponto"] > 0 and total_pontos_projeto > 0:
+                  linhas_resumo.append({"Categoria": "🖥️ Software de Supervisão", "Item": f"Licenciamento por Ponto de I/O (R$ {regra_soft['por_ponto']}/pto)", "Qtd": total_pontos_projeto, "Custo_Total": total_pontos_projeto * regra_soft["por_ponto"]})
 
         if len(linhas_resumo) > 0:
             df_final = pd.DataFrame(linhas_resumo)
