@@ -718,11 +718,11 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                                 if item_nome in novos_instrumentos: novos_instrumentos[item_nome] = qtd_padrao
                             nome_limpo = kit_final_selecionado.split(" ", 1)[1] if " " in kit_final_selecionado else kit_final_selecionado
                             grupos_equip.append({
-                                "nome_grupo": f"{nome_limpo} 1", "multiplicador": 1, "instrumentos": novos_instrumentos
+                                "nome_grupo": f"{nome_limpo}", "multiplicador": 1, "instrumentos": novos_instrumentos, "tags_lista": [""]
                             })
                         else:
                             grupos_equip.append({
-                                "nome_grupo": "Equipamento Customizado 1", "multiplicador": 1, "instrumentos": novos_instrumentos
+                                "nome_grupo": "Equipamento Customizado", "multiplicador": 1, "instrumentos": novos_instrumentos, "tags_lista": [""]
                             })
                             
                         st.session_state.paineis_auto.append({
@@ -763,28 +763,52 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                                 if item_nome in novos_inst: novos_inst[item_nome] = qtd_padrao
                             n_limpo = sub_kit.split(" ", 1)[1] if " " in sub_kit else sub_kit
                             p_data['grupos_equipamentos'].append({
-                                "nome_grupo": f"{n_limpo} {len(p_data['grupos_equipamentos']) + 1}", "multiplicador": 1, "instrumentos": novos_inst
+                                "nome_grupo": f"{n_limpo}", "multiplicador": 1, "instrumentos": novos_inst, "tags_lista": [""]
                             })
                             st.rerun()
 
                 total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
 
                 for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
-                    pts_maquina = sum(g_data['instrumentos'].values())
-                    with st.expander(f"📦 {g_data['nome_grupo']} (Qtd: {g_data.get('multiplicador', 1)}) — {pts_maquina} canais"):
-                        cg_nome, cg_mult = st.columns([3, 1])
-                        g_data['nome_grupo'] = cg_nome.text_input("Nome", value=g_data['nome_grupo'], key=f"n_g_{p_idx}_{g_idx}")
-                        g_data['multiplicador'] = cg_mult.number_input("Multiplicador", min_value=1, value=g_data.get('multiplicador', 1), key=f"m_g_{p_idx}_{g_idx}")
+                    # Retirado o "canais" do título do expander
+                    with st.expander(f"📦 {g_data['nome_grupo']} (Qtd: {g_data.get('multiplicador', 1)})"):
                         
+                        # Controle de geração dinâmica de TAGS baseado na Qtd
+                        qtd_key = f"m_g_{p_idx}_{g_idx}"
+                        qtd_atual = st.session_state.get(qtd_key, g_data.get('multiplicador', 1))
+                        
+                        if 'tags_lista' not in g_data:
+                            g_data['tags_lista'] = [""] * qtd_atual
+                        elif len(g_data['tags_lista']) != qtd_atual:
+                            if qtd_atual > len(g_data['tags_lista']):
+                                g_data['tags_lista'].extend([""] * (qtd_atual - len(g_data['tags_lista'])))
+                            else:
+                                g_data['tags_lista'] = g_data['tags_lista'][:qtd_atual]
+
+                        # Define a proporção das colunas: Nome(3) + N TAGs(1.5 cada) + Qtd(1)
+                        render_qtd = min(qtd_atual, 5) # Limite de exibição em linha para não quebrar layout
+                        col_ratios = [3] + [1.5] * render_qtd + [1]
+                        cols = st.columns(col_ratios)
+                        
+                        g_data['nome_grupo'] = cols[0].text_input("Equipamento", value=g_data['nome_grupo'], key=f"n_g_{p_idx}_{g_idx}")
+                        
+                        for i in range(render_qtd):
+                            g_data['tags_lista'][i] = cols[i+1].text_input(f"TAG {i+1}", value=g_data['tags_lista'][i], key=f"t_g_{p_idx}_{g_idx}_{i}")
+                            
+                        g_data['multiplicador'] = cols[-1].number_input("Qtd", min_value=1, value=qtd_atual, key=qtd_key)
+                        
+                        if qtd_atual > 5:
+                            st.caption("⚠️ Para mais de 5 equipamentos, as TAGs extras podem ser inseridas como anotações no final do projeto.")
+
                         with st.expander("⚙️ Ajuste Fino de Instrumentos (Engenharia)"):
                             for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
                                 open_p = True if "Controle" in grupo_nome else False
                                 with st.expander(grupo_nome, expanded=open_p):
                                     if "CAG" in grupo_nome: st.caption("💡 *Dica de Engenharia: Dividir a vazão em válvulas menores reduz custos de Bypass.*")
-                                    cols = st.columns(2)
+                                    cols_inst = st.columns(2)
                                     for i, inst in enumerate(lista_itens):
                                         if inst not in g_data['instrumentos']: g_data['instrumentos'][inst] = 0
-                                        with cols[i % 2]:
+                                        with cols_inst[i % 2]:
                                             g_data['instrumentos'][inst] = st.number_input(inst, min_value=0, step=1, value=g_data['instrumentos'][inst], key=f"inst_{p_idx}_{g_idx}_{inst}")
                             
                             if st.button("🗑️ Remover Máquina", key=f"del_{p_idx}_{g_idx}"):
@@ -862,7 +886,6 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                     except Exception as e: st.error(f"Erro ao salvar rascunho: {e}")
 
         # --- FILTRAGEM INTELIGENTE NO HISTÓRICO ---
-        # Removi daqui e deixei visível SEMPRE caso a tela esteja vazia
         st.markdown("---")
         with st.expander(f"📂 Abrir Orçamento Existente (Histórico de {st.session_state.nome_exibicao})"):
             try:
@@ -1042,6 +1065,12 @@ elif menu_selecionado == "🔌 Sistema de Automação":
             total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
             for g in p['grupos_equipamentos']:
                 mult = g.get('multiplicador', 1)
+                
+                # Monta as TAGs no nome para o Resumo
+                lista_tags = [t for t in g.get('tags_lista', []) if t.strip() != ""]
+                str_tags = f" (TAGs: {', '.join(lista_tags)})" if len(lista_tags) > 0 else ""
+                nome_equip = f"{g['nome_grupo']}{str_tags}"
+                
                 for inst, qtd in g['instrumentos'].items():
                     if qtd > 0:
                         qtd_final = qtd * mult
@@ -1053,8 +1082,8 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                         total_ao_painel += qtd_final * io_vals["AO"]
                         total_di_painel += qtd_final * io_vals["DI"]
                         total_do_painel += qtd_final * io_vals["DO"]
-                        linhas_resumo.append({"Categoria": f"{p['nome']} - Campo", "Item": f"{inst} ({g['nome_grupo']})", "Qtd": qtd_final, "Custo_Total": qtd_final * preco_item})
-                        linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": g['nome_grupo'], "Instrumento": inst, "Quantidade Total": qtd_final, "Entrada Digital (DI)": qtd_final * io_vals["DI"], "Saída Digital (DO)": qtd_final * io_vals["DO"], "Entrada Analógica (AI)": qtd_final * io_vals["AI"], "Saída Analógica (AO)": qtd_final * io_vals["AO"]})
+                        linhas_resumo.append({"Categoria": f"{p['nome']} - Campo", "Item": f"{inst} ({nome_equip})", "Qtd": qtd_final, "Custo_Total": qtd_final * preco_item})
+                        linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": nome_equip, "Instrumento": inst, "Quantidade Total": qtd_final, "Entrada Digital (DI)": qtd_final * io_vals["DI"], "Saída Digital (DO)": qtd_final * io_vals["DO"], "Entrada Analógica (AI)": qtd_final * io_vals["AI"], "Saída Analógica (AO)": qtd_final * io_vals["AO"]})
 
             tot_io_painel = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
             if tot_io_painel > 0:
