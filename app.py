@@ -1119,4 +1119,143 @@ elif menu_selecionado == "🔌 Sistema de Automação":
                 st.write(f"**{tipo_inst}** (Cabo: R${custo_cabo:.2f}/m | Infra: R${custo_infra:.2f}/m)")
                 c1, c2 = st.columns(2)
                 qtd_inst = c1.number_input("Qtd. de Instrumentos", min_value=0, value=0, key=f"infra_qtd_{index}")
-                dist_media = c2.number_input("Distância Média (m)", min_value=0.0, value=0.0, step=1.0, key=f
+                dist_media = c2.number_input("Distância Média (m)", min_value=0.0, value=0.0, step=1.0, key=f"infra_dist_{index}")
+                if qtd_inst > 0 and dist_media > 0:
+                    metragem = qtd_inst * dist_media
+                    st.session_state.orcamento.append({"Categoria": "Infraestrutura", "Item": f"Cabo ({tipo_inst})", "Quantidade": metragem, "Custo_Total": metragem * custo_cabo})
+                    st.session_state.orcamento.append({"Categoria": "Infraestrutura", "Item": f"Infra ({tipo_inst})", "Quantidade": metragem, "Custo_Total": metragem * custo_infra})
+
+    with aba_resumo:
+        st.header("Consolidação Financeira do Orçamento")
+        linhas_resumo = []
+        linhas_pontos = []
+        softwares_incluidos = {}
+
+        for p in st.session_state.paineis_auto:
+            total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
+            for g in p['grupos_equipamentos']:
+                mult = g.get('multiplicador', 1)
+                
+                # Monta as TAGs no nome para o Resumo
+                lista_tags = [t for t in g.get('tags_lista', []) if t.strip() != ""]
+                str_tags = f" (TAGs: {', '.join(lista_tags)})" if len(lista_tags) > 0 else ""
+                nome_equip = f"{g['nome_grupo']}{str_tags}"
+                
+                for inst, qtd in g['instrumentos'].items():
+                    if qtd > 0:
+                        qtd_final = qtd * mult
+                        preco_item = st.session_state.precos_banco.get(inst, 0.0)
+                        
+                        io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
+                        
+                        total_ai_painel += qtd_final * io_vals["AI"]
+                        total_ao_painel += qtd_final * io_vals["AO"]
+                        total_di_painel += qtd_final * io_vals["DI"]
+                        total_do_painel += qtd_final * io_vals["DO"]
+                        linhas_resumo.append({"Categoria": f"{p['nome']} - Campo", "Item": f"{inst} ({nome_equip})", "Preço Unit.": preco_item, "Qtd": qtd_final, "Custo Total": qtd_final * preco_item})
+                        linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": nome_equip, "Instrumento": inst, "Quantidade Total": qtd_final, "Entrada Digital (DI)": qtd_final * io_vals["DI"], "Saída Digital (DO)": qtd_final * io_vals["DO"], "Entrada Analógica (AI)": qtd_final * io_vals["AI"], "Saída Analógica (AO)": qtd_final * io_vals["AO"]})
+
+            tot_io_painel = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
+            if tot_io_painel > 0:
+                custo_ana = (total_ai_painel + total_ao_painel) * st.session_state.precos_banco.get("Custo AI/AO", 565.0)
+                custo_dig = (total_di_painel + total_do_painel) * st.session_state.precos_banco.get("Custo DI/DO", 120.0)
+                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Analógicos (AI/AO)", "Preço Unit.": st.session_state.precos_banco.get("Custo AI/AO", 565.0), "Qtd": (total_ai_painel + total_ao_painel), "Custo Total": custo_ana})
+                linhas_resumo.append({"Categoria": f"{p['nome']} - I/Os", "Item": "Pontos Digitais (DI/DO)", "Preço Unit.": st.session_state.precos_banco.get("Custo DI/DO", 120.0), "Qtd": (total_di_painel + total_do_painel), "Custo Total": custo_dig})
+                
+                c36, c24, c18, c15 = dimensionar_controladores(tot_io_painel)
+                if c36 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-36A", "Preço Unit.": st.session_state.precos_banco.get("MP-C-36A", 9459.0), "Qtd": c36, "Custo Total": c36 * st.session_state.precos_banco.get("MP-C-36A", 9459.0)})
+                if c24 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-24A", "Preço Unit.": st.session_state.precos_banco.get("MP-C-24A", 7290.0), "Qtd": c24, "Custo Total": c24 * st.session_state.precos_banco.get("MP-C-24A", 7290.0)})
+                if c18 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-18A", "Preço Unit.": st.session_state.precos_banco.get("MP-C-18A", 5185.0), "Qtd": c18, "Custo Total": c18 * st.session_state.precos_banco.get("MP-C-18A", 5185.0)})
+                if c15 > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - MPC", "Item": "Controlador MP-C-15A", "Preço Unit.": st.session_state.precos_banco.get("MP-C-15A", 4649.0), "Qtd": c15, "Custo Total": c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0)})
+                
+                nome_caixa, preco_caixa = calcular_painel_fisico(c36 + c24 + c18 + c15)
+                linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": nome_caixa, "Preço Unit.": preco_caixa, "Qtd": 1, "Custo Total": preco_caixa})
+                if PRECOS_IHM[p['ihm']] > 0: linhas_resumo.append({"Categoria": f"{p['nome']} - Estrutura Fís.", "Item": p['ihm'], "Preço Unit.": PRECOS_IHM[p['ihm']], "Qtd": 1, "Custo Total": PRECOS_IHM[p['ihm']]})
+
+                s_type = p.get('supervisorio', "Sem Supervisório")
+                if s_type != "Sem Supervisório":
+                    if s_type not in softwares_incluidos: softwares_incluidos[s_type] = 0
+                    softwares_incluidos[s_type] += tot_io_painel
+
+        for item in st.session_state.orcamento:
+            linhas_resumo.append({"Categoria": item['Categoria'], "Item": item['Item'], "Preço Unit.": item['Custo_Total']/item['Quantidade'] if item['Quantidade'] > 0 else 0, "Qtd": item['Quantidade'], "Custo Total": item['Custo_Total']})
+
+        for s_name, pts_total in softwares_incluidos.items():
+            b_k, p_k = "", ""
+            if "SEM certificação" in s_name:
+                b_k, p_k = "Licença Supervisório - SEM CFR-21 (Base)", "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)"
+            elif "COM certificação" in s_name:
+                b_k, p_k = "Licença Supervisório - COM CFR-21 (Base)", "Licença Supervisório - COM CFR-21 (Por Ponto I/O)"
+            else:
+                b_k, p_k = "Licença Supervisório - Schneider EBO (Base)", "Licença Supervisório - Schneider EBO (Por Ponto I/O)"
+            
+            p_base = st.session_state.precos_banco.get(b_k, 23000.0)
+            p_pto = st.session_state.precos_banco.get(p_k, 100.0)
+            
+            linhas_resumo.append({"Categoria": "🖥️ Software de Supervisão", "Item": f"Licença Base: {s_name}", "Preço Unit.": p_base, "Qtd": 1, "Custo Total": p_base})
+            if p_pto > 0 and pts_total > 0:
+                linhas_resumo.append({"Categoria": "🖥️ Software de Supervisão", "Item": f"Pontos Licenciados no Software ({pts_total} canais)", "Preço Unit.": p_pto, "Qtd": pts_total, "Custo Total": pts_total * p_pto})
+
+        if len(linhas_resumo) > 0:
+            df_final = pd.DataFrame(linhas_resumo)
+            df_agrupado = df_final.groupby(['Categoria', 'Item', 'Preço Unit.'], as_index=False).agg({'Qtd': 'sum', 'Custo Total': 'sum'})
+            subtotal_materiais = df_agrupado['Custo Total'].sum()
+            custo_servicos_logica = subtotal_materiais * 0.25  
+            total_projeto = subtotal_materiais + custo_servicos_logica
+            
+            st.dataframe(df_agrupado.style.format({'Preço Unit.': 'R$ {:.2f}', 'Custo Total': 'R$ {:.2f}'}), use_container_width=True)
+            st.markdown("---")
+            c1, c2, c3 = st.columns(3)
+            c1.info(f"**Subtotal Materiais/Hardware:**\nR$ {subtotal_materiais:,.2f}")
+            c2.warning(f"**Serviços de Lógica (25%):**\nR$ {custo_servicos_logica:,.2f}")
+            c3.success(f"**CUSTO TOTAL ESTIMADO:**\nR$ {total_projeto:,.2f}")
+            
+            df_pontos = pd.DataFrame(linhas_pontos)
+            if not df_pontos.empty:
+                total_qtd = df_pontos['Quantidade Total'].sum()
+                linha_total = pd.DataFrame([{"Painel": "TOTAL GERAL", "Grupo/Equipamento": "-", "Instrumento": "-", "Quantidade Total": total_qtd, "Entrada Digital (DI)": df_pontos['Entrada Digital (DI)'].sum(), "Saída Digital (DO)": df_pontos['Saída Digital (DO)'].sum(), "Entrada Analógica (AI)": df_pontos['Entrada Analógica (AI)'].sum(), "Saída Analógica (AO)": df_pontos['Saída Analógica (AO)'].sum()}])
+                df_pontos = pd.concat([df_pontos, linha_total], ignore_index=True)
+
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                df_exportacao = pd.concat([
+                    df_agrupado, 
+                    pd.DataFrame([{'Categoria': 'Serviços', 'Item': 'Mão de Obra Lógica', 'Preço Unit.': custo_servicos_logica, 'Qtd': 1, 'Custo Total': custo_servicos_logica}]), 
+                    pd.DataFrame([{'Categoria': 'TOTAL', 'Item': 'Geral', 'Preço Unit.': '-', 'Qtd': '-', 'Custo Total': total_projeto}])
+                ], ignore_index=True)
+                df_exportacao.to_excel(writer, index=False, sheet_name='Detalhamento Financeiro')
+                if not df_pontos.empty: df_pontos.to_excel(writer, index=False, sheet_name='Matriz de Pontos (IO)')
+            
+            st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.markdown("---")
+            
+            # --- SALVAR ENGENHARIA COMPLETA ---
+            if st.button("☁️ Salvar Orçamento Final e Gerar Revisão", type="primary", use_container_width=True):
+                if not st.session_state.nome_projeto_orcamento: 
+                    st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento / Projeto' antes de salvar.")
+                else:
+                    try:
+                        sh = conectar_google_sheets()
+                        try: ws_hist_orc = sh.worksheet("Historico_Orcamentos")
+                        except:
+                            ws_hist_orc = sh.add_worksheet(title="Historico_Orcamentos", rows="1000", cols="8")
+                            ws_hist_orc.append_row(["Data/Hora", "Nome do Projeto", "Revisão", "Subtotal Hardware", "Serviços de Lógica", "Custo Total Estimado", "Configuracao_JSON", "Usuário"])
+                        
+                        todas_linhas_existentes = ws_hist_orc.get_all_values()
+                        contagem_revisoes = 0
+                        if len(todas_linhas_existentes) > 1:
+                            for r_row in todas_linhas_existentes[1:]:
+                                if r_row[1].strip().upper() == st.session_state.nome_projeto_orcamento.strip().upper():
+                                    contagem_revisoes += 1
+                        
+                        revisao_atual = f"R-{contagem_revisoes:02d}"
+                        agora = datetime.now(fuso_br).strftime("%d/%m/%Y %H:%M:%S")
+                        json_config = json.dumps(st.session_state.paineis_auto)
+                        
+                        nova_linha_banco = [
+                            agora, st.session_state.nome_projeto_orcamento, revisao_atual,
+                            f"R$ {subtotal_materiais:.2f}".replace('.', ','), f"R$ {custo_servicos_logica:.2f}".replace('.', ','), f"R$ {total_projeto:.2f}".replace('.', ','), json_config, st.session_state.usuario_logado
+                        ]
+                        ws_hist_orc.append_row(nova_linha_banco)
+                        st.success(f"✅ Sucesso! Orçamento para '{st.session_state.nome_projeto_orcamento}' salvo com a revisão {revisao_atual}!")
+                    except Exception as e: st.error(f"Erro ao salvar: {e}")
