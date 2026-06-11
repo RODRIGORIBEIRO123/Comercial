@@ -45,11 +45,12 @@ def conectar_google_sheets():
 fuso_br = timezone(timedelta(hours=-3))
 
 # ==========================================
-# 🔐 CONTROLE DE ACESSO E LOGIN
+# 🔐 CONTROLE DE ACESSO, LOGIN E VARIÁVEIS GLOBAIS
 # ==========================================
 if "usuario_logado" not in st.session_state: st.session_state.usuario_logado = None
 if "nome_exibicao" not in st.session_state: st.session_state.nome_exibicao = ""
 if "menu_selecionado" not in st.session_state: st.session_state.menu_selecionado = "🏠 Tela Inicial"
+if "orcamento" not in st.session_state: st.session_state.orcamento = [] # Correção principal aqui!
 
 if st.session_state.usuario_logado is None:
     st.markdown("""
@@ -637,7 +638,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
     def dimensionar_siemens_1500(ai, ao, di, do):
         hw = {}
-        rem_ai = max(0, ai - 0) # 1511-1 PN não possui onboard
+        rem_ai = max(0, ai - 0) 
         rem_ao = max(0, ao - 0)
         rem_di = max(0, di - 0)
         rem_do = max(0, do - 0)
