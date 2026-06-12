@@ -45,13 +45,22 @@ def conectar_google_sheets():
 fuso_br = timezone(timedelta(hours=-3))
 
 # ==========================================
-# 🔐 CONTROLE DE ACESSO E LOGIN
+# 🔐 INICIALIZAÇÃO SEGURA DE VARIÁVEIS GLOBAIS
 # ==========================================
 if "usuario_logado" not in st.session_state: st.session_state.usuario_logado = None
 if "nome_exibicao" not in st.session_state: st.session_state.nome_exibicao = ""
 if "menu_selecionado" not in st.session_state: st.session_state.menu_selecionado = "🏠 Tela Inicial"
 if "orcamento" not in st.session_state: st.session_state.orcamento = []
+if "historico_precos" not in st.session_state: st.session_state.historico_precos = []
+if 'nome_projeto_orcamento' not in st.session_state: st.session_state.nome_projeto_orcamento = ""
+if 'projeto_para_abrir' not in st.session_state: st.session_state.projeto_para_abrir = None
+if 'dados_projeto_abrir' not in st.session_state: st.session_state.dados_projeto_abrir = {}
+if 'wizard_ativo' not in st.session_state: st.session_state.wizard_ativo = False
+if 'paineis_auto' not in st.session_state: st.session_state.paineis_auto = []
 
+# ==========================================
+# TELA DE LOGIN
+# ==========================================
 if st.session_state.usuario_logado is None:
     st.markdown("""
         <style>
@@ -411,12 +420,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     st.title("🔌 Engenharia e Custos - Automação e Infra")
     st.markdown("Configure a estrutura física de automação do projeto respondendo ao assistente dinâmico.")
     
-    if 'nome_projeto_orcamento' not in st.session_state: st.session_state.nome_projeto_orcamento = ""
-    if 'projeto_para_abrir' not in st.session_state: st.session_state.projeto_para_abrir = None
-    if 'dados_projeto_abrir' not in st.session_state: st.session_state.dados_projeto_abrir = {}
-    if 'wizard_ativo' not in st.session_state: st.session_state.wizard_ativo = False
-    if 'paineis_auto' not in st.session_state: st.session_state.paineis_auto = []
-        
     nome_proj = st.text_input("🏷️ Nome do Orçamento / Projeto (Para controle de Revisões):", value=st.session_state.nome_projeto_orcamento)
     st.session_state.nome_projeto_orcamento = nome_proj
     st.markdown("---")
@@ -461,9 +464,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     }
 
     # ==========================================
-    # DICIONÁRIOS ESTÁTICOS DE PREÇOS (SEPARADOS DE VERDADE)
+    # DICIONÁRIOS ESTÁTICOS DE PREÇOS (SEPARADOS)
     # ==========================================
-    # 1. Base Schneider e Itens Comuns (NÃO entra IHM aqui)
     banco_schneider_comum = {
         "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1490.00,
         "Transmissor de temperatura e umidade para duto (TT/MT)": 2050.00,
@@ -505,12 +507,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Licença Supervisório - SEM CFR-21 (Base)": 23000.00, "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)": 100.00,
         "Licença Supervisório - COM CFR-21 (Base)": 23000.00, "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
         "Licença Supervisório - Schneider EBO (Base)": 13000.00, "Licença Supervisório - Schneider EBO (Por Ponto I/O)": 110.00,
-        "MP-C-15A": 4649.49, "MP-C-18A": 5185.54, "MP-C-24A": 7290.75, "MP-C-36A": 9459.08,
-        "IHM Padrão 7\"": 3400.00,
-        "IHM Premium 10\"": 8500.00
+        "MP-C-15A": 4649.49, "MP-C-18A": 5185.54, "MP-C-24A": 7290.75, "MP-C-36A": 9459.08
     }
 
-    # 2. Base Siemens
     banco_siemens = {
         "Siemens - CPU 1214C DC/DC/DC": 2500.00,
         "Siemens - CPU 1215C DC/DC/DC": 3200.00,
@@ -531,7 +530,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Siemens - Serviço Custo DI/DO": 180.00
     }
 
-    # 3. Base Mercato (IHM EXCLUSIVA AQUI)
     banco_mercato = {
         "Mercato - Controlador MCP-4 (2AO, 3DO, 4UI)": 950.00,
         "Mercato - Controlador MCP-8 (4AO, 5DO, 8UI, 2DI)": 1400.00,
@@ -543,9 +541,14 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Mercato - IHM Básica 4.3\"": 1700.00
     }
 
-    # Junta tudo num banco consolidado pro processamento geral do app
-    banco_padrao_precos = {**banco_schneider_comum, **banco_siemens, **banco_mercato}
-    banco_padrao_precos["Sem Interface (Cego)"] = 0.00
+    # As IHMs da Schneider/Siemens
+    banco_ihm = {
+        "IHM Padrão 7\"": 3400.00,
+        "IHM Premium 10\"": 8500.00,
+        "Sem Interface (Cego)": 0.00
+    }
+
+    banco_padrao_precos = {**banco_schneider_comum, **banco_siemens, **banco_mercato, **banco_ihm}
 
     if 'precos_banco' not in st.session_state:
         st.session_state.precos_banco = banco_padrao_precos.copy()
@@ -665,16 +668,13 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         return hw
         
     def dimensionar_mercato(ui, ao, do):
-        if ui <= 4 and ao <= 2 and do <= 3:
-            return "Mercato - Controlador MCP-4 (2AO, 3DO, 4UI)"
-        elif ui <= 8 and ao <= 4 and do <= 5:
-            return "Mercato - Controlador MCP-8 (4AO, 5DO, 8UI, 2DI)"
-        elif ui <= 12 and ao <= 4 and do <= 8:
-            return "Mercato - Controlador MCP-12 (4AO, 8DO, 12UI, 4DI)"
+        if ui <= 4 and ao <= 2 and do <= 3: return "Mercato - Controlador MCP-4 (2AO, 3DO, 4UI)"
+        elif ui <= 8 and ao <= 4 and do <= 5: return "Mercato - Controlador MCP-8 (4AO, 5DO, 8UI, 2DI)"
+        elif ui <= 12 and ao <= 4 and do <= 8: return "Mercato - Controlador MCP-12 (4AO, 8DO, 12UI, 4DI)"
         return None
 
     aba_auto, aba_infra, aba_precos, aba_resumo = st.tabs([
-        "🚀 Dimensionamento de Automação", "🔌 Infraestrutura", "💲 Base de Preços", "📊 Orçamento Final"
+        "🚀 Dimensionamento de Automação", "🔌 Infraestrutura Lançamento", "💲 Base de Preços", "📊 Orçamento Final"
     ])
 
     with aba_auto:
@@ -691,7 +691,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 is_mercato_arch = "Mercato" in arquitetura_opt
                 is_siemens_arch = "Siemens" in arquitetura_opt
                 
-                # --- Lógica de IHM no Wizard ---
+                # --- Lógica Exclusiva de IHM ---
                 if is_mercato_arch:
                     opcoes_ihm_wizard = ["Sem Interface (Cego)", "Mercato - IHM Básica 4.3\""]
                 else:
@@ -701,6 +701,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 
                 tipo_q = st.radio("3. Selecione o Tipo do Quadro:", ["Controle (HVAC/Máquinas)", "CAG (Central de Água Gelada)"], horizontal=True)
                 
+                # --- Lógica Exclusiva de Supervisório ---
                 if is_mercato_arch:
                     sup_opt = "Não"
                     soft_sel = "Sem Supervisório"
@@ -713,7 +714,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             opcoes_soft = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21"]
                         else:
                             opcoes_soft = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21", "Sistema de monitoramento Schneider EBO"]
-                            
                         soft_sel = st.selectbox("Selecione o Software de Supervisão:", opcoes_soft)
                 
                 tag_q = st.text_input("5. Insira a TAG / Identificação do Quadro (Ex: QTA-01, QD-CAG):")
@@ -740,7 +740,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             grupos_equip.append({"nome_grupo": f"{nome_limpo}", "multiplicador": 1, "instrumentos": novos_instrumentos, "tags_lista": [""]})
                         else:
                             grupos_equip.append({"nome_grupo": "Equipamento Customizado", "multiplicador": 1, "instrumentos": novos_instrumentos, "tags_lista": [""]})
-                            
+
                         st.session_state.paineis_auto.append({
                             "id": len(st.session_state.paineis_auto),
                             "nome": tag_q, "tipo": tipo_q, "supervisorio": soft_sel, "arquitetura": arquitetura_opt,
@@ -763,9 +763,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 c_icone.markdown("## 🎛️")
                 p_data['nome'] = c_nome_painel.text_input("Identificação do Quadro", value=p_data['nome'], key=f"n_p_{p_idx}", label_visibility="collapsed")
                 
-                # Exibe a IHM selecionada, mas agora em formato texto (já que a decisão ocorreu no wizard)
                 c_ihm_painel.markdown(f"<div style='padding-top:10px; color:#555;'><b>IHM:</b> {p_data.get('ihm', 'Sem Interface (Cego)')}</div>", unsafe_allow_html=True)
-                
                 st.caption(f"**Arquitetura:** {p_data.get('arquitetura', 'SpaceLogic (Schneider)')} | **Supervisão:** {p_data.get('supervisorio', 'Sem Supervisório')}")
                 
                 with st.expander("➕ Adicionar outro Equipamento neste mesmo Quadro"):
@@ -785,7 +783,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
                     total_ai_g_single = total_ao_g_single = total_di_g_single = total_do_g_single = 0
                     
-                    with st.expander(f"📦 {g_data['nome_grupo']}"):
+                    # FECHAMENTO AUTOMÁTICO DA CAG E OUTROS, DEIXA APENAS HVAC ABERTO
+                    open_p_hvac = True if "HVAC" in g_data['nome_grupo'].upper() else False
+                    
+                    with st.expander(f"📦 {g_data['nome_grupo']}", expanded=open_p_hvac):
                         qtd_key = f"m_g_{p_idx}_{g_idx}"
                         qtd_atual = st.session_state.get(qtd_key, g_data.get('multiplicador', 1))
                         if 'tags_lista' not in g_data: g_data['tags_lista'] = [""] * qtd_atual
@@ -820,8 +821,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
                         with st.expander("⚙️ Ajuste Fino de Instrumentos (Engenharia)"):
                             for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
-                                open_p = True if "Controle" in grupo_nome else False
-                                with st.expander(grupo_nome, expanded=open_p):
+                                # Fechamento da CAG aqui também
+                                open_p_eng = True if "HVAC" in grupo_nome.upper() else False
+                                with st.expander(grupo_nome, expanded=open_p_eng):
                                     cols_inst = st.columns(2)
                                     for i, inst in enumerate(lista_itens):
                                         if inst not in g_data['instrumentos']: g_data['instrumentos'][inst] = 0
@@ -870,6 +872,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         ws_hist_orc.append_row(nova_linha)
                         st.session_state.paineis_auto = []
                         st.session_state.nome_projeto_orcamento = ""
+                        st.cache_data.clear() # Limpa o cache para atualizar o histórico
                         st.toast("📝 Rascunho salvo na nuvem com sucesso! Tela limpa.", icon="💾")
                         st.rerun()
                     except Exception as e: st.error(f"Erro ao salvar: {e}")
@@ -924,18 +927,22 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         st.header("Gestão da Base de Preços")
         st.write("Altere os valores e salve na nuvem para manter a equipe comercial sincronizada.")
         
-        df_precos_total = pd.DataFrame(list(st.session_state.precos_banco.items()), columns=["Item / Equipamento", "Valor Atual (R$)"])
-        
+        # Filtros precisos utilizando chaves estritas dos dicionários de criação
         st.subheader("Base Geral e Schneider")
-        df_geral = df_precos_total[~df_precos_total['Item / Equipamento'].str.contains('Siemens|Mercato', case=False, na=False, regex=True)].reset_index(drop=True)
+        lista_schneider = list(banco_schneider_comum.keys())
+        # Adiciona a IHM geral caso alguem queira editar o preço
+        lista_schneider.extend(["IHM Padrão 7\"", "IHM Premium 10\""])
+        df_geral = pd.DataFrame([{"Item / Equipamento": k, "Valor Atual (R$)": st.session_state.precos_banco.get(k, 0.0)} for k in lista_schneider if k in st.session_state.precos_banco])
         edited_geral = st.data_editor(df_geral, use_container_width=True, hide_index=True, key="ed_geral")
         
         st.subheader("Base Siemens")
-        df_siemens = df_precos_total[df_precos_total['Item / Equipamento'].str.contains('Siemens', case=False, na=False)].reset_index(drop=True)
+        lista_siemens = list(banco_siemens.keys())
+        df_siemens = pd.DataFrame([{"Item / Equipamento": k, "Valor Atual (R$)": st.session_state.precos_banco.get(k, 0.0)} for k in lista_siemens if k in st.session_state.precos_banco])
         edited_siemens = st.data_editor(df_siemens, use_container_width=True, hide_index=True, key="ed_siem")
 
         st.subheader("Base Mercato e NTC")
-        df_mercato = df_precos_total[df_precos_total['Item / Equipamento'].str.contains('Mercato', case=False, na=False)].reset_index(drop=True)
+        lista_mercato = list(banco_mercato.keys())
+        df_mercato = pd.DataFrame([{"Item / Equipamento": k, "Valor Atual (R$)": st.session_state.precos_banco.get(k, 0.0)} for k in lista_mercato if k in st.session_state.precos_banco])
         edited_mercato = st.data_editor(df_mercato, use_container_width=True, hide_index=True, key="ed_merc")
         
         if st.button("💾 Salvar Novos Preços no Banco de Dados", type="primary"):
@@ -966,6 +973,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         ws_hist = sh.add_worksheet(title="Historico_Precos", rows="1000", cols="4")
                         ws_hist.append_row(["Data/Hora", "Item Alterado", "Valor Antigo", "Novo Valor"])
                     if novos_historicos: ws_hist.append_rows([[h["Data/Hora"], h["Item Alterado"], h["Valor Antigo"], h["Novo Valor"]] for h in novos_historicos])
+                    st.cache_data.clear() # Limpa o cache
                     st.success("✅ Preços atualizados na nuvem!")
                 except Exception as e: st.error(f"Erro ao salvar: {e}")
 
@@ -1250,7 +1258,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             st.markdown("---")
             if st.button("☁️ Salvar Orçamento Final e Gerar Revisão", type="primary", use_container_width=True):
-                if not st.session_state.nome_projeto_orcamento: st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento'.")
+                if not st.session_state.nome_projeto_orcamento: st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento / Projeto' antes de salvar.")
                 else:
                     try:
                         sh = conectar_google_sheets()
@@ -1263,5 +1271,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         revisao_atual = f"R-{contagem_revisoes:02d}"
                         nova_linha = [datetime.now(fuso_br).strftime("%d/%m/%Y %H:%M:%S"), st.session_state.nome_projeto_orcamento, revisao_atual, f"R$ {subtotal_hw:.2f}".replace('.', ','), f"R$ {subtotal_serv:.2f}".replace('.', ','), f"R$ {total_geral:.2f}".replace('.', ','), json.dumps(st.session_state.paineis_auto), st.session_state.usuario_logado]
                         ws_hist_orc.append_row(nova_linha)
-                        st.success(f"✅ Sucesso! Salvo com revisão {revisao_atual}!")
+                        st.cache_data.clear() # Limpa o cache para que a tabela do banco recarregue no visual
+                        st.success(f"✅ Sucesso! Orçamento para '{st.session_state.nome_projeto_orcamento}' salvo com a revisão {revisao_atual}!")
                     except Exception as e: st.error(f"Erro ao salvar: {e}")
