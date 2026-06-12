@@ -598,13 +598,13 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1,
             "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Válvula de controle de água gelada proporcional (TCV)": 1,
             "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1, "Pressostato para monitorar os filtros H13/H14 (PSH)": 1,
-            "Termostato de segurança (TSH)": 1, "Pressostato diferencial para ar (PSH)": 1
+            "Termostato de segurança (TSH)": 1, "Pressostato diferencial para ar (PSH)": 1, "Resistência de aquecimento (Equipamento) (RAQ)": 1
         },
         "ENTREGÁVEL EXP. DIRET + RESISTÊNCIA": {
             "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1,
             "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Relé de Corrente - Status Compressor (TC)": 2,
             "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1, "Pressostato para monitorar os filtros H13/H14 (PSH)": 1,
-            "Termostato de segurança (TSH)": 1, "Pressostato diferencial para ar (PSH)": 1
+            "Termostato de segurança (TSH)": 1, "Pressostato diferencial para ar (PSH)": 1, "Resistência de aquecimento (Equipamento) (RAQ)": 1
         },
         "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1 },
         "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 }
@@ -793,6 +793,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 total_di_g_single += q * io_vals["DI"]
                                 total_do_g_single += q * io_vals["DO"]
                                 
+                            # +2 DI's da Seletora de Painel por equipamento contabilizado
+                            total_di_g_single += 2
+                                
                             if is_mercato_quadro:
                                 ui_nec = total_ai_g_single + total_di_g_single
                                 ui_check = math.ceil(ui_nec * 1.2) if tem_sobra_20 else ui_nec
@@ -824,6 +827,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         raw_ao_painel += q * io_vals["AO"] * qtd_atual
                         raw_di_painel += q * io_vals["DI"] * qtd_atual
                         raw_do_painel += q * io_vals["DO"] * qtd_atual
+
+                    # Adiciona as DIs invisíveis de cada máquina no painel global
+                    raw_di_painel += (2 * qtd_atual)
 
                 reserva_ai = math.ceil(raw_ai_painel * 0.2) if tem_sobra_20 else 0
                 reserva_ao = math.ceil(raw_ao_painel * 0.2) if tem_sobra_20 else 0
@@ -1033,7 +1039,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 
                 nome_limpo_grupo = g['nome_grupo'].replace("Equipamento Novo", "").replace("Equipamento Customizado", "").strip()
                 if not nome_limpo_grupo:
-                    lista_equip_nomes.append(f"{mult}x Equipamentos{str_tags}")
+                    lista_equip_nomes.append(f"{mult}x Equipamento{str_tags}")
                     nome_equip = f"Equipamento{str_tags}"
                 else:
                     lista_equip_nomes.append(f"{mult}x {nome_limpo_grupo}{str_tags}")
@@ -1046,7 +1052,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         qtd_final = qtd * mult
                         item_nome_real = inst
                         
-                        # --- Swap para NTC se Mercato OU Schneider ---
                         if is_mercato:
                             if "Transmissor de temperatura para duto (TT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC (Duto)"
                             elif "Transmissor de temperatura Ambiente (TT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC (Ambiente)"
@@ -1055,7 +1060,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             if "Transmissor de temperatura para duto (TT)" in inst: item_nome_real = "Schneider - Sensor de Temperatura NTC (Duto)"
                             elif "Transmissor de temperatura Ambiente (TT)" in inst: item_nome_real = "Schneider - Sensor de Temperatura NTC (Ambiente)"
                         
-                        # Definindo função e limpando a tag base
                         nome_curto_inst = item_nome_real.replace("Mercato - ", "").replace("Schneider - ", "").replace("Siemens - ", "")
                         nome_curto_inst = re.sub(r'\s*\([A-Z/]+\)$', '', nome_curto_inst)
                         lista_instrumentos_nomes.add(nome_curto_inst)
@@ -1067,7 +1071,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             if "pdit" in inst.lower() or "pdt" in inst.lower(): tem_filtro_pdt = True
                             if "psh" in inst.lower() or "pressostato" in inst.lower(): tem_filtro_psh = True
 
-                        # Função comercial
                         func_inst = "Medição Genérica"
                         if "pressão dif. para ar" in inst.lower(): func_inst = "Medição da Vazão de Ar"
                         elif "temperatura e umidade" in inst.lower(): func_inst = "Medição de Temperatura e Umidade"
@@ -1104,6 +1107,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         elif is_mercato: custo_base_mercato += custo_tot_inst
                         else: custo_base_schneider += custo_tot_inst
                 
+                # ADIÇÃO DA CHAVE SELETORA AUTO/MANUAL POR EQUIPAMENTO (2 DIs)
+                raw_di_painel += (2 * mult)
+                raw_di_g_single += 2
+                linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": nome_equip, "Instrumento": "Chave Seletora Auto/Manual (Painel Elétrico)", "Quantidade Total": mult, "Entrada Digital (DI)": 2 * mult, "Saída Digital (DO)": 0, "Entrada Analógica (AI)": 0, "Saída Analógica (AO)": 0})
+
                 if is_mercato:
                     reserva_g_ui = math.ceil((raw_ai_g_single + raw_di_g_single) * 0.2) if tem_sobra_20 else 0
                     reserva_g_ao = math.ceil(raw_ao_g_single * 0.2) if tem_sobra_20 else 0
@@ -1342,6 +1350,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             df_display['Custo Total'] = df_display['Custo Total'].apply(format_currency)
             st.dataframe(df_display, use_container_width=True)
             
+            # --- EXPANDER PARA O DESCRITIVO COMERCIAL ---
             with st.expander("📄 Gerar Descritivo Detalhado para Proposta Comercial", expanded=False):
                 st.markdown("<div style='background-color:#E3F2FD; padding:20px; border-radius:10px;'>", unsafe_allow_html=True)
                 for t_com in descritivo_comercial_linhas:
@@ -1361,6 +1370,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             ws1.title = "Detalhamento Financeiro"
             ws1.views.sheetView[0].showGridLines = True
             
+            # --- NOVO CABEÇALHO DO EXCEL (Mais largo) ---
             ws1.row_dimensions[1].height = 35
             ws1.row_dimensions[2].height = 25
             ws1.row_dimensions[3].height = 25
@@ -1409,6 +1419,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             cell.alignment = Alignment(horizontal="right")
                         elif c_idx == 4: cell.alignment = Alignment(horizontal="center")
             
+            # --- CAIXA DE TEXTO DESCRITIVO NO EXCEL ---
             end_row_table = start_row + len(df_exportacao) + 2
             num_linhas_texto = len(texto_descritivo_final.split('\n'))
             tamanho_caixa = max(10, num_linhas_texto + 2) 
@@ -1459,6 +1470,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         revisao_atual = f"R-{contagem_revisoes:02d}"
                         nova_linha = [datetime.now(fuso_br).strftime("%d/%m/%Y %H:%M:%S"), st.session_state.nome_projeto_orcamento, revisao_atual, f"R$ {subtotal_hw:.2f}".replace('.', ','), f"R$ {subtotal_serv:.2f}".replace('.', ','), f"R$ {total_geral:.2f}".replace('.', ','), json.dumps(st.session_state.paineis_auto), st.session_state.usuario_logado]
                         ws_hist_orc.append_row(nova_linha)
-                        st.cache_data.clear()
+                        st.cache_data.clear() # Limpa o cache para que a tabela do banco recarregue no visual
                         st.success(f"✅ Sucesso! Orçamento para '{st.session_state.nome_projeto_orcamento}' salvo com a revisão {revisao_atual}!")
                     except Exception as e: st.error(f"Erro ao salvar: {e}")
