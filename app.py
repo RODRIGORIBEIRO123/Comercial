@@ -3,6 +3,7 @@ import pandas as pd
 from docxtpl import DocxTemplate
 import io
 import json
+import math
 from datetime import date, datetime, timezone, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -463,9 +464,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Transmissor de temperatura e umidade ambiente com display (TT/MT)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0}
     }
 
-    # ==========================================
-    # DICIONÁRIOS ESTÁTICOS DE PREÇOS (SEPARADOS)
-    # ==========================================
     banco_schneider_comum = {
         "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1490.00,
         "Transmissor de temperatura e umidade para duto (TT/MT)": 2050.00,
@@ -511,22 +509,14 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     }
 
     banco_siemens = {
-        "Siemens - CPU 1214C DC/DC/DC": 2500.00,
-        "Siemens - CPU 1215C DC/DC/DC": 3200.00,
-        "Siemens - SM 1231 AI 8x13Bit": 1900.00,
-        "Siemens - SM 1232 AQ 4x14Bit": 2100.00,
-        "Siemens - SM 1221 DI 16x24VDC": 1200.00,
-        "Siemens - SM 1222 DQ 16x24VDC": 1300.00,
-        "Siemens - Fonte 24VDC 2.5A": 800.00,
-        "Siemens - Cartão de Memória 4MB": 400.00,
-        "Siemens - CPU 1511-1 PN": 5500.00,
-        "Siemens - AI 8xU/I HS": 2800.00,
-        "Siemens - AQ 4xU/I ST": 3100.00,
-        "Siemens - DI 16x24VDC HF": 1800.00,
-        "Siemens - DQ 16x24VDC/0.5A": 1900.00,
-        "Siemens - Fonte PM 1507 24VDC 8A": 1500.00,
-        "Siemens - Cartão de Memória 12MB": 900.00,
-        "Siemens - Serviço Custo AI/AO": 750.00,
+        "Siemens - CPU 1214C DC/DC/DC": 2500.00, "Siemens - CPU 1215C DC/DC/DC": 3200.00,
+        "Siemens - SM 1231 AI 8x13Bit": 1900.00, "Siemens - SM 1232 AQ 4x14Bit": 2100.00,
+        "Siemens - SM 1221 DI 16x24VDC": 1200.00, "Siemens - SM 1222 DQ 16x24VDC": 1300.00,
+        "Siemens - Fonte 24VDC 2.5A": 800.00, "Siemens - Cartão de Memória 4MB": 400.00,
+        "Siemens - CPU 1511-1 PN": 5500.00, "Siemens - AI 8xU/I HS": 2800.00,
+        "Siemens - AQ 4xU/I ST": 3100.00, "Siemens - DI 16x24VDC HF": 1800.00,
+        "Siemens - DQ 16x24VDC/0.5A": 1900.00, "Siemens - Fonte PM 1507 24VDC 8A": 1500.00,
+        "Siemens - Cartão de Memória 12MB": 900.00, "Siemens - Serviço Custo AI/AO": 750.00,
         "Siemens - Serviço Custo DI/DO": 180.00
     }
 
@@ -541,12 +531,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Mercato - IHM Básica 4.3\"": 1700.00
     }
 
-    # As IHMs da Schneider/Siemens
-    banco_ihm = {
-        "IHM Padrão 7\"": 3400.00,
-        "IHM Premium 10\"": 8500.00,
-        "Sem Interface (Cego)": 0.00
-    }
+    banco_ihm = { "IHM Padrão 7\"": 3400.00, "IHM Premium 10\"": 8500.00, "Sem Interface (Cego)": 0.00 }
 
     banco_padrao_precos = {**banco_schneider_comum, **banco_siemens, **banco_mercato, **banco_ihm}
 
@@ -637,10 +622,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
     def dimensionar_siemens_1200(ai, ao, di, do):
         hw = {}
-        rem_ai = max(0, ai - 2)
-        rem_ao = max(0, ao - 0)
-        rem_di = max(0, di - 14)
-        rem_do = max(0, do - 10)
+        rem_ai = max(0, ai - 2); rem_ao = max(0, ao - 0)
+        rem_di = max(0, di - 14); rem_do = max(0, do - 10)
         if ai>0 or ao>0 or di>0 or do>0:
             hw["Siemens - CPU 1214C DC/DC/DC"] = 1
             hw["Siemens - Fonte 24VDC 2.5A"] = 1
@@ -653,10 +636,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
     def dimensionar_siemens_1500(ai, ao, di, do):
         hw = {}
-        rem_ai = max(0, ai - 0) 
-        rem_ao = max(0, ao - 0)
-        rem_di = max(0, di - 0)
-        rem_do = max(0, do - 0)
+        rem_ai = max(0, ai - 0); rem_ao = max(0, ao - 0)
+        rem_di = max(0, di - 0); rem_do = max(0, do - 0)
         if ai>0 or ao>0 or di>0 or do>0:
             hw["Siemens - CPU 1511-1 PN"] = 1
             hw["Siemens - Fonte PM 1507 24VDC 8A"] = 1
@@ -691,17 +672,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 is_mercato_arch = "Mercato" in arquitetura_opt
                 is_siemens_arch = "Siemens" in arquitetura_opt
                 
-                # --- Lógica Exclusiva de IHM ---
-                if is_mercato_arch:
-                    opcoes_ihm_wizard = ["Sem Interface (Cego)", "Mercato - IHM Básica 4.3\""]
-                else:
-                    opcoes_ihm_wizard = ["Sem Interface (Cego)", "IHM Padrão 7\"", "IHM Premium 10\""]
-                    
+                if is_mercato_arch: opcoes_ihm_wizard = ["Sem Interface (Cego)", "Mercato - IHM Básica 4.3\""]
+                else: opcoes_ihm_wizard = ["Sem Interface (Cego)", "IHM Padrão 7\"", "IHM Premium 10\""]
                 ihm_selecionada = st.radio("2. O quadro possuirá IHM local?", opcoes_ihm_wizard, horizontal=True)
                 
                 tipo_q = st.radio("3. Selecione o Tipo do Quadro:", ["Controle (HVAC/Máquinas)", "CAG (Central de Água Gelada)"], horizontal=True)
                 
-                # --- Lógica Exclusiva de Supervisório ---
                 if is_mercato_arch:
                     sup_opt = "Não"
                     soft_sel = "Sem Supervisório"
@@ -710,10 +686,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     sup_opt = st.radio("4. Este quadro fará parte de um Sistema de Supervisório?", ["Não", "Sim"], horizontal=True)
                     soft_sel = "Sem Supervisório"
                     if sup_opt == "Sim":
-                        if is_siemens_arch:
-                            opcoes_soft = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21"]
-                        else:
-                            opcoes_soft = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21", "Sistema de monitoramento Schneider EBO"]
+                        if is_siemens_arch: opcoes_soft = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21"]
+                        else: opcoes_soft = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21", "Sistema de monitoramento Schneider EBO"]
                         soft_sel = st.selectbox("Selecione o Software de Supervisão:", opcoes_soft)
                 
                 tag_q = st.text_input("5. Insira a TAG / Identificação do Quadro (Ex: QTA-01, QD-CAG):")
@@ -725,6 +699,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     if "CAG" in tipo_q: opcoes_kits_filtrados = [k for k in KITS_PADRAO.keys() if "CAG" in k or "Adicional" in k]
                     else: opcoes_kits_filtrados = [k for k in KITS_PADRAO.keys() if "CAG" not in k]
                     kit_final_selecionado = st.selectbox("Selecione o Modelo Padrão SIARCON:", ["Selecione..."] + opcoes_kits_filtrados)
+                
+                # --- NOVA PERGUNTA DE RESERVA (20%) ---
+                sobra_opt = st.radio("7. Deseja considerar 20% de sobra nas I/O (Reserva Técnica)?", ["Não", "Sim"], horizontal=True)
                 
                 c_conf, c_canc = st.columns(2)
                 if c_conf.button("🚀 Confirmar e Montar Quadro", use_container_width=True):
@@ -744,7 +721,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         st.session_state.paineis_auto.append({
                             "id": len(st.session_state.paineis_auto),
                             "nome": tag_q, "tipo": tipo_q, "supervisorio": soft_sel, "arquitetura": arquitetura_opt,
-                            "modo_config": config_opt, "ihm": ihm_selecionada, "grupos_equipamentos": grupos_equip
+                            "modo_config": config_opt, "ihm": ihm_selecionada, "sobra_20": sobra_opt, "grupos_equipamentos": grupos_equip
                         })
                         st.session_state.wizard_ativo = False
                         st.rerun()
@@ -757,6 +734,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
             is_mercato_quadro = ('Mercato' in p_data.get('arquitetura', ''))
+            tem_sobra_20 = (p_data.get('sobra_20', 'Não') == 'Sim')
             
             with st.container(border=True):
                 c_icone, c_nome_painel, c_ihm_painel = st.columns([0.5, 4, 2])
@@ -764,7 +742,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 p_data['nome'] = c_nome_painel.text_input("Identificação do Quadro", value=p_data['nome'], key=f"n_p_{p_idx}", label_visibility="collapsed")
                 
                 c_ihm_painel.markdown(f"<div style='padding-top:10px; color:#555;'><b>IHM:</b> {p_data.get('ihm', 'Sem Interface (Cego)')}</div>", unsafe_allow_html=True)
-                st.caption(f"**Arquitetura:** {p_data.get('arquitetura', 'SpaceLogic (Schneider)')} | **Supervisão:** {p_data.get('supervisorio', 'Sem Supervisório')}")
+                st.caption(f"**Arquitetura:** {p_data.get('arquitetura', 'SpaceLogic (Schneider)')} | **Supervisão:** {p_data.get('supervisorio', 'Sem Supervisório')} | **Reserva 20%:** {p_data.get('sobra_20', 'Não')}")
                 
                 with st.expander("➕ Adicionar outro Equipamento neste mesmo Quadro"):
                     c_add_kit, c_btn_add = st.columns([3, 1])
@@ -778,14 +756,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             p_data['grupos_equipamentos'].append({"nome_grupo": f"{n_limpo}", "multiplicador": 1, "instrumentos": novos_inst, "tags_lista": [""]})
                             st.rerun()
 
-                total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
+                raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
 
                 for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
                     total_ai_g_single = total_ao_g_single = total_di_g_single = total_do_g_single = 0
                     
-                    # FECHAMENTO AUTOMÁTICO DA CAG E OUTROS, DEIXA APENAS HVAC ABERTO
                     open_p_hvac = True if "HVAC" in g_data['nome_grupo'].upper() else False
-                    
                     with st.expander(f"📦 {g_data['nome_grupo']}", expanded=open_p_hvac):
                         qtd_key = f"m_g_{p_idx}_{g_idx}"
                         qtd_atual = st.session_state.get(qtd_key, g_data.get('multiplicador', 1))
@@ -813,15 +789,19 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 
                             if is_mercato_quadro:
                                 ui_nec = total_ai_g_single + total_di_g_single
-                                modelo_mcp = dimensionar_mercato(ui_nec, total_ao_g_single, total_do_g_single)
+                                # Adicionando a sobra para checagem visual individual se aplicável
+                                ui_check = math.ceil(ui_nec * 1.2) if tem_sobra_20 else ui_nec
+                                ao_check = math.ceil(total_ao_g_single * 1.2) if tem_sobra_20 else total_ao_g_single
+                                do_check = math.ceil(total_do_g_single * 1.2) if tem_sobra_20 else total_do_g_single
+                                
+                                modelo_mcp = dimensionar_mercato(ui_check, ao_check, do_check)
                                 if not modelo_mcp:
-                                    st.error(f"⚠️ CAPACIDADE EXCEDIDA: O sistema exige {ui_nec} Entradas Universais (UI), {total_ao_g_single} AO e {total_do_g_single} DO. Isso ultrapassa a capacidade máxima do maior controlador da linha MCP Mercato. Configuração não recomendada, divida o sistema ou use arquiteturas modulares (Schneider/Siemens).")
+                                    st.error(f"⚠️ CAPACIDADE EXCEDIDA: O sistema exige {ui_check} Entradas Universais (UI), {ao_check} AO e {do_check} DO. Isso ultrapassa a capacidade máxima do maior controlador da linha MCP Mercato. Configuração não recomendada, divida o sistema ou use arquiteturas modulares (Schneider/Siemens).")
                                 else:
                                     st.success(f"✅ OK! Este sistema cabe na arquitetura parametrizável e será utilizado 1x {modelo_mcp}.")
 
                         with st.expander("⚙️ Ajuste Fino de Instrumentos (Engenharia)"):
                             for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
-                                # Fechamento da CAG aqui também
                                 open_p_eng = True if "HVAC" in grupo_nome.upper() else False
                                 with st.expander(grupo_nome, expanded=open_p_eng):
                                     cols_inst = st.columns(2)
@@ -835,20 +815,32 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
                     for inst, q in g_data['instrumentos'].items():
                         io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
-                        total_ai_painel += q * io_vals["AI"] * qtd_atual
-                        total_ao_painel += q * io_vals["AO"] * qtd_atual
-                        total_di_painel += q * io_vals["DI"] * qtd_atual
-                        total_do_painel += q * io_vals["DO"] * qtd_atual
+                        raw_ai_painel += q * io_vals["AI"] * qtd_atual
+                        raw_ao_painel += q * io_vals["AO"] * qtd_atual
+                        raw_di_painel += q * io_vals["DI"] * qtd_atual
+                        raw_do_painel += q * io_vals["DO"] * qtd_atual
 
-                total_io_pontos = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
+                # --- LÓGICA DA SOBRA DE 20% ---
+                reserva_ai = math.ceil(raw_ai_painel * 0.2) if tem_sobra_20 else 0
+                reserva_ao = math.ceil(raw_ao_painel * 0.2) if tem_sobra_20 else 0
+                reserva_di = math.ceil(raw_di_painel * 0.2) if tem_sobra_20 else 0
+                reserva_do = math.ceil(raw_do_painel * 0.2) if tem_sobra_20 else 0
+                
+                hw_ai_painel = raw_ai_painel + reserva_ai
+                hw_ao_painel = raw_ao_painel + reserva_ao
+                hw_di_painel = raw_di_painel + reserva_di
+                hw_do_painel = raw_do_painel + reserva_do
+
+                total_io_pontos_hw = hw_ai_painel + hw_ao_painel + hw_di_painel + hw_do_painel
                 
                 st.markdown("##### 🧠 Estrutura Total de I/O do Quadro")
                 m1, m2, m3, m4, m5 = st.columns(5)
-                m1.metric("Total I/O Físico", str(total_io_pontos)) 
-                m2.metric("AI / UI", total_ai_painel)
-                m3.metric("AO", total_ao_painel)
-                m4.metric("DI / UI", total_di_painel)
-                m5.metric("DO", total_do_painel)
+                titulo_total = "Total I/O Físico (Com Reserva)" if tem_sobra_20 else "Total I/O Físico"
+                m1.metric(titulo_total, str(total_io_pontos_hw)) 
+                m2.metric("AI / UI", hw_ai_painel)
+                m3.metric("AO", hw_ao_painel)
+                m4.metric("DI / UI", hw_di_painel)
+                m5.metric("DO", hw_do_painel)
                 
                 if st.button("🗑️ Deletar Todo este Quadro", key=f"del_quadro_{p_idx}"):
                     st.session_state.paineis_auto.pop(p_idx)
@@ -872,7 +864,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         ws_hist_orc.append_row(nova_linha)
                         st.session_state.paineis_auto = []
                         st.session_state.nome_projeto_orcamento = ""
-                        st.cache_data.clear() # Limpa o cache para atualizar o histórico
+                        st.cache_data.clear()
                         st.toast("📝 Rascunho salvo na nuvem com sucesso! Tela limpa.", icon="💾")
                         st.rerun()
                     except Exception as e: st.error(f"Erro ao salvar: {e}")
@@ -927,10 +919,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         st.header("Gestão da Base de Preços")
         st.write("Altere os valores e salve na nuvem para manter a equipe comercial sincronizada.")
         
-        # Filtros precisos utilizando chaves estritas dos dicionários de criação
+        df_precos_total = pd.DataFrame(list(st.session_state.precos_banco.items()), columns=["Item / Equipamento", "Valor Atual (R$)"])
+        
         st.subheader("Base Geral e Schneider")
         lista_schneider = list(banco_schneider_comum.keys())
-        # Adiciona a IHM geral caso alguem queira editar o preço
         lista_schneider.extend(["IHM Padrão 7\"", "IHM Premium 10\""])
         df_geral = pd.DataFrame([{"Item / Equipamento": k, "Valor Atual (R$)": st.session_state.precos_banco.get(k, 0.0)} for k in lista_schneider if k in st.session_state.precos_banco])
         edited_geral = st.data_editor(df_geral, use_container_width=True, hide_index=True, key="ed_geral")
@@ -973,7 +965,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         ws_hist = sh.add_worksheet(title="Historico_Precos", rows="1000", cols="4")
                         ws_hist.append_row(["Data/Hora", "Item Alterado", "Valor Antigo", "Novo Valor"])
                     if novos_historicos: ws_hist.append_rows([[h["Data/Hora"], h["Item Alterado"], h["Valor Antigo"], h["Novo Valor"]] for h in novos_historicos])
-                    st.cache_data.clear() # Limpa o cache
+                    st.cache_data.clear()
                     st.success("✅ Preços atualizados na nuvem!")
                 except Exception as e: st.error(f"Erro ao salvar: {e}")
 
@@ -986,6 +978,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         
         softwares_incluidos = {}
         
+        # Estas variáveis controlam os serviços lógicos que são baseados SOMENTE nos pontos brutos (usados)
         total_ai_schneider = total_ao_schneider = total_di_schneider = total_do_schneider = 0
         total_ai_siemens = total_ao_siemens = total_di_siemens = total_do_siemens = 0
         total_io_mercato = 0
@@ -1000,8 +993,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             is_siemens_1500 = (arquitetura_atual == 'S7-1500 (Siemens)')
             is_siemens = is_siemens_1200 or is_siemens_1500
             is_mercato = ('Mercato' in arquitetura_atual)
+            tem_sobra_20 = (p.get('sobra_20', 'Não') == 'Sim')
             
-            total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
+            raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
             qtd_equipamentos_painel = 0
             
             for g in p['grupos_equipamentos']:
@@ -1011,7 +1005,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 str_tags = f" (TAGs: {', '.join(lista_tags)})" if len(lista_tags) > 0 else ""
                 nome_equip = f"{g['nome_grupo']}{str_tags}"
                 
-                total_ai_g_single = total_ao_g_single = total_di_g_single = total_do_g_single = 0
+                raw_ai_g_single = raw_ao_g_single = raw_di_g_single = raw_do_g_single = 0
                 
                 for inst, qtd in g['instrumentos'].items():
                     if qtd > 0:
@@ -1025,14 +1019,15 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         preco_item = st.session_state.precos_banco.get(item_nome_real, st.session_state.precos_banco.get(inst, 0.0))
                         io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
                         
-                        total_ai_painel += qtd_final * io_vals["AI"]
-                        total_ao_painel += qtd_final * io_vals["AO"]
-                        total_di_painel += qtd_final * io_vals["DI"]
-                        total_do_painel += qtd_final * io_vals["DO"]
-                        total_ai_g_single += qtd * io_vals["AI"]
-                        total_ao_g_single += qtd * io_vals["AO"]
-                        total_di_g_single += qtd * io_vals["DI"]
-                        total_do_g_single += qtd * io_vals["DO"]
+                        raw_ai_painel += qtd_final * io_vals["AI"]
+                        raw_ao_painel += qtd_final * io_vals["AO"]
+                        raw_di_painel += qtd_final * io_vals["DI"]
+                        raw_do_painel += qtd_final * io_vals["DO"]
+                        
+                        raw_ai_g_single += qtd * io_vals["AI"]
+                        raw_ao_g_single += qtd * io_vals["AO"]
+                        raw_di_g_single += qtd * io_vals["DI"]
+                        raw_do_g_single += qtd * io_vals["DO"]
                         
                         custo_tot_inst = qtd_final * preco_item
                         linhas_inst_campo.append({"Categoria": "Instrumentação de Campo", "Item": f"{item_nome_real} ({nome_equip} - {p['nome']})", "Preço Unit.": preco_item, "Qtd": qtd_final, "Custo Total": custo_tot_inst})
@@ -1043,8 +1038,15 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         else: custo_base_schneider += custo_tot_inst
                 
                 if is_mercato:
-                    ui_nec = total_ai_g_single + total_di_g_single
-                    modelo_mcp = dimensionar_mercato(ui_nec, total_ao_g_single, total_do_g_single)
+                    reserva_g_ui = math.ceil((raw_ai_g_single + raw_di_g_single) * 0.2) if tem_sobra_20 else 0
+                    reserva_g_ao = math.ceil(raw_ao_g_single * 0.2) if tem_sobra_20 else 0
+                    reserva_g_do = math.ceil(raw_do_g_single * 0.2) if tem_sobra_20 else 0
+                    
+                    ui_nec = raw_ai_g_single + raw_di_g_single + reserva_g_ui
+                    ao_nec = raw_ao_g_single + reserva_g_ao
+                    do_nec = raw_do_g_single + reserva_g_do
+                    
+                    modelo_mcp = dimensionar_mercato(ui_nec, ao_nec, do_nec)
                     if modelo_mcp:
                         p_hw = st.session_state.precos_banco.get(modelo_mcp, 1650.0)
                         linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"{modelo_mcp} ({g['nome_grupo']} - {p['nome']})", "Preço Unit.": p_hw, "Qtd": mult, "Custo Total": mult * p_hw})
@@ -1052,35 +1054,54 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     else:
                         linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"⚠️ ALERTA: Capacidade MCP Excedida ({g['nome_grupo']} - {p['nome']})", "Preço Unit.": 0.0, "Qtd": mult, "Custo Total": 0.0})
 
-            tot_io_painel = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
+            # Calcula a sobra de IO no Painel como um todo para Siemens e Schneider
+            reserva_ai_painel = math.ceil(raw_ai_painel * 0.2) if tem_sobra_20 else 0
+            reserva_ao_painel = math.ceil(raw_ao_painel * 0.2) if tem_sobra_20 else 0
+            reserva_di_painel = math.ceil(raw_di_painel * 0.2) if tem_sobra_20 else 0
+            reserva_do_painel = math.ceil(raw_do_painel * 0.2) if tem_sobra_20 else 0
             
+            hw_ai_painel = raw_ai_painel + reserva_ai_painel
+            hw_ao_painel = raw_ao_painel + reserva_ao_painel
+            hw_di_painel = raw_di_painel + reserva_di_painel
+            hw_do_painel = raw_do_painel + reserva_do_painel
+            
+            tot_io_painel_hw = hw_ai_painel + hw_ao_painel + hw_di_painel + hw_do_painel
+            
+            if reserva_ai_painel > 0 or reserva_ao_painel > 0 or reserva_di_painel > 0 or reserva_do_painel > 0:
+                linhas_pontos.append({
+                    "Painel": p['nome'], "Grupo/Equipamento": "Reserva Técnica (20%)", "Instrumento": "Pontos de Sobra Física", 
+                    "Quantidade Total": "-", "Entrada Digital (DI)": reserva_di_painel, "Saída Digital (DO)": reserva_do_painel, 
+                    "Entrada Analógica (AI)": reserva_ai_painel, "Saída Analógica (AO)": reserva_ao_painel
+                })
+
+            # Os serviços baseiam-se na contagem RAW (sem reserva)
             if is_siemens:
-                total_ai_siemens += total_ai_painel
-                total_ao_siemens += total_ao_painel
-                total_di_siemens += total_di_painel
-                total_do_siemens += total_do_painel
+                total_ai_siemens += raw_ai_painel
+                total_ao_siemens += raw_ao_painel
+                total_di_siemens += raw_di_painel
+                total_do_siemens += raw_do_painel
             elif is_mercato:
-                total_io_mercato += tot_io_painel
+                total_io_mercato += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel)
             else:
-                total_ai_schneider += total_ai_painel
-                total_ao_schneider += total_ao_painel
-                total_di_schneider += total_di_painel
-                total_do_schneider += total_do_painel
+                total_ai_schneider += raw_ai_painel
+                total_ao_schneider += raw_ao_painel
+                total_di_schneider += raw_di_painel
+                total_do_schneider += raw_do_painel
             
-            if tot_io_painel > 0:
+            if tot_io_painel_hw > 0:
                 if is_mercato:
                     nome_caixa, preco_caixa = calcular_painel_fisico(qtd_equipamentos_painel)
                     linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Estrutura Física: {nome_caixa} ({p['nome']})", "Preço Unit.": preco_caixa, "Qtd": 1, "Custo Total": preco_caixa})
                     custo_base_mercato += preco_caixa
                         
                 else:
-                    nome_caixa, preco_caixa = calcular_painel_fisico(tot_io_painel/15)
+                    nome_caixa, preco_caixa = calcular_painel_fisico(tot_io_painel_hw/15)
                     linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Estrutura Física: {nome_caixa} ({p['nome']})", "Preço Unit.": preco_caixa, "Qtd": 1, "Custo Total": preco_caixa})
                     
                     if is_siemens:
                         custo_base_siemens += preco_caixa
-                        if is_siemens_1200: hw_s = dimensionar_siemens_1200(total_ai_painel, total_ao_painel, total_di_painel, total_do_painel)
-                        else: hw_s = dimensionar_siemens_1500(total_ai_painel, total_ao_painel, total_di_painel, total_do_painel)
+                        if is_siemens_1200: hw_s = dimensionar_siemens_1200(hw_ai_painel, hw_ao_painel, hw_di_painel, hw_do_painel)
+                        else: hw_s = dimensionar_siemens_1500(hw_ai_painel, hw_ao_painel, hw_di_painel, hw_do_painel)
                         for i_hw, q_hw in hw_s.items():
                             if q_hw > 0:
                                 p_hw = st.session_state.precos_banco.get(i_hw, 0.0)
@@ -1088,7 +1109,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 custo_base_siemens += (q_hw * p_hw)
                     else:
                         custo_base_schneider += preco_caixa
-                        c36, c24, c18, c15 = dimensionar_controladores(tot_io_painel)
+                        c36, c24, c18, c15 = dimensionar_controladores(tot_io_painel_hw)
                         if c36 > 0: 
                             linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Controlador MP-C-36A ({p['nome']})", "Preço Unit.": st.session_state.precos_banco.get("MP-C-36A", 9459.0), "Qtd": c36, "Custo Total": c36 * st.session_state.precos_banco.get("MP-C-36A", 9459.0)})
                             custo_base_schneider += (c36 * st.session_state.precos_banco.get("MP-C-36A", 9459.0))
@@ -1113,7 +1134,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 s_type = p.get('supervisorio', "Sem Supervisório")
                 if s_type != "Sem Supervisório":
                     if s_type not in softwares_incluidos: softwares_incluidos[s_type] = 0
-                    softwares_incluidos[s_type] += tot_io_painel
+                    softwares_incluidos[s_type] += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel) # Licença é baseada nos pontos RAW em uso!
 
         for s_name, pts_total in softwares_incluidos.items():
             b_k, p_k = "", ""
@@ -1125,7 +1146,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             p_pto = st.session_state.precos_banco.get(p_k, 100.0)
             linhas_software.append({"Categoria": "Software de Supervisão", "Item": f"Licença Base: {s_name}", "Preço Unit.": p_base, "Qtd": 1, "Custo Total": p_base})
             if p_pto > 0 and pts_total > 0:
-                linhas_software.append({"Categoria": "Software de Supervisão", "Item": f"Pontos Licenciados no Software ({pts_total} canais)", "Preço Unit.": p_pto, "Qtd": pts_total, "Custo Total": pts_total * p_pto})
+                linhas_software.append({"Categoria": "Software de Supervisão", "Item": f"Pontos Licenciados no Software ({pts_total} canais ativos)", "Preço Unit.": p_pto, "Qtd": pts_total, "Custo Total": pts_total * p_pto})
 
         for infra_avulsa in st.session_state.orcamento:
             linhas_inst_campo.append({"Categoria": "Instrumentação de Campo", "Item": infra_avulsa['Item'], "Preço Unit.": infra_avulsa['Custo_Total']/infra_avulsa['Quantidade'] if infra_avulsa['Quantidade'] > 0 else 0, "Qtd": infra_avulsa['Quantidade'], "Custo Total": infra_avulsa['Custo_Total']})
@@ -1196,7 +1217,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             
             df_pontos = pd.DataFrame(linhas_pontos)
             if not df_pontos.empty:
-                total_qtd = df_pontos['Quantidade Total'].sum()
+                total_qtd = pd.to_numeric(df_pontos['Quantidade Total'], errors='coerce').fillna(0).sum()
                 linha_total = pd.DataFrame([{"Painel": "TOTAL GERAL", "Grupo/Equipamento": "-", "Instrumento": "-", "Quantidade Total": total_qtd, "Entrada Digital (DI)": df_pontos['Entrada Digital (DI)'].sum(), "Saída Digital (DO)": df_pontos['Saída Digital (DO)'].sum(), "Entrada Analógica (AI)": df_pontos['Entrada Analógica (AI)'].sum(), "Saída Analógica (AO)": df_pontos['Saída Analógica (AO)'].sum()}])
                 df_pontos = pd.concat([df_pontos, linha_total], ignore_index=True)
 
