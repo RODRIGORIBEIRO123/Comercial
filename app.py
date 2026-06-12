@@ -51,7 +51,6 @@ if "usuario_logado" not in st.session_state: st.session_state.usuario_logado = N
 if "nome_exibicao" not in st.session_state: st.session_state.nome_exibicao = ""
 if "menu_selecionado" not in st.session_state: st.session_state.menu_selecionado = "🏠 Tela Inicial"
 if "orcamento" not in st.session_state: st.session_state.orcamento = []
-if "historico_precos" not in st.session_state: st.session_state.historico_precos = []
 
 if st.session_state.usuario_logado is None:
     st.markdown("""
@@ -461,8 +460,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Transmissor de temperatura e umidade ambiente com display (TT/MT)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0}
     }
 
-    banco_padrao_precos = {
-        # PADRÃO GERAL E SCHNEIDER
+    # ==========================================
+    # DICIONÁRIOS ESTÁTICOS DE PREÇOS (SEPARADOS)
+    # ==========================================
+    # 1. Base Schneider e Itens Comuns
+    banco_schneider_comum = {
         "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1490.00,
         "Transmissor de temperatura e umidade para duto (TT/MT)": 2050.00,
         "Transmissor de temperatura para duto (TT)": 800.00,
@@ -503,17 +505,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Licença Supervisório - SEM CFR-21 (Base)": 23000.00, "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)": 100.00,
         "Licença Supervisório - COM CFR-21 (Base)": 23000.00, "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
         "Licença Supervisório - Schneider EBO (Base)": 13000.00, "Licença Supervisório - Schneider EBO (Por Ponto I/O)": 110.00,
-        
-        # IHMs 
-        "IHM Básica 4.3\"": 1700.00,
-        "IHM Padrão 7\"": 3400.00,
-        "IHM Premium 10\"": 8500.00,
-        "Sem Interface (Cego)": 0.00,
-        
-        # SCHNEIDER
-        "MP-C-15A": 4649.49, "MP-C-18A": 5185.54, "MP-C-24A": 7290.75, "MP-C-36A": 9459.08,
-        
-        # SIEMENS S7-1200
+        "MP-C-15A": 4649.49, "MP-C-18A": 5185.54, "MP-C-24A": 7290.75, "MP-C-36A": 9459.08
+    }
+
+    # 2. Base Siemens
+    banco_siemens = {
         "Siemens - CPU 1214C DC/DC/DC": 2500.00,
         "Siemens - CPU 1215C DC/DC/DC": 3200.00,
         "Siemens - SM 1231 AI 8x13Bit": 1900.00,
@@ -522,8 +518,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Siemens - SM 1222 DQ 16x24VDC": 1300.00,
         "Siemens - Fonte 24VDC 2.5A": 800.00,
         "Siemens - Cartão de Memória 4MB": 400.00,
-        
-        # SIEMENS S7-1500
         "Siemens - CPU 1511-1 PN": 5500.00,
         "Siemens - AI 8xU/I HS": 2800.00,
         "Siemens - AQ 4xU/I ST": 3100.00,
@@ -531,22 +525,26 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Siemens - DQ 16x24VDC/0.5A": 1900.00,
         "Siemens - Fonte PM 1507 24VDC 8A": 1500.00,
         "Siemens - Cartão de Memória 12MB": 900.00,
-        
-        # SERVIÇOS SIEMENS GERAIS
         "Siemens - Serviço Custo AI/AO": 750.00,
-        "Siemens - Serviço Custo DI/DO": 180.00,
-        
-        # MERCATO E NTC
+        "Siemens - Serviço Custo DI/DO": 180.00
+    }
+
+    # 3. Base Mercato
+    banco_mercato = {
         "Mercato - Controlador MCP-4 (2AO, 3DO, 4UI)": 950.00,
         "Mercato - Controlador MCP-8 (4AO, 5DO, 8UI, 2DI)": 1400.00,
         "Mercato - Controlador MCP-12 (4AO, 8DO, 12UI, 4DI)": 1850.00,
         "Mercato - Sensor de Temperatura NTC (Duto)": 120.00,
         "Mercato - Sensor de Temperatura NTC (Ambiente)": 85.00,
         "Mercato - Sensor de Temperatura NTC com Display (Ambiente)": 350.00,
-        "Mercato - Serviço Parametrização por Ponto": 80.00
+        "Mercato - Serviço Parametrização por Ponto": 80.00,
+        "Mercato - IHM Básica 4.3\"": 1700.00
     }
 
-    if 'banco_precos_carregado' not in st.session_state:
+    # Junta tudo num banco consolidado pro processamento
+    banco_padrao_precos = {**banco_schneider_comum, **banco_siemens, **banco_mercato}
+
+    if 'precos_banco' not in st.session_state:
         st.session_state.precos_banco = banco_padrao_precos.copy()
         try:
             sh = conectar_google_sheets()
@@ -557,8 +555,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     st.session_state.precos_banco.update(precos_bd)
             except: pass
         except: pass
-        st.session_state.banco_precos_carregado = True
 
+    # Trava de segurança para novos itens inseridos no código
     for k_n, v_n in banco_padrao_precos.items():
         if k_n not in st.session_state.precos_banco: st.session_state.precos_banco[k_n] = v_n
 
@@ -674,7 +672,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         return None
 
     aba_auto, aba_infra, aba_precos, aba_resumo = st.tabs([
-        "🚀 Dimensionamento de Automação", "🔌 Infraestrutura Lançamento", "💲 Base de Preços", "📊 Orçamento Final"
+        "🚀 Dimensionamento de Automação", "🔌 Infraestrutura", "💲 Base de Preços", "📊 Orçamento Final"
     ])
 
     with aba_auto:
@@ -727,10 +725,15 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         else:
                             grupos_equip.append({"nome_grupo": "Equipamento Customizado", "multiplicador": 1, "instrumentos": novos_instrumentos, "tags_lista": [""]})
                             
+                        # IHM Default lógica: Mercato pode ter IHM. Schneider/Siemens NÃO pelo assistente (ficam cegas padrão)
+                        ihm_default = "Sem Interface (Cego)"
+                        if is_mercato_arch:
+                            ihm_default = "Mercato - IHM Básica 4.3\""
+
                         st.session_state.paineis_auto.append({
                             "id": len(st.session_state.paineis_auto),
                             "nome": tag_q, "tipo": tipo_q, "supervisorio": soft_sel, "arquitetura": arquitetura_opt,
-                            "modo_config": config_opt, "ihm": "IHM Básica 4.3\"", "grupos_equipamentos": grupos_equip
+                            "modo_config": config_opt, "ihm": ihm_default, "grupos_equipamentos": grupos_equip
                         })
                         st.session_state.wizard_ativo = False
                         st.rerun()
@@ -749,14 +752,15 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 c_icone.markdown("## 🎛️")
                 p_data['nome'] = c_nome_painel.text_input("Identificação do Quadro", value=p_data['nome'], key=f"n_p_{p_idx}", label_visibility="collapsed")
                 
+                # Regra de Exclusividade da IHM na tela do Painel
                 if is_mercato_quadro:
-                    opcoes_ihm = ["IHM Básica 4.3\"", "Sem Interface (Cego)"]
+                    opcoes_ihm = ["Mercato - IHM Básica 4.3\"", "Sem Interface (Cego)"]
+                    ihm_salva = p_data.get('ihm', "Sem Interface (Cego)")
+                    idx_ihm = opcoes_ihm.index(ihm_salva) if ihm_salva in opcoes_ihm else 0 
+                    p_data['ihm'] = c_ihm_painel.selectbox("Interface", opcoes_ihm, index=idx_ihm, key=f"i_p_{p_idx}", label_visibility="collapsed")
                 else:
-                    opcoes_ihm = ["Sem Interface (Cego)", "IHM Básica 4.3\"", "IHM Padrão 7\"", "IHM Premium 10\""]
-                    
-                ihm_salva = p_data.get('ihm', opcoes_ihm[0])
-                idx_ihm = opcoes_ihm.index(ihm_salva) if ihm_salva in opcoes_ihm else 0 
-                p_data['ihm'] = c_ihm_painel.selectbox("Interface", opcoes_ihm, index=idx_ihm, key=f"i_p_{p_idx}", label_visibility="collapsed")
+                    c_ihm_painel.markdown("<div style='padding-top:10px; color:#888;'><em>Sem IHM local (Apenas Supervisório)</em></div>", unsafe_allow_html=True)
+                    p_data['ihm'] = "Sem Interface (Cego)"
                 
                 st.caption(f"**Arquitetura:** {p_data.get('arquitetura', 'SpaceLogic (Schneider)')} | **Supervisão:** {p_data.get('supervisorio', 'Sem Supervisório')}")
                 
@@ -914,26 +918,27 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     
     with aba_precos:
         st.header("Gestão da Base de Preços")
-        st.write("Altere os valores e salve na nuvem para manter toda a equipe comercial sincronizada.")
+        st.write("Altere os valores e salve na nuvem para manter a equipe comercial sincronizada.")
         
-        df_precos_total = pd.DataFrame(list(st.session_state.precos_banco.items()), columns=["Item / Equipamento", "Valor Atual (R$)"])
-        
+        # Filtros precisos utilizando chaves estritas dos dicionários de criação
         st.subheader("Base Geral e Schneider")
-        df_geral = df_precos_total[~df_precos_total['Item / Equipamento'].str.contains('Siemens|Mercato', case=False, na=False, regex=True)].reset_index(drop=True)
+        lista_schneider = list(banco_schneider_comum.keys())
+        df_geral = pd.DataFrame([{"Item / Equipamento": k, "Valor Atual (R$)": st.session_state.precos_banco.get(k, 0.0)} for k in lista_schneider])
         edited_geral = st.data_editor(df_geral, use_container_width=True, hide_index=True, key="ed_geral")
         
         st.subheader("Base Siemens")
-        df_siemens = df_precos_total[df_precos_total['Item / Equipamento'].str.contains('Siemens', case=False, na=False)].reset_index(drop=True)
+        lista_siemens = list(banco_siemens.keys())
+        df_siemens = pd.DataFrame([{"Item / Equipamento": k, "Valor Atual (R$)": st.session_state.precos_banco.get(k, 0.0)} for k in lista_siemens])
         edited_siemens = st.data_editor(df_siemens, use_container_width=True, hide_index=True, key="ed_siem")
 
         st.subheader("Base Mercato e NTC")
-        df_mercato = df_precos_total[df_precos_total['Item / Equipamento'].str.contains('Mercato', case=False, na=False)].reset_index(drop=True)
+        lista_mercato = list(banco_mercato.keys())
+        df_mercato = pd.DataFrame([{"Item / Equipamento": k, "Valor Atual (R$)": st.session_state.precos_banco.get(k, 0.0)} for k in lista_mercato])
         edited_mercato = st.data_editor(df_mercato, use_container_width=True, hide_index=True, key="ed_merc")
         
         if st.button("💾 Salvar Novos Preços no Banco de Dados", type="primary"):
             alterou_algo = False
             novos_historicos = []
-            
             edited_total = pd.concat([edited_geral, edited_siemens, edited_mercato], ignore_index=True)
             for idx, row in edited_total.iterrows():
                 item = row['Item / Equipamento']
@@ -945,7 +950,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     novos_historicos.append(novo_hist)
                     st.session_state.precos_banco[item] = novo_valor
                     alterou_algo = True
-            
             if alterou_algo:
                 try:
                     sh = conectar_google_sheets()
@@ -993,27 +997,20 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             for g in p['grupos_equipamentos']:
                 mult = g.get('multiplicador', 1)
                 qtd_equipamentos_painel += mult
-                
                 lista_tags = [t for t in g.get('tags_lista', []) if t.strip() != ""]
                 str_tags = f" (TAGs: {', '.join(lista_tags)})" if len(lista_tags) > 0 else ""
                 nome_equip = f"{g['nome_grupo']}{str_tags}"
                 
-                # Para checar se excedeu individualmente o controlador no resumo:
                 total_ai_g_single = total_ao_g_single = total_di_g_single = total_do_g_single = 0
                 
                 for inst, qtd in g['instrumentos'].items():
                     if qtd > 0:
                         qtd_final = qtd * mult
-                        
-                        # Swap para NTC se Mercato
                         item_nome_real = inst
                         if is_mercato:
-                            if "Transmissor de temperatura para duto (TT)" in inst:
-                                item_nome_real = "Mercato - Sensor de Temperatura NTC (Duto)"
-                            elif "Transmissor de temperatura Ambiente (TT)" in inst:
-                                item_nome_real = "Mercato - Sensor de Temperatura NTC (Ambiente)"
-                            elif "Transmissor de temperatura ambiente com display (TIT)" in inst:
-                                item_nome_real = "Mercato - Sensor de Temperatura NTC com Display (Ambiente)"
+                            if "Transmissor de temperatura para duto (TT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC (Duto)"
+                            elif "Transmissor de temperatura Ambiente (TT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC (Ambiente)"
+                            elif "Transmissor de temperatura ambiente com display (TIT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC com Display (Ambiente)"
                         
                         preco_item = st.session_state.precos_banco.get(item_nome_real, st.session_state.precos_banco.get(inst, 0.0))
                         io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
@@ -1022,7 +1019,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         total_ao_painel += qtd_final * io_vals["AO"]
                         total_di_painel += qtd_final * io_vals["DI"]
                         total_do_painel += qtd_final * io_vals["DO"]
-                        
                         total_ai_g_single += qtd * io_vals["AI"]
                         total_ao_g_single += qtd * io_vals["AO"]
                         total_di_g_single += qtd * io_vals["DI"]
@@ -1036,7 +1032,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         elif is_mercato: custo_base_mercato += custo_tot_inst
                         else: custo_base_schneider += custo_tot_inst
                 
-                # Se for mercado, acha o controlador para este grupo
                 if is_mercato:
                     ui_nec = total_ai_g_single + total_di_g_single
                     modelo_mcp = dimensionar_mercato(ui_nec, total_ao_g_single, total_do_g_single)
@@ -1076,7 +1071,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         custo_base_siemens += preco_caixa
                         if is_siemens_1200: hw_s = dimensionar_siemens_1200(total_ai_painel, total_ao_painel, total_di_painel, total_do_painel)
                         else: hw_s = dimensionar_siemens_1500(total_ai_painel, total_ao_painel, total_di_painel, total_do_painel)
-                        
                         for i_hw, q_hw in hw_s.items():
                             if q_hw > 0:
                                 p_hw = st.session_state.precos_banco.get(i_hw, 0.0)
@@ -1098,12 +1092,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Controlador MP-C-15A ({p['nome']})", "Preço Unit.": st.session_state.precos_banco.get("MP-C-15A", 4649.0), "Qtd": c15, "Custo Total": c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0)})
                             custo_base_schneider += (c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0))
                 
-                preco_ihm = st.session_state.precos_banco.get(p['ihm'], 0.0)
-                if preco_ihm > 0: 
-                    linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Interface: {p['ihm']} ({p['nome']})", "Preço Unit.": preco_ihm, "Qtd": 1, "Custo Total": preco_ihm})
-                    if is_siemens: custo_base_siemens += preco_ihm
-                    elif is_mercato: custo_base_mercato += preco_ihm
-                    else: custo_base_schneider += preco_ihm
+                # IHM se aplica a Mercato e cego para os outros via painel de visualizacao. Se tiver valor > 0.
+                if p.get('ihm') and "Cego" not in p['ihm']:
+                    preco_ihm = st.session_state.precos_banco.get(p['ihm'], 0.0)
+                    if preco_ihm > 0: 
+                        linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Interface: {p['ihm']} ({p['nome']})", "Preço Unit.": preco_ihm, "Qtd": 1, "Custo Total": preco_ihm})
+                        if is_mercato: custo_base_mercato += preco_ihm
 
                 s_type = p.get('supervisorio', "Sem Supervisório")
                 if s_type != "Sem Supervisório":
@@ -1112,16 +1106,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
         for s_name, pts_total in softwares_incluidos.items():
             b_k, p_k = "", ""
-            if "SEM certificação" in s_name:
-                b_k, p_k = "Licença Supervisório - SEM CFR-21 (Base)", "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)"
-            elif "COM certificação" in s_name:
-                b_k, p_k = "Licença Supervisório - COM CFR-21 (Base)", "Licença Supervisório - COM CFR-21 (Por Ponto I/O)"
-            else:
-                b_k, p_k = "Licença Supervisório - Schneider EBO (Base)", "Licença Supervisório - Schneider EBO (Por Ponto I/O)"
+            if "SEM certificação" in s_name: b_k, p_k = "Licença Supervisório - SEM CFR-21 (Base)", "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)"
+            elif "COM certificação" in s_name: b_k, p_k = "Licença Supervisório - COM CFR-21 (Base)", "Licença Supervisório - COM CFR-21 (Por Ponto I/O)"
+            else: b_k, p_k = "Licença Supervisório - Schneider EBO (Base)", "Licença Supervisório - Schneider EBO (Por Ponto I/O)"
             
             p_base = st.session_state.precos_banco.get(b_k, 23000.0)
             p_pto = st.session_state.precos_banco.get(p_k, 100.0)
-            
             linhas_software.append({"Categoria": "Software de Supervisão", "Item": f"Licença Base: {s_name}", "Preço Unit.": p_base, "Qtd": 1, "Custo Total": p_base})
             if p_pto > 0 and pts_total > 0:
                 linhas_software.append({"Categoria": "Software de Supervisão", "Item": f"Pontos Licenciados no Software ({pts_total} canais)", "Preço Unit.": p_pto, "Qtd": pts_total, "Custo Total": pts_total * p_pto})
@@ -1138,36 +1128,28 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         subtotal_sw = df_sw['Custo Total'].sum() if not df_sw.empty else 0
         
         linhas_servicos = []
-        
-        # ALOCAÇÃO DOS SERVIÇOS
         if (total_ai_schneider + total_ao_schneider) > 0:
             pr_ai_sch = st.session_state.precos_banco.get("Custo AI/AO", 565.0)
             linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Serviços de lógica: Pontos Analógicos", "Preço Unit.": pr_ai_sch, "Qtd": (total_ai_schneider + total_ao_schneider), "Custo Total": (total_ai_schneider + total_ao_schneider) * pr_ai_sch})
-        
         if (total_di_schneider + total_do_schneider) > 0:
             pr_di_sch = st.session_state.precos_banco.get("Custo DI/DO", 120.0)
             linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Serviços de lógica: Pontos Digitais", "Preço Unit.": pr_di_sch, "Qtd": (total_di_schneider + total_do_schneider), "Custo Total": (total_di_schneider + total_do_schneider) * pr_di_sch})
-            
         if (total_ai_siemens + total_ao_siemens) > 0:
             pr_ai_siem = st.session_state.precos_banco.get("Siemens - Serviço Custo AI/AO", 750.0)
             linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Serviços de lógica (Siemens): Pontos Analógicos", "Preço Unit.": pr_ai_siem, "Qtd": (total_ai_siemens + total_ao_siemens), "Custo Total": (total_ai_siemens + total_ao_siemens) * pr_ai_siem})
-        
         if (total_di_siemens + total_do_siemens) > 0:
             pr_di_siem = st.session_state.precos_banco.get("Siemens - Serviço Custo DI/DO", 180.0)
             linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Serviços de lógica (Siemens): Pontos Digitais", "Preço Unit.": pr_di_siem, "Qtd": (total_di_siemens + total_do_siemens), "Custo Total": (total_di_siemens + total_do_siemens) * pr_di_siem})
-
         if total_io_mercato > 0:
             pr_serv_merc = st.session_state.precos_banco.get("Mercato - Serviço Parametrização por Ponto", 80.0)
             linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Parametrização de Pontos (Mercato)", "Preço Unit.": pr_serv_merc, "Qtd": total_io_mercato, "Custo Total": total_io_mercato * pr_serv_merc})
 
         mao_de_obra_extra = (custo_base_schneider * 0.25) + (custo_base_siemens * 0.35) + (custo_base_mercato * 0.10)
-        
         if mao_de_obra_extra > 0:
             linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Demais programações e desenvolvimentos", "Preço Unit.": mao_de_obra_extra, "Qtd": 1, "Custo Total": mao_de_obra_extra})
             
         df_serv = pd.DataFrame(linhas_servicos)
         subtotal_serv = df_serv['Custo Total'].sum() if not df_serv.empty else 0
-        
         total_geral = subtotal_inst + subtotal_hw + subtotal_sw + subtotal_serv
         
         if total_geral > 0:
@@ -1181,27 +1163,21 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             if not df_inst.empty:
                 df_export_list.append(df_inst.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
                 df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "INSTRUMENTAÇÃO DE CAMPO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_inst}]))
-                
             if not df_hw.empty:
                 df_export_list.append(df_hw.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
                 df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "HARDWARE E PAINÉIS", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_hw}]))
-                
             if not df_sw.empty:
                 df_export_list.append(df_sw.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
                 df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "SOFTWARE", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_sw}]))
-                
             if not df_serv.empty:
                 df_export_list.append(df_serv)
                 df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "SERVIÇOS E LÓGICA", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_serv}]))
-            
             df_export_list.append(pd.DataFrame([{"Categoria": "TOTAL GERAL", "Item": "ORÇAMENTO COMPLETO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": total_geral}]))
-            
             df_exportacao = pd.concat(df_export_list, ignore_index=True)
             
             def format_currency(val):
                 try: return f"R$ {float(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                 except: return val
-
             df_display = df_exportacao.copy()
             df_display['Preço Unit.'] = df_display['Preço Unit.'].apply(format_currency)
             df_display['Custo Total'] = df_display['Custo Total'].apply(format_currency)
@@ -1218,7 +1194,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             ws1 = wb.active
             ws1.title = "Detalhamento Financeiro"
             ws1.views.sheetView[0].showGridLines = True
-            
             start_row = 1
             if ARQUIVO_LOGO:
                 try:
@@ -1229,38 +1204,28 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     ws1.add_image(img, "A1")
                     start_row = 4
                 except: pass
-                
             fill_header = PatternFill(start_color="1C8590", end_color="1C8590", fill_type="solid")
             font_header = Font(name="Arial", size=11, bold=True, color="FFFFFF")
             border_thin = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
-            
             for r_idx, row in enumerate(dataframe_to_rows(df_exportacao, index=False, header=True), start=start_row):
                 for c_idx, value in enumerate(row, start=1):
                     cell = ws1.cell(row=r_idx, column=c_idx, value=value)
                     cell.border = border_thin
                     if r_idx == start_row:
-                        cell.fill = fill_header
-                        cell.font = font_header
-                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                        cell.fill = fill_header; cell.font = font_header; cell.alignment = Alignment(horizontal="center", vertical="center")
                     else:
                         is_subtotal = "SUBTOTAL" in str(ws1.cell(row=r_idx, column=1).value) or "TOTAL GERAL" in str(ws1.cell(row=r_idx, column=1).value)
                         cell.font = Font(name="Arial", size=10, bold=is_subtotal)
                         if is_subtotal: cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-                        
                         if c_idx in [3, 5]: 
                             if str(value).strip() != "-": 
-                                try:
-                                    cell.value = float(value)
-                                    cell.number_format = '"R$" #,##0.00'
+                                try: cell.value = float(value); cell.number_format = '"R$" #,##0.00'
                                 except: pass
                             cell.alignment = Alignment(horizontal="right")
-                        elif c_idx == 4:
-                            cell.alignment = Alignment(horizontal="center")
-                            
+                        elif c_idx == 4: cell.alignment = Alignment(horizontal="center")
             for col in ws1.columns:
                 max_len = max(len(str(cell.value or '')) for cell in col)
-                col_letter = get_column_letter(col[0].column)
-                ws1.column_dimensions[col_letter].width = max(max_len + 4, 12)
+                ws1.column_dimensions[get_column_letter(col[0].column)].width = max(max_len + 4, 12)
 
             if not df_pontos.empty:
                 ws2 = wb.create_sheet(title="Matriz de Pontos (IO)")
@@ -1269,28 +1234,20 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     for c_idx, value in enumerate(row, start=1):
                         cell = ws2.cell(row=r_idx, column=c_idx, value=value)
                         cell.border = border_thin
-                        if r_idx == 1:
-                            cell.fill = fill_header
-                            cell.font = font_header
-                            cell.alignment = Alignment(horizontal="center", vertical="center")
+                        if r_idx == 1: cell.fill = fill_header; cell.font = font_header; cell.alignment = Alignment(horizontal="center", vertical="center")
                         else:
                             cell.font = Font(name="Arial", size=10)
-                            if c_idx >= 4:
-                                cell.alignment = Alignment(horizontal="center")
-                                
+                            if c_idx >= 4: cell.alignment = Alignment(horizontal="center")
                 for col in ws2.columns:
                     max_len = max(len(str(cell.value or '')) for cell in col)
-                    col_letter = get_column_letter(col[0].column)
-                    ws2.column_dimensions[col_letter].width = max(max_len + 4, 12)
+                    ws2.column_dimensions[get_column_letter(col[0].column)].width = max(max_len + 4, 12)
             
             wb.save(buffer)
             buffer.seek(0)
-            
             st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             st.markdown("---")
-            
             if st.button("☁️ Salvar Orçamento Final e Gerar Revisão", type="primary", use_container_width=True):
-                if not st.session_state.nome_projeto_orcamento: st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento / Projeto' antes de salvar.")
+                if not st.session_state.nome_projeto_orcamento: st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento'.")
                 else:
                     try:
                         sh = conectar_google_sheets()
@@ -1303,5 +1260,5 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         revisao_atual = f"R-{contagem_revisoes:02d}"
                         nova_linha = [datetime.now(fuso_br).strftime("%d/%m/%Y %H:%M:%S"), st.session_state.nome_projeto_orcamento, revisao_atual, f"R$ {subtotal_hw:.2f}".replace('.', ','), f"R$ {subtotal_serv:.2f}".replace('.', ','), f"R$ {total_geral:.2f}".replace('.', ','), json.dumps(st.session_state.paineis_auto), st.session_state.usuario_logado]
                         ws_hist_orc.append_row(nova_linha)
-                        st.success(f"✅ Sucesso! Orçamento para '{st.session_state.nome_projeto_orcamento}' salvo com a revisão {revisao_atual}!")
+                        st.success(f"✅ Sucesso! Salvo com revisão {revisao_atual}!")
                     except Exception as e: st.error(f"Erro ao salvar: {e}")
