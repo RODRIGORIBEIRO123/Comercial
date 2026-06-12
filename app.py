@@ -657,6 +657,30 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         elif ui <= 12 and ao <= 4 and do <= 8: return "Mercato - Controlador MCP-12 (4AO, 8DO, 12UI, 4DI)"
         return None
 
+    def gerar_descritivo_comercial(painel_data, inst_list, qt_list, funcoes_list, is_mercato, is_schneider, tem_resistencia):
+        arquitetura_nome = painel_data.get('arquitetura', '').replace(" - Linha mais econômica", "")
+        ihm_val = painel_data.get('ihm', 'Sem Interface (Cego)')
+        
+        texto_ihm = ""
+        if "Cego" not in ihm_val:
+            tamanho = ihm_val.replace("Mercato - ", "").replace("IHM Padrão ", "").replace("IHM Premium ", "").replace("IHM Básica ", "")
+            texto_ihm = f" equipado com IHM {tamanho} local"
+            
+        texto = f"**Sistema completo de automação [TAG: {painel_data['nome']}]**, construído com arquitetura de controladores {arquitetura_nome}{texto_ihm}. "
+        texto += "O quadro de automação será responsável pelo controle e monitoramento dos seguintes componentes de campo:\n\n"
+        
+        for inst_nome, qty, func_name in zip(inst_list, qt_list, funcoes_list):
+            if qty > 0:
+                texto += f"• **{qty}x {func_name}**: {inst_nome.split('(')[0].strip()}\n"
+        
+        texto += "\n**Lógica de Operação Resumida:**\n"
+        texto += "O sistema irá realizar o controle da vazão de forma constante, fazendo os ajustes necessários para que a vazão de ar seja mantida, independentemente da saturação dos filtros. O sistema também irá modular a válvula de água gelada (ou condensadora) para atender aos parâmetros de setpoint de temperatura e umidade. "
+        
+        if tem_resistencia:
+            texto += "A resistência elétrica será acionada por malha PID para garantir o aquecimento fino e desumidificação do ambiente, contando com intertravamento de segurança via termostato."
+            
+        return texto
+
     aba_auto, aba_infra, aba_precos, aba_resumo = st.tabs([
         "🚀 Dimensionamento de Automação", "🔌 Infraestrutura Lançamento", "💲 Base de Preços", "📊 Orçamento Final"
     ])
@@ -930,8 +954,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         st.header("Gestão da Base de Preços")
         st.write("Altere os valores e salve na nuvem para manter a equipe comercial sincronizada.")
         
-        df_precos_total = pd.DataFrame(list(st.session_state.precos_banco.items()), columns=["Item / Equipamento", "Valor Atual (R$)"])
-        
+        # Filtros precisos utilizando chaves estritas dos dicionários de criação
         st.subheader("Base Geral e Schneider")
         lista_schneider = list(banco_schneider_comum.keys())
         lista_schneider.extend(["IHM Padrão 7\"", "IHM Premium 10\""])
@@ -997,7 +1020,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         custo_base_siemens = 0.0
         custo_base_mercato = 0.0
 
-        descritivo_linhas = []
+        descritivo_linhas_excel = ["DESCRIÇÃO SIMPLIFICADA DO ESCOPO CONTEMPLADO:\n"]
 
         for p in st.session_state.paineis_auto:
             arquitetura_atual = p.get('arquitetura', 'SpaceLogic (Schneider)')
@@ -1013,7 +1036,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             
             lista_equip_nomes = []
             tem_resistencia = False
-            lista_instrumentos_nomes = set()
+            lista_instrumentos_nomes = set() # Para o excel simplificado
+            lista_instrumentos_detalhados = [] # Para a proposta comercial
             controladores_desc_lista = []
             
             for g in p['grupos_equipamentos']:
@@ -1025,10 +1049,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 
                 nome_limpo_grupo = g['nome_grupo'].replace("Equipamento Novo", "").strip()
                 if not nome_limpo_grupo:
-                    lista_equip_nomes.append(f"{mult}x Equipamentos{str_tags}")
+                    lista_equip_nomes.append(f"{mult} Equipamentos{str_tags}")
                     nome_equip = f"Equipamento{str_tags}"
                 else:
-                    lista_equip_nomes.append(f"{mult}x {nome_limpo_grupo}{str_tags}")
+                    lista_equip_nomes.append(f"{mult} {nome_limpo_grupo}{str_tags}")
                     nome_equip = f"{nome_limpo_grupo}{str_tags}"
                 
                 raw_ai_g_single = raw_ao_g_single = raw_di_g_single = raw_do_g_single = 0
@@ -1048,17 +1072,36 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         
                         nome_curto_inst = item_nome_real.split(' (')[0].replace("Mercato - ", "").replace("Schneider - ", "").replace("Siemens - ", "")
                         lista_instrumentos_nomes.add(nome_curto_inst)
-                        if "resistência" in inst.lower() or "raq" in inst.lower():
+                        
+                        # Definindo função do instrumento para a Proposta detalhada
+                        func_inst = "Medição Genérica"
+                        if "pressão dif. para ar" in inst.lower(): func_inst = "Medição da Vazão de Ar"
+                        elif "temperatura e umidade" in inst.lower(): func_inst = "Medição de Temperatura e Umidade"
+                        elif "temperatura" in inst.lower(): func_inst = "Medição de Temperatura"
+                        elif "proporcional" in inst.lower(): func_inst = "Controle Proporcional Térmico"
+                        elif "compressor" in inst.lower(): func_inst = "Status de Operação do Compressor"
+                        elif "termostato" in inst.lower(): func_inst = "Segurança de Sobreaquecimento"
+                        elif "resistência" in inst.lower() and "pressostato" not in inst.lower(): func_inst = "Aquecimento"
+                        elif "pressostato diferencial para ar" in inst.lower() and "resistência" in inst.lower(): func_inst = "Segurança da Resistência por Fluxo de Ar"
+                        elif "pressostato para monitorar" in inst.lower(): func_inst = "Alarme de Saturação de Filtro"
+                        elif "transmissor de pressão diferencial (monitorar" in inst.lower(): func_inst = "Monitoramento da Saturação do Filtro"
+                        elif "funcionamento ventilador" in inst.lower(): func_inst = "Status de Operação do Ventilador"
+                        
+                        lista_instrumentos_detalhados.append((item_nome_real, qtd_final, func_inst))
+
+                        if "resistência" in inst.lower() or "raq" in inst.lower() or "tsh" in inst.lower():
                             tem_resistencia = True
 
                         preco_item = st.session_state.precos_banco.get(item_nome_real, st.session_state.precos_banco.get(inst, 0.0))
                         io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
                         
+                        # Soma Total do Painel (RAW)
                         raw_ai_painel += qtd_final * io_vals["AI"]
                         raw_ao_painel += qtd_final * io_vals["AO"]
                         raw_di_painel += qtd_final * io_vals["DI"]
                         raw_do_painel += qtd_final * io_vals["DO"]
                         
+                        # Soma Unitária do Grupo (RAW - Para dimensionamento individual Mercado)
                         raw_ai_g_single += qtd * io_vals["AI"]
                         raw_ao_g_single += qtd * io_vals["AO"]
                         raw_di_g_single += qtd * io_vals["DI"]
@@ -1170,27 +1213,32 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     if s_type not in softwares_incluidos: softwares_incluidos[s_type] = 0
                     softwares_incluidos[s_type] += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel)
 
-            # --- Construção Estilizada do Descritivo ---
+            # --- Construção Estilizada do Descritivo Excel (Simplificado) ---
             ihm_desc = f"com IHM instalada na porta, com display de {p['ihm'].replace('Mercato - ', '').replace('IHM Padrão ', '').replace('IHM Premium ', '').replace('IHM Básica ', '')}" if "Cego" not in p['ihm'] else "sem interface IHM instalada"
-            res_desc = " bem como controle da resistência elétrica de aquecimento" if tem_resistencia else ""
+            res_desc = " e controle da resistência elétrica de aquecimento" if tem_resistencia else ""
+            
+            sup_desc = ""
+            if "Sem" in p['supervisorio']: sup_desc = "Stand-alone (sem supervisório)"
+            elif "EBO" in p['supervisorio']: sup_desc = "integrado ao sistema supervisório EBO"
+            else: sup_desc = "integrado ao sistema supervisório"
+            
             eq_desc = ", ".join(lista_equip_nomes)
             nome_arquitetura = arquitetura_atual.replace(" - Linha mais econômica", "")
             
-            # Formatação baseada no padrão sugerido
             texto_p = (
-                f"Sistema de automação dedicado para controle das unidades {eq_desc}, "
+                f"Sistema de automação dedicado para controle de {eq_desc}, "
                 f"incluindo monitoramento contínuo da saturação dos filtros e controle geral de climatização{res_desc}.\n\n"
-                f"O sistema contempla quadro elétrico [TAG: {p['nome']}] {ihm_desc}, "
-                f"baseado na tecnologia {nome_arquitetura}, permitindo a visualização e controle dos seguintes parâmetros operacionais gerais:\n\n"
-                f"• Status de operação dos equipamentos.\n"
-                f"• Monitoramento e alarmes de saturação de filtros.\n"
-                f"• Leitura de instrumentos de campo diversos ({', '.join(list(lista_instrumentos_nomes))}).\n"
-                f"• Condições gerais de funcionamento.\n\n"
+                f"O sistema contempla quadro de automação [TAG: {p['nome']}] {ihm_desc}, "
+                f"baseado na tecnologia {nome_arquitetura}, operando no modo {sup_desc}, permitindo a visualização em tempo real dos parâmetros operacionais.\n\n"
                 f"A solução proporciona maior confiabilidade operacional, facilidade de manutenção e gestão eficiente dos ativos de climatização."
             )
-            descritivo_linhas.append(texto_p)
+            descritivo_linhas_excel.append(texto_p)
+            
+            # --- Construção do Descritivo COMERCIAL (Detalhado) ---
+            texto_comercial = gerar_descritivo_comercial(p, lista_instrumentos_nomes, [i[1] for i in lista_instrumentos_detalhados], [i[2] for i in lista_instrumentos_detalhados], is_mercato, is_schneider, tem_resistencia)
+            p['descritivo_comercial'] = texto_comercial
 
-        texto_descritivo_final = "\n\n----------------------------------------------------\n\n".join(descritivo_linhas)
+        texto_descritivo_final = "\n\n----------------------------------------------------\n\n".join(descritivo_linhas_excel)
 
         for s_name, pts_total in softwares_incluidos.items():
             b_k, p_k = "", ""
@@ -1271,6 +1319,14 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             df_display['Custo Total'] = df_display['Custo Total'].apply(format_currency)
             st.dataframe(df_display, use_container_width=True)
             
+            # --- EXPANDER PARA O DESCRITIVO COMERCIAL ---
+            with st.expander("📄 Gerar Descritivo Detalhado para Proposta Comercial", expanded=False):
+                st.markdown("<div style='background-color:#E3F2FD; padding:20px; border-radius:10px;'>", unsafe_allow_html=True)
+                for p in st.session_state.paineis_auto:
+                    st.markdown(p.get('descritivo_comercial', ''))
+                    st.markdown("---")
+                st.markdown("</div>", unsafe_allow_html=True)
+            
             df_pontos = pd.DataFrame(linhas_pontos)
             if not df_pontos.empty:
                 total_qtd = pd.to_numeric(df_pontos['Quantidade Total'], errors='coerce').fillna(0).sum()
@@ -1283,7 +1339,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             ws1.title = "Detalhamento Financeiro"
             ws1.views.sheetView[0].showGridLines = True
             
-            # --- NOVO CABEÇALHO DO EXCEL ---
+            # --- NOVO CABEÇALHO DO EXCEL (Mais largo) ---
             ws1.row_dimensions[1].height = 35
             ws1.row_dimensions[2].height = 25
             ws1.row_dimensions[3].height = 25
@@ -1332,12 +1388,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             cell.alignment = Alignment(horizontal="right")
                         elif c_idx == 4: cell.alignment = Alignment(horizontal="center")
             
-            # --- CAIXA DE TEXTO DESCRITIVO ---
+            # --- CAIXA DE TEXTO DESCRITIVO NO EXCEL ---
             end_row_table = start_row + len(df_exportacao) + 2
-            
-            # Calculando quantas quebras de linha o texto tem para ajustar o tamanho da caixa
             num_linhas_texto = len(texto_descritivo_final.split('\n'))
-            tamanho_caixa = max(10, num_linhas_texto + 2) # Pelo menos 10 linhas, ou mais se o texto for grande
+            tamanho_caixa = max(10, num_linhas_texto + 2) 
             
             ws1.merge_cells(start_row=end_row_table, start_column=1, end_row=end_row_table+tamanho_caixa, end_column=5)
             cell_desc = ws1.cell(row=end_row_table, column=1, value=texto_descritivo_final)
