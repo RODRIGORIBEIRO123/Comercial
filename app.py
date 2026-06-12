@@ -421,12 +421,14 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     st.title("🔌 Engenharia e Custos - Automação e Infra")
     st.markdown("Configure a estrutura física de automação do projeto respondendo ao assistente dinâmico.")
     
-    nome_proj = st.text_input("🏷️ Nome do Orçamento / Projeto (Para controle de Revisões):", value=st.session_state.nome_projeto_orcamento)
+    c_proj1, c_proj2 = st.columns([3, 1])
+    nome_proj = c_proj1.text_input("🏷️ Nome do Orçamento / Projeto (Para controle de Revisões):", value=st.session_state.nome_projeto_orcamento)
+    rev_proj = c_proj2.text_input("Revisão", value="R-00")
     st.session_state.nome_projeto_orcamento = nome_proj
     st.markdown("---")
 
     REGRA_IO = {
-        "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
         "Transmissor de temperatura e umidade para duto (TT/MT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de temperatura para duto (TT)": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
         "Válvula de controle proporcional com atuador (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
@@ -449,13 +451,13 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Chave de fluxo (FS)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
         "Bombas (I/O para controlador)": {"AI": 0, "AO": 1, "DI": 1, "DO": 1},
         "Tanques (I/O para controlador)": {"AI": 1, "AO": 0, "DI": 1, "DO": 1},
-        "Pressostato - Filtro G4 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "Pressostato - Filtro F9 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
-        "Pressostato - Filtro H13/H14 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Pressostato para monitorar os filtros G4 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Pressostato para monitorar os filtros F9 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Pressostato para monitorar os filtros H13/H14 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
         "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
-        "Transmissor de pressão diferencial - Filtro G4 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de pressão diferencial - Filtro F9 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de pressão diferencial - Filtro H13 (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de pressão diferencial entre salas (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de pressão diferencial entre salas com display (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de temperatura Ambiente (TT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
@@ -465,7 +467,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     }
 
     banco_schneider_comum = {
-        "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1490.00,
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1490.00,
         "Transmissor de temperatura e umidade para duto (TT/MT)": 2050.00,
         "Transmissor de temperatura para duto (TT)": 800.00,
         "Válvula de controle proporcional com atuador (TCV)": 0.00,
@@ -488,13 +490,13 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Chave de fluxo (FS)": 349.00,
         "Bombas (I/O para controlador)": 0.00,
         "Tanques (I/O para controlador)": 0.00,
-        "Pressostato - Filtro G4 (PSH)": 349.00,
-        "Pressostato - Filtro F9 (PSH)": 349.00,
-        "Pressostato - Filtro H13/H14 (PSH)": 349.00,
+        "Pressostato para monitorar os filtros G4 (PSH)": 349.00,
+        "Pressostato para monitorar os filtros F9 (PSH)": 349.00,
+        "Pressostato para monitorar os filtros H13/H14 (PSH)": 349.00,
         "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 349.00,
-        "Transmissor de pressão diferencial - Filtro G4 (PDIT)": 1490.00,
-        "Transmissor de pressão diferencial - Filtro F9 (PDIT)": 1490.00,
-        "Transmissor de pressão diferencial - Filtro H13 (PDIT)": 1490.00,
+        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDIT)": 1490.00,
+        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDIT)": 1490.00,
+        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDIT)": 1490.00,
         "Transmissor de pressão diferencial entre salas (PDT)": 1490.00,
         "Transmissor de pressão diferencial entre salas com display (PDIT)": 2110.00,
         "Transmissor de temperatura Ambiente (TT)": 2050.00,
@@ -505,7 +507,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Licença Supervisório - SEM CFR-21 (Base)": 23000.00, "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)": 100.00,
         "Licença Supervisório - COM CFR-21 (Base)": 23000.00, "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
         "Licença Supervisório - Schneider EBO (Base)": 13000.00, "Licença Supervisório - Schneider EBO (Por Ponto I/O)": 110.00,
-        "MP-C-15A": 4649.49, "MP-C-18A": 5185.54, "MP-C-24A": 7290.75, "MP-C-36A": 9459.08
+        "MP-C-15A": 4649.49, "MP-C-18A": 5185.54, "MP-C-24A": 7290.75, "MP-C-36A": 9459.08,
+        "Schneider - Sensor de Temperatura NTC (Duto)": 120.00,
+        "Schneider - Sensor de Temperatura NTC (Ambiente)": 85.00,
+        "Schneider - Servidor de Automação (SpaceLogic AS-P/AS-B)": 9500.00
     }
 
     banco_siemens = {
@@ -552,7 +557,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
     GRUPOS_INSTRUMENTOS = {
         "🔹 Controle (HVAC e Máquinas)": [
-            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)",
+            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)",
             "Transmissor de temperatura e umidade para duto (TT/MT)", "Transmissor de temperatura para duto (TT)",
             "Válvula de controle proporcional com atuador (TCV)", "Válvula de controle de água gelada proporcional (TCV)",
             "Válvula de controle de água quente proporcional (TCV)", "Válvula de controle de vapor proporcional (TCV)",
@@ -566,9 +571,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             "Transmissor de vazão para água (FIT)", "Válvula bloqueio motorizada (XV)", "Chave de fluxo (FS)", "Bombas (I/O para controlador)", "Tanques (I/O para controlador)"
         ],
         "🔸 Monitoramento (Filtros e Status)": [
-            "Pressostato - Filtro G4 (PSH)", "Pressostato - Filtro F9 (PSH)", "Pressostato - Filtro H13/H14 (PSH)",
-            "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", "Transmissor de pressão diferencial - Filtro G4 (PDIT)",
-            "Transmissor de pressão diferencial - Filtro F9 (PDIT)", "Transmissor de pressão diferencial - Filtro H13 (PDIT)"
+            "Pressostato para monitorar os filtros G4 (PSH)", "Pressostato para monitorar os filtros F9 (PSH)", "Pressostato para monitorar os filtros H13/H14 (PSH)",
+            "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", "Transmissor de pressão diferencial (monitorar os filtros G4) (PDIT)",
+            "Transmissor de pressão diferencial (monitorar os filtros F9) (PDIT)", "Transmissor de pressão diferencial (monitorar os filtros H13) (PDIT)"
         ],
         "🟢 Monitoramento de Ambiente (Salas)": [
             "Transmissor de pressão diferencial entre salas (PDT)", "Transmissor de pressão diferencial entre salas com display (PDIT)",
@@ -579,28 +584,28 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     
     KITS_PADRAO = {
         "❄️ UTA Padrão - Água Gelada": {
-            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1,
+            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1,
             "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Válvula de controle de água gelada proporcional (TCV)": 1,
-            "Pressostato - Filtro G4 (PSH)": 1, "Pressostato - Filtro F9 (PSH)": 1, "Pressostato - Filtro H13/H14 (PSH)": 1
+            "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1, "Pressostato para monitorar os filtros H13/H14 (PSH)": 1
         },
         "🌬️ UTA Padrão - Expansão Direta": {
-            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1,
+            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1,
             "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Relé de Corrente - Status Compressor (TC)": 2,
-            "Pressostato - Filtro G4 (PSH)": 1, "Pressostato - Filtro F9 (PSH)": 1, "Pressostato - Filtro H13/H14 (PSH)": 1
+            "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1, "Pressostato para monitorar os filtros H13/H14 (PSH)": 1
         },
         "🔥 UTA Padrão - Água Gelada + Resistência": {
-            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1,
+            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1,
             "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Válvula de controle de água gelada proporcional (TCV)": 1,
-            "Pressostato - Filtro G4 (PSH)": 1, "Pressostato - Filtro F9 (PSH)": 1, "Pressostato - Filtro H13/H14 (PSH)": 1,
+            "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1, "Pressostato para monitorar os filtros H13/H14 (PSH)": 1,
             "Termostato de segurança (TSH)": 1, "Pressostato diferencial para ar (PSH)": 1
         },
         "ENTREGÁVEL EXP. DIRET + RESISTÊNCIA": {
-            "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1,
+            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1,
             "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Relé de Corrente - Status Compressor (TC)": 2,
-            "Pressostato - Filtro G4 (PSH)": 1, "Pressostato - Filtro F9 (PSH)": 1, "Pressostato - Filtro H13/H14 (PSH)": 1,
+            "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1, "Pressostato para monitorar os filtros H13/H14 (PSH)": 1,
             "Termostato de segurança (TSH)": 1, "Pressostato diferencial para ar (PSH)": 1
         },
-        "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1 },
+        "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1 },
         "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 }
     }
 
@@ -715,7 +720,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             nome_limpo = kit_final_selecionado.split(" ", 1)[1] if " " in kit_final_selecionado else kit_final_selecionado
                             grupos_equip.append({"nome_grupo": f"{nome_limpo}", "multiplicador": 1, "instrumentos": novos_instrumentos, "tags_lista": [""]})
                         else:
-                            grupos_equip.append({"nome_grupo": "Equipamento Customizado", "multiplicador": 1, "instrumentos": novos_instrumentos, "tags_lista": [""]})
+                            grupos_equip.append({"nome_grupo": "Equipamento Novo", "multiplicador": 1, "instrumentos": novos_instrumentos, "tags_lista": [""]})
 
                         st.session_state.paineis_auto.append({
                             "id": len(st.session_state.paineis_auto),
@@ -733,6 +738,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
             is_mercato_quadro = ('Mercato' in p_data.get('arquitetura', ''))
+            is_schneider_quadro = ('Schneider' in p_data.get('arquitetura', ''))
             tem_sobra_20 = (p_data.get('sobra_20', 'Não') == 'Sim')
             
             with st.container(border=True):
@@ -760,7 +766,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
                     total_ai_g_single = total_ao_g_single = total_di_g_single = total_do_g_single = 0
                     
-                    open_p_hvac = False # Mantém os equipamentos fechados visualmente por padrão
+                    open_p_hvac = False 
                     with st.expander(f"📦 {g_data['nome_grupo']}", expanded=open_p_hvac):
                         qtd_key = f"m_g_{p_idx}_{g_idx}"
                         qtd_atual = st.session_state.get(qtd_key, g_data.get('multiplicador', 1))
@@ -846,7 +852,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         if st.session_state.paineis_auto:
             st.markdown("---")
             if st.button("💾 Salvar Rascunho e Sair (Retomar depois)", type="secondary", use_container_width=True):
-                if not st.session_state.nome_projeto_orcamento: st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento'.")
+                if not st.session_state.nome_projeto_orcamento: st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento / Projeto' no topo da página antes de salvar o rascunho.")
                 else:
                     try:
                         sh = conectar_google_sheets()
@@ -993,8 +999,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         custo_base_siemens = 0.0
         custo_base_mercato = 0.0
 
-        # VARIÁVEL PARA O DESCRITIVO
-        descritivo_linhas = ["DESCRIÇÃO SIMPLIFICADA DO ESCOPO CONTEMPLADO:"]
+        descritivo_linhas = ["DESCRIÇÃO SIMPLIFICADA DO ESCOPO CONTEMPLADO:\n"]
 
         for p in st.session_state.paineis_auto:
             arquitetura_atual = p.get('arquitetura', 'SpaceLogic (Schneider)')
@@ -1002,12 +1007,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             is_siemens_1500 = (arquitetura_atual == 'S7-1500 (Siemens)')
             is_siemens = is_siemens_1200 or is_siemens_1500
             is_mercato = ('Mercato' in arquitetura_atual)
+            is_schneider = ('Schneider' in arquitetura_atual)
             tem_sobra_20 = (p.get('sobra_20', 'Não') == 'Sim')
             
             raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
             qtd_equipamentos_painel = 0
             
-            # Variáveis para o descritivo
             lista_equip_nomes = []
             tem_resistencia = False
             lista_instrumentos_nomes = set()
@@ -1017,11 +1022,16 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 mult = g.get('multiplicador', 1)
                 qtd_equipamentos_painel += mult
                 
-                lista_equip_nomes.append(f"{mult}x {g['nome_grupo']}")
-                
                 lista_tags = [t for t in g.get('tags_lista', []) if t.strip() != ""]
-                str_tags = f" (TAGs: {', '.join(lista_tags)})" if len(lista_tags) > 0 else ""
-                nome_equip = f"{g['nome_grupo']}{str_tags}"
+                str_tags = f" [TAGs: {', '.join(lista_tags)}]" if len(lista_tags) > 0 else ""
+                
+                nome_limpo_grupo = g['nome_grupo'].replace("Equipamento Novo", "").strip()
+                if not nome_limpo_grupo:
+                    lista_equip_nomes.append(f"{mult}x Equipamentos{str_tags}")
+                    nome_equip = f"Equipamento{str_tags}"
+                else:
+                    lista_equip_nomes.append(f"{mult}x {nome_limpo_grupo}{str_tags}")
+                    nome_equip = f"{nome_limpo_grupo}{str_tags}"
                 
                 raw_ai_g_single = raw_ao_g_single = raw_di_g_single = raw_do_g_single = 0
                 
@@ -1029,13 +1039,16 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     if qtd > 0:
                         qtd_final = qtd * mult
                         item_nome_real = inst
+                        
                         if is_mercato:
                             if "Transmissor de temperatura para duto (TT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC (Duto)"
                             elif "Transmissor de temperatura Ambiente (TT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC (Ambiente)"
                             elif "Transmissor de temperatura ambiente com display (TIT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC com Display (Ambiente)"
+                        elif is_schneider:
+                            if "Transmissor de temperatura para duto (TT)" in inst: item_nome_real = "Schneider - Sensor de Temperatura NTC (Duto)"
+                            elif "Transmissor de temperatura Ambiente (TT)" in inst: item_nome_real = "Schneider - Sensor de Temperatura NTC (Ambiente)"
                         
-                        # Add a set for description
-                        nome_curto_inst = item_nome_real.split(' (')[0].replace("Mercato - ", "").replace("Siemens - ", "")
+                        nome_curto_inst = item_nome_real.split(' (')[0].replace("Mercato - ", "").replace("Schneider - ", "").replace("Siemens - ", "")
                         lista_instrumentos_nomes.add(nome_curto_inst)
                         if "resistência" in inst.lower() or "raq" in inst.lower():
                             tem_resistencia = True
@@ -1071,7 +1084,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     
                     modelo_mcp = dimensionar_mercato(ui_nec, ao_nec, do_nec)
                     if modelo_mcp:
-                        controladores_desc_lista.append(f"{mult}x {modelo_mcp}")
+                        controladores_desc_lista.append(f"{mult}x {modelo_mcp.replace('Mercato - ', '')}")
                         p_hw = st.session_state.precos_banco.get(modelo_mcp, 1650.0)
                         linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"{modelo_mcp} ({g['nome_grupo']} - {p['nome']})", "Preço Unit.": p_hw, "Qtd": mult, "Custo Total": mult * p_hw})
                         custo_base_mercato += (mult * p_hw)
@@ -1094,17 +1107,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": "Reserva Técnica (20%)", "Instrumento": "Pontos de Sobra Física do Quadro", "Quantidade Total": "-", "Entrada Digital (DI)": reserva_di_painel, "Saída Digital (DO)": reserva_do_painel, "Entrada Analógica (AI)": reserva_ai_painel, "Saída Analógica (AO)": reserva_ao_painel})
 
             if is_siemens:
-                total_ai_siemens += raw_ai_painel
-                total_ao_siemens += raw_ao_painel
-                total_di_siemens += raw_di_painel
-                total_do_siemens += raw_do_painel
+                total_ai_siemens += raw_ai_painel; total_ao_siemens += raw_ao_painel; total_di_siemens += raw_di_painel; total_do_siemens += raw_do_painel
             elif is_mercato:
                 total_io_mercato += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel)
             else:
-                total_ai_schneider += raw_ai_painel
-                total_ao_schneider += raw_ao_painel
-                total_di_schneider += raw_di_painel
-                total_do_schneider += raw_do_painel
+                total_ai_schneider += raw_ai_painel; total_ao_schneider += raw_ao_painel; total_di_schneider += raw_di_painel; total_do_schneider += raw_do_painel
             
             if tot_io_painel_hw > 0:
                 if is_mercato:
@@ -1122,7 +1129,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         else: hw_s = dimensionar_siemens_1500(hw_ai_painel, hw_ao_painel, hw_di_painel, hw_do_painel)
                         for i_hw, q_hw in hw_s.items():
                             if q_hw > 0:
-                                controladores_desc_lista.append(f"{q_hw}x {i_hw}")
+                                controladores_desc_lista.append(f"{q_hw}x {i_hw.replace('Siemens - ', '')}")
                                 p_hw = st.session_state.precos_banco.get(i_hw, 0.0)
                                 linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"{i_hw} ({p['nome']})", "Preço Unit.": p_hw, "Qtd": q_hw, "Custo Total": q_hw * p_hw})
                                 custo_base_siemens += (q_hw * p_hw)
@@ -1156,21 +1163,27 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
                 s_type = p.get('supervisorio', "Sem Supervisório")
                 if s_type != "Sem Supervisório":
+                    if is_schneider:
+                        pr_as = st.session_state.precos_banco.get("Schneider - Servidor de Automação (SpaceLogic AS-P/AS-B)", 9500.0)
+                        controladores_desc_lista.append("1x Servidor de Automação AS-P/AS-B")
+                        linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Servidor de Automação AS-P/AS-B ({p['nome']})", "Preço Unit.": pr_as, "Qtd": 1, "Custo Total": pr_as})
+                        custo_base_schneider += pr_as
+                        
                     if s_type not in softwares_incluidos: softwares_incluidos[s_type] = 0
                     softwares_incluidos[s_type] += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel)
 
-            # --- Constrói o texto do painel para o resumo no Excel ---
-            ihm_desc = f"com {p['ihm'].replace('Mercato - ', '')}" if "Cego" not in p['ihm'] else "sem IHM local"
-            sup_desc = f"e com Sistema de Supervisão ({p['supervisorio']})" if p['supervisorio'] != "Sem Supervisório" else "e sem supervisório integrado"
-            res_desc = "com resistências de aquecimento integradas" if tem_resistencia else "sem resistências"
-            sobra_desc = "incluindo +20% de reserva técnica de I/O" if tem_sobra_20 else "sem sobra de I/O"
+            ihm_desc = f"com IHM ({p['ihm'].replace('Mercato - ', '').replace('IHM Padrão ', '').replace('IHM Premium ', '').replace('IHM Básica ', '')})" if "Cego" not in p['ihm'] else "sem IHM local"
+            sup_desc = f"e com sistema de supervisão integrado" if p['supervisorio'] != "Sem Supervisório" else "e sem supervisório integrado"
+            res_desc = ", com resistências de aquecimento" if tem_resistencia else ""
             eq_desc = ", ".join(lista_equip_nomes)
             inst_desc = ", ".join(list(lista_instrumentos_nomes))
-            ctrl_desc = ", ".join(controladores_desc_lista) if controladores_desc_lista else "Controlador a definir"
+            ctrl_desc = ", ".join(controladores_desc_lista) if controladores_desc_lista else "Controladores"
             
-            texto_p = (f"• Fornecimento de 01x Quadro de Automação/Comando [TAG: {p['nome']}], baseado na tecnologia {arquitetura_atual} ({ctrl_desc}), "
-                       f"{ihm_desc} {sup_desc}. Dimensionado para atender as seguintes máquinas/sistemas: {eq_desc}, {res_desc}, {sobra_desc}. "
-                       f"Instrumentação contemplada: {inst_desc}.")
+            nome_arquitetura = arquitetura_atual.replace(" - Linha mais econômica", "")
+            
+            texto_p = (f"• Fornecimento de 01x quadro de controle para atender {eq_desc} [TAG: {p['nome']}], {ihm_desc} {sup_desc}. "
+                       f"Hardware baseado na tecnologia {nome_arquitetura} ({ctrl_desc}). "
+                       f"O escopo contempla a seguinte instrumentação de campo{res_desc}: {inst_desc}.")
             descritivo_linhas.append(texto_p)
 
         texto_descritivo_final = "\n\n".join(descritivo_linhas)
@@ -1266,29 +1279,41 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             ws1.title = "Detalhamento Financeiro"
             ws1.views.sheetView[0].showGridLines = True
             
-            # Formatação do Cabeçalho de Auditoria do Excel
-            ws1.row_dimensions[1].height = 20
-            ws1.row_dimensions[2].height = 20
-            ws1.row_dimensions[3].height = 20
+            # --- NOVO CABEÇALHO DO EXCEL ---
+            ws1.row_dimensions[1].height = 35
+            ws1.row_dimensions[2].height = 25
+            ws1.row_dimensions[3].height = 25
+            ws1.row_dimensions[4].height = 25
             
             nome_projeto_header = st.session_state.nome_projeto_orcamento if st.session_state.nome_projeto_orcamento else "PROJETO NÃO NOMEADO"
-            ws1.merge_cells("E1:G1"); ws1.cell(row=1, column=5, value=f"PROJETO: {nome_projeto_header.upper()}").font = Font(name="Arial", size=11, bold=True, color="1C8590")
-            ws1.merge_cells("E2:G2"); ws1.cell(row=2, column=5, value=f"DATA/HORA EMISSÃO: {datetime.now(fuso_br).strftime('%d/%m/%Y %H:%M:%S')}").font = Font(name="Arial", size=10, color="555555")
-            ws1.merge_cells("E3:G3"); ws1.cell(row=3, column=5, value=f"RESPONSÁVEL: {st.session_state.nome_exibicao.upper()}").font = Font(name="Arial", size=10, color="555555")
             
-            start_row = 5
+            # Título principal
+            ws1.merge_cells("C1:E1")
+            ws1.cell(row=1, column=3, value="DESCRIÇÃO TÉCNICA E ORÇAMENTÁRIA DE SISTEMAS DE AUTOMAÇÃO").font = Font(name="Arial", size=12, bold=True, color="1C8590")
+            ws1.cell(row=1, column=3).alignment = Alignment(horizontal="center", vertical="center")
+            
+            # Detalhes
+            ws1.merge_cells("C2:E2"); ws1.cell(row=2, column=3, value=f"PROJETO: {nome_projeto_header.upper()}").font = Font(name="Arial", size=10, bold=True, color="333333")
+            ws1.merge_cells("C3:E3"); ws1.cell(row=3, column=3, value=f"DATA/HORA EMISSÃO: {datetime.now(fuso_br).strftime('%d/%m/%Y %H:%M:%S')}").font = Font(name="Arial", size=10, color="555555")
+            ws1.merge_cells("C4:E4"); ws1.cell(row=4, column=3, value=f"RESPONSÁVEL TÉCNICO: {st.session_state.nome_exibicao.upper()}").font = Font(name="Arial", size=10, color="555555")
+            
+            for r in range(2, 5): ws1.cell(row=r, column=3).alignment = Alignment(horizontal="center", vertical="center")
+            
+            start_row = 6
             if ARQUIVO_LOGO:
                 try:
                     from openpyxl.drawing.image import Image as OpenpyxlImage
                     img = OpenpyxlImage(ARQUIVO_LOGO)
-                    img.width = 170
-                    img.height = 45
-                    ws1.add_image(img, "B1")
+                    # Ajustando o logo para não ficar espremido
+                    img.width = 180
+                    img.height = 50
+                    ws1.add_image(img, "A1")
                 except: pass
                 
             fill_header = PatternFill(start_color="1C8590", end_color="1C8590", fill_type="solid")
             font_header = Font(name="Arial", size=11, bold=True, color="FFFFFF")
             border_thin = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
+            
             for r_idx, row in enumerate(dataframe_to_rows(df_exportacao, index=False, header=True), start=start_row):
                 for c_idx, value in enumerate(row, start=1):
                     cell = ws1.cell(row=r_idx, column=c_idx, value=value)
@@ -1306,16 +1331,16 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             cell.alignment = Alignment(horizontal="right")
                         elif c_idx == 4: cell.alignment = Alignment(horizontal="center")
             
-            # Adiciona o Descritivo Abaixo da Tabela
+            # --- CAIXA DE TEXTO DESCRITIVO ---
             end_row_table = start_row + len(df_exportacao) + 2
-            ws1.merge_cells(start_row=end_row_table, start_column=1, end_row=end_row_table+6, end_column=5)
+            ws1.merge_cells(start_row=end_row_table, start_column=1, end_row=end_row_table+8, end_column=5)
             cell_desc = ws1.cell(row=end_row_table, column=1, value=texto_descritivo_final)
-            cell_desc.font = Font(name="Arial", size=10, italic=True, color="333333")
+            cell_desc.font = Font(name="Arial", size=10, italic=False, color="333333")
             cell_desc.alignment = Alignment(vertical="top", wrap_text=True)
             cell_desc.fill = PatternFill(start_color="F2F4F4", end_color="F2F4F4", fill_type="solid")
-            for r in range(end_row_table, end_row_table+7):
-                for c in range(1, 6):
-                    ws1.cell(row=r, column=c).border = border_thin
+            
+            for r in range(end_row_table, end_row_table+9):
+                for c in range(1, 6): ws1.cell(row=r, column=c).border = border_thin
             
             for col in ws1.columns:
                 max_len = max(len(str(cell.value or '')) for cell in col if cell.row <= start_row + len(df_exportacao))
