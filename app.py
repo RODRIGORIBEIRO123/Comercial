@@ -421,9 +421,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     st.title("🔌 Engenharia e Custos - Automação e Infra")
     st.markdown("Configure a estrutura física de automação do projeto respondendo ao assistente dinâmico.")
     
-    c_proj1, c_proj2 = st.columns([3, 1])
-    nome_proj = c_proj1.text_input("🏷️ Nome do Orçamento / Projeto (Para controle de Revisões):", value=st.session_state.nome_projeto_orcamento)
-    rev_proj = c_proj2.text_input("Revisão", value="R-00")
+    nome_proj = st.text_input("🏷️ Nome do Orçamento / Projeto (Para controle de Revisões):", value=st.session_state.nome_projeto_orcamento)
     st.session_state.nome_projeto_orcamento = nome_proj
     st.markdown("---")
 
@@ -999,7 +997,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         custo_base_siemens = 0.0
         custo_base_mercato = 0.0
 
-        descritivo_linhas = ["DESCRIÇÃO SIMPLIFICADA DO ESCOPO CONTEMPLADO:\n"]
+        descritivo_linhas = []
 
         for p in st.session_state.paineis_auto:
             arquitetura_atual = p.get('arquitetura', 'SpaceLogic (Schneider)')
@@ -1172,21 +1170,27 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     if s_type not in softwares_incluidos: softwares_incluidos[s_type] = 0
                     softwares_incluidos[s_type] += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel)
 
-            ihm_desc = f"com IHM ({p['ihm'].replace('Mercato - ', '').replace('IHM Padrão ', '').replace('IHM Premium ', '').replace('IHM Básica ', '')})" if "Cego" not in p['ihm'] else "sem IHM local"
-            sup_desc = f"e com sistema de supervisão integrado" if p['supervisorio'] != "Sem Supervisório" else "e sem supervisório integrado"
-            res_desc = ", com resistências de aquecimento" if tem_resistencia else ""
+            # --- Construção Estilizada do Descritivo ---
+            ihm_desc = f"com IHM instalada na porta, com display de {p['ihm'].replace('Mercato - ', '').replace('IHM Padrão ', '').replace('IHM Premium ', '').replace('IHM Básica ', '')}" if "Cego" not in p['ihm'] else "sem interface IHM instalada"
+            res_desc = " bem como controle da resistência elétrica de aquecimento" if tem_resistencia else ""
             eq_desc = ", ".join(lista_equip_nomes)
-            inst_desc = ", ".join(list(lista_instrumentos_nomes))
-            ctrl_desc = ", ".join(controladores_desc_lista) if controladores_desc_lista else "Controladores"
-            
             nome_arquitetura = arquitetura_atual.replace(" - Linha mais econômica", "")
             
-            texto_p = (f"• Fornecimento de 01x quadro de controle para atender {eq_desc} [TAG: {p['nome']}], {ihm_desc} {sup_desc}. "
-                       f"Hardware baseado na tecnologia {nome_arquitetura} ({ctrl_desc}). "
-                       f"O escopo contempla a seguinte instrumentação de campo{res_desc}: {inst_desc}.")
+            # Formatação baseada no padrão sugerido
+            texto_p = (
+                f"Sistema de automação dedicado para controle das unidades {eq_desc}, "
+                f"incluindo monitoramento contínuo da saturação dos filtros e controle geral de climatização{res_desc}.\n\n"
+                f"O sistema contempla quadro elétrico [TAG: {p['nome']}] {ihm_desc}, "
+                f"baseado na tecnologia {nome_arquitetura}, permitindo a visualização e controle dos seguintes parâmetros operacionais gerais:\n\n"
+                f"• Status de operação dos equipamentos.\n"
+                f"• Monitoramento e alarmes de saturação de filtros.\n"
+                f"• Leitura de instrumentos de campo diversos ({', '.join(list(lista_instrumentos_nomes))}).\n"
+                f"• Condições gerais de funcionamento.\n\n"
+                f"A solução proporciona maior confiabilidade operacional, facilidade de manutenção e gestão eficiente dos ativos de climatização."
+            )
             descritivo_linhas.append(texto_p)
 
-        texto_descritivo_final = "\n\n".join(descritivo_linhas)
+        texto_descritivo_final = "\n\n----------------------------------------------------\n\n".join(descritivo_linhas)
 
         for s_name, pts_total in softwares_incluidos.items():
             b_k, p_k = "", ""
@@ -1287,12 +1291,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             
             nome_projeto_header = st.session_state.nome_projeto_orcamento if st.session_state.nome_projeto_orcamento else "PROJETO NÃO NOMEADO"
             
-            # Título principal
             ws1.merge_cells("C1:E1")
             ws1.cell(row=1, column=3, value="DESCRIÇÃO TÉCNICA E ORÇAMENTÁRIA DE SISTEMAS DE AUTOMAÇÃO").font = Font(name="Arial", size=12, bold=True, color="1C8590")
             ws1.cell(row=1, column=3).alignment = Alignment(horizontal="center", vertical="center")
             
-            # Detalhes
             ws1.merge_cells("C2:E2"); ws1.cell(row=2, column=3, value=f"PROJETO: {nome_projeto_header.upper()}").font = Font(name="Arial", size=10, bold=True, color="333333")
             ws1.merge_cells("C3:E3"); ws1.cell(row=3, column=3, value=f"DATA/HORA EMISSÃO: {datetime.now(fuso_br).strftime('%d/%m/%Y %H:%M:%S')}").font = Font(name="Arial", size=10, color="555555")
             ws1.merge_cells("C4:E4"); ws1.cell(row=4, column=3, value=f"RESPONSÁVEL TÉCNICO: {st.session_state.nome_exibicao.upper()}").font = Font(name="Arial", size=10, color="555555")
@@ -1304,7 +1306,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 try:
                     from openpyxl.drawing.image import Image as OpenpyxlImage
                     img = OpenpyxlImage(ARQUIVO_LOGO)
-                    # Ajustando o logo para não ficar espremido
                     img.width = 180
                     img.height = 50
                     ws1.add_image(img, "A1")
@@ -1333,13 +1334,18 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             
             # --- CAIXA DE TEXTO DESCRITIVO ---
             end_row_table = start_row + len(df_exportacao) + 2
-            ws1.merge_cells(start_row=end_row_table, start_column=1, end_row=end_row_table+8, end_column=5)
+            
+            # Calculando quantas quebras de linha o texto tem para ajustar o tamanho da caixa
+            num_linhas_texto = len(texto_descritivo_final.split('\n'))
+            tamanho_caixa = max(10, num_linhas_texto + 2) # Pelo menos 10 linhas, ou mais se o texto for grande
+            
+            ws1.merge_cells(start_row=end_row_table, start_column=1, end_row=end_row_table+tamanho_caixa, end_column=5)
             cell_desc = ws1.cell(row=end_row_table, column=1, value=texto_descritivo_final)
             cell_desc.font = Font(name="Arial", size=10, italic=False, color="333333")
             cell_desc.alignment = Alignment(vertical="top", wrap_text=True)
             cell_desc.fill = PatternFill(start_color="F2F4F4", end_color="F2F4F4", fill_type="solid")
             
-            for r in range(end_row_table, end_row_table+9):
+            for r in range(end_row_table, end_row_table+tamanho_caixa+1):
                 for c in range(1, 6): ws1.cell(row=r, column=c).border = border_thin
             
             for col in ws1.columns:
