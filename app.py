@@ -51,6 +51,7 @@ if "usuario_logado" not in st.session_state: st.session_state.usuario_logado = N
 if "nome_exibicao" not in st.session_state: st.session_state.nome_exibicao = ""
 if "menu_selecionado" not in st.session_state: st.session_state.menu_selecionado = "🏠 Tela Inicial"
 if "orcamento" not in st.session_state: st.session_state.orcamento = []
+if "historico_precos" not in st.session_state: st.session_state.historico_precos = []
 
 if st.session_state.usuario_logado is None:
     st.markdown("""
@@ -503,6 +504,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Licença Supervisório - COM CFR-21 (Base)": 23000.00, "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
         "Licença Supervisório - Schneider EBO (Base)": 13000.00, "Licença Supervisório - Schneider EBO (Por Ponto I/O)": 110.00,
         
+        # IHMs 
+        "IHM Básica 4.3\"": 1700.00,
+        "IHM Padrão 7\"": 3400.00,
+        "IHM Premium 10\"": 8500.00,
+        "Sem Interface (Cego)": 0.00,
+        
         # SCHNEIDER
         "MP-C-15A": 4649.49, "MP-C-18A": 5185.54, "MP-C-24A": 7290.75, "MP-C-36A": 9459.08,
         
@@ -608,8 +615,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1 },
         "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 }
     }
-
-    PRECOS_IHM = {"Sem Interface (Cego)": 0.0, "IHM Básica 4.3\"": 1700.00, "IHM Padrão 7\"": 3400.00, "IHM Premium 10\"": 8500.00}
 
     def calcular_painel_fisico(qtd_controladores):
         if qtd_controladores == 0: return "Sem Painel", 0.0
@@ -747,7 +752,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 if is_mercato_quadro:
                     opcoes_ihm = ["IHM Básica 4.3\"", "Sem Interface (Cego)"]
                 else:
-                    opcoes_ihm = list(PRECOS_IHM.keys())
+                    opcoes_ihm = ["Sem Interface (Cego)", "IHM Básica 4.3\"", "IHM Padrão 7\"", "IHM Premium 10\""]
                     
                 ihm_salva = p_data.get('ihm', opcoes_ihm[0])
                 idx_ihm = opcoes_ihm.index(ihm_salva) if ihm_salva in opcoes_ihm else 0 
@@ -1093,11 +1098,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Controlador MP-C-15A ({p['nome']})", "Preço Unit.": st.session_state.precos_banco.get("MP-C-15A", 4649.0), "Qtd": c15, "Custo Total": c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0)})
                             custo_base_schneider += (c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0))
                 
-                if PRECOS_IHM[p['ihm']] > 0: 
-                    linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Interface: {p['ihm']} ({p['nome']})", "Preço Unit.": PRECOS_IHM[p['ihm']], "Qtd": 1, "Custo Total": PRECOS_IHM[p['ihm']]})
-                    if is_siemens: custo_base_siemens += PRECOS_IHM[p['ihm']]
-                    elif is_mercato: custo_base_mercato += PRECOS_IHM[p['ihm']]
-                    else: custo_base_schneider += PRECOS_IHM[p['ihm']]
+                preco_ihm = st.session_state.precos_banco.get(p['ihm'], 0.0)
+                if preco_ihm > 0: 
+                    linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Interface: {p['ihm']} ({p['nome']})", "Preço Unit.": preco_ihm, "Qtd": 1, "Custo Total": preco_ihm})
+                    if is_siemens: custo_base_siemens += preco_ihm
+                    elif is_mercato: custo_base_mercato += preco_ihm
+                    else: custo_base_schneider += preco_ihm
 
                 s_type = p.get('supervisorio', "Sem Supervisório")
                 if s_type != "Sem Supervisório":
