@@ -530,7 +530,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Siemens - Serviço Custo DI/DO": 180.00,
         
         # MERCATO E NTC
-        "Mercato - Controlador MCP": 1650.00,
+        "Mercato - Controlador MCP-4 (2AO, 3DO, 4UI)": 950.00,
+        "Mercato - Controlador MCP-8 (4AO, 5DO, 8UI, 2DI)": 1400.00,
+        "Mercato - Controlador MCP-12 (4AO, 8DO, 12UI, 4DI)": 1850.00,
         "Mercato - Sensor de Temperatura NTC (Duto)": 120.00,
         "Mercato - Sensor de Temperatura NTC (Ambiente)": 85.00,
         "Mercato - Sensor de Temperatura NTC com Display (Ambiente)": 350.00,
@@ -656,6 +658,15 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         if rem_di > 0: hw["Siemens - DI 16x24VDC HF"] = (rem_di + 15) // 16
         if rem_do > 0: hw["Siemens - DQ 16x24VDC/0.5A"] = (rem_do + 15) // 16
         return hw
+        
+    def dimensionar_mercato(ui, ao, do):
+        if ui <= 4 and ao <= 2 and do <= 3:
+            return "Mercato - Controlador MCP-4 (2AO, 3DO, 4UI)"
+        elif ui <= 8 and ao <= 4 and do <= 5:
+            return "Mercato - Controlador MCP-8 (4AO, 5DO, 8UI, 2DI)"
+        elif ui <= 12 and ao <= 4 and do <= 8:
+            return "Mercato - Controlador MCP-12 (4AO, 8DO, 12UI, 4DI)"
+        return None
 
     aba_auto, aba_infra, aba_precos, aba_resumo = st.tabs([
         "🚀 Dimensionamento de Automação", "🔌 Infraestrutura Lançamento", "💲 Base de Preços", "📊 Orçamento Final"
@@ -671,13 +682,20 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             with st.container(border=True):
                 st.markdown("### 🧙‍♂️ Assistente de Configuração de Quadro")
                 
-                arquitetura_opt = st.radio("1. Selecione a Arquitetura do Hardware do Quadro:", ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "S7-1500 (Siemens)", "MCP Parametrizável (Mercato)"], horizontal=True)
-                tipo_q = st.radio("2. Selecione o Tipo do Quadro:", ["Controle (HVAC/Máquinas)", "CAG (Central de Água Gelada)"], horizontal=True)
-                sup_opt = st.radio("3. Este quadro fará parte de um Sistema de Supervisório?", ["Não", "Sim"], horizontal=True)
+                arquitetura_opt = st.radio("1. Selecione a Arquitetura do Hardware do Quadro:", ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "S7-1500 (Siemens)", "MCP Parametrizável (Mercato - Linha mais econômica)"], horizontal=True)
+                is_mercato_arch = "Mercato" in arquitetura_opt
                 
-                soft_sel = "Sem Supervisório"
-                if sup_opt == "Sim":
-                    soft_sel = st.selectbox("Selecione o Software de Supervisão:", ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21", "Sistema de monitoramento Schneider EBO"])
+                tipo_q = st.radio("2. Selecione o Tipo do Quadro:", ["Controle (HVAC/Máquinas)", "CAG (Central de Água Gelada)"], horizontal=True)
+                
+                if is_mercato_arch:
+                    sup_opt = "Não"
+                    soft_sel = "Sem Supervisório"
+                    st.info("ℹ️ A arquitetura Parametrizável Mercato não contempla sistema de integração em rede / supervisório nativo nesta configuração padrão.")
+                else:
+                    sup_opt = st.radio("3. Este quadro fará parte de um Sistema de Supervisório?", ["Não", "Sim"], horizontal=True)
+                    soft_sel = "Sem Supervisório"
+                    if sup_opt == "Sim":
+                        soft_sel = st.selectbox("Selecione o Software de Supervisão:", ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21", "Sistema de monitoramento Schneider EBO"])
                 
                 tag_q = st.text_input("4. Insira a TAG / Identificação do Quadro (Ex: QTA-01, QD-CAG):")
                 config_opt = st.radio("5. Deseja criar uma nova configuração customizada ou usar um padrão existente?", ["Usar Padrão Existente (Kits)", "Criar Nova Configuração Customizada (Em Branco)"], horizontal=True)
@@ -707,7 +725,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         st.session_state.paineis_auto.append({
                             "id": len(st.session_state.paineis_auto),
                             "nome": tag_q, "tipo": tipo_q, "supervisorio": soft_sel, "arquitetura": arquitetura_opt,
-                            "modo_config": config_opt, "ihm": "IHM Padrão 7\"", "grupos_equipamentos": grupos_equip
+                            "modo_config": config_opt, "ihm": "IHM Básica 4.3\"", "grupos_equipamentos": grupos_equip
                         })
                         st.session_state.wizard_ativo = False
                         st.rerun()
@@ -719,16 +737,20 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         st.write("")
 
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
-            is_mercato_quadro = (p_data.get('arquitetura') == 'MCP Parametrizável (Mercato)')
+            is_mercato_quadro = ('Mercato' in p_data.get('arquitetura', ''))
             
             with st.container(border=True):
                 c_icone, c_nome_painel, c_ihm_painel = st.columns([0.5, 4, 2])
                 c_icone.markdown("## 🎛️")
                 p_data['nome'] = c_nome_painel.text_input("Identificação do Quadro", value=p_data['nome'], key=f"n_p_{p_idx}", label_visibility="collapsed")
                 
-                opcoes_ihm = list(PRECOS_IHM.keys())
+                if is_mercato_quadro:
+                    opcoes_ihm = ["IHM Básica 4.3\"", "Sem Interface (Cego)"]
+                else:
+                    opcoes_ihm = list(PRECOS_IHM.keys())
+                    
                 ihm_salva = p_data.get('ihm', opcoes_ihm[0])
-                idx_ihm = opcoes_ihm.index(ihm_salva) if ihm_salva in opcoes_ihm else 2 
+                idx_ihm = opcoes_ihm.index(ihm_salva) if ihm_salva in opcoes_ihm else 0 
                 p_data['ihm'] = c_ihm_painel.selectbox("Interface", opcoes_ihm, index=idx_ihm, key=f"i_p_{p_idx}", label_visibility="collapsed")
                 
                 st.caption(f"**Arquitetura:** {p_data.get('arquitetura', 'SpaceLogic (Schneider)')} | **Supervisão:** {p_data.get('supervisorio', 'Sem Supervisório')}")
@@ -777,10 +799,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 
                             if is_mercato_quadro:
                                 ui_nec = total_ai_g_single + total_di_g_single
-                                if ui_nec > 8 or total_ao_g_single > 4 or total_do_g_single > 6:
-                                    st.error(f"⚠️ CAPACIDADE EXCEDIDA: O sistema exige {ui_nec} Entradas Universais, {total_ao_g_single} AO e {total_do_g_single} DO. Um controlador MCP Mercato suporta no máximo 8 UI, 4 AO e 6 DO. Configuração não recomendada, divida o sistema ou use Schneider/Siemens.")
+                                modelo_mcp = dimensionar_mercato(ui_nec, total_ao_g_single, total_do_g_single)
+                                if not modelo_mcp:
+                                    st.error(f"⚠️ CAPACIDADE EXCEDIDA: O sistema exige {ui_nec} Entradas Universais (UI), {total_ao_g_single} AO e {total_do_g_single} DO. Isso ultrapassa a capacidade máxima do maior controlador da linha MCP Mercato. Configuração não recomendada, divida o sistema ou use arquiteturas modulares (Schneider/Siemens).")
                                 else:
-                                    st.success(f"✅ OK! Este sistema cabe em 1 controlador MCP Mercato ({ui_nec}/8 UI, {total_ao_g_single}/4 AO, {total_do_g_single}/6 DO).")
+                                    st.success(f"✅ OK! Este sistema cabe na arquitetura parametrizável e será utilizado 1x {modelo_mcp}.")
 
                         with st.expander("⚙️ Ajuste Fino de Instrumentos (Engenharia)"):
                             for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
@@ -957,7 +980,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             is_siemens_1200 = (arquitetura_atual == 'S7-1200 (Siemens)')
             is_siemens_1500 = (arquitetura_atual == 'S7-1500 (Siemens)')
             is_siemens = is_siemens_1200 or is_siemens_1500
-            is_mercato = (arquitetura_atual == 'MCP Parametrizável (Mercato)')
+            is_mercato = ('Mercato' in arquitetura_atual)
             
             total_ai_painel = total_ao_painel = total_di_painel = total_do_painel = 0
             qtd_equipamentos_painel = 0
@@ -969,6 +992,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 lista_tags = [t for t in g.get('tags_lista', []) if t.strip() != ""]
                 str_tags = f" (TAGs: {', '.join(lista_tags)})" if len(lista_tags) > 0 else ""
                 nome_equip = f"{g['nome_grupo']}{str_tags}"
+                
+                # Para checar se excedeu individualmente o controlador no resumo:
+                total_ai_g_single = total_ao_g_single = total_di_g_single = total_do_g_single = 0
                 
                 for inst, qtd in g['instrumentos'].items():
                     if qtd > 0:
@@ -992,6 +1018,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         total_di_painel += qtd_final * io_vals["DI"]
                         total_do_painel += qtd_final * io_vals["DO"]
                         
+                        total_ai_g_single += qtd * io_vals["AI"]
+                        total_ao_g_single += qtd * io_vals["AO"]
+                        total_di_g_single += qtd * io_vals["DI"]
+                        total_do_g_single += qtd * io_vals["DO"]
+                        
                         custo_tot_inst = qtd_final * preco_item
                         linhas_inst_campo.append({"Categoria": "Instrumentação de Campo", "Item": f"{item_nome_real} ({nome_equip} - {p['nome']})", "Preço Unit.": preco_item, "Qtd": qtd_final, "Custo Total": custo_tot_inst})
                         linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": nome_equip, "Instrumento": item_nome_real, "Quantidade Total": qtd_final, "Entrada Digital (DI)": qtd_final * io_vals["DI"], "Saída Digital (DO)": qtd_final * io_vals["DO"], "Entrada Analógica (AI)": qtd_final * io_vals["AI"], "Saída Analógica (AO)": qtd_final * io_vals["AO"]})
@@ -999,6 +1030,17 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         if is_siemens: custo_base_siemens += custo_tot_inst
                         elif is_mercato: custo_base_mercato += custo_tot_inst
                         else: custo_base_schneider += custo_tot_inst
+                
+                # Se for mercado, acha o controlador para este grupo
+                if is_mercato:
+                    ui_nec = total_ai_g_single + total_di_g_single
+                    modelo_mcp = dimensionar_mercato(ui_nec, total_ao_g_single, total_do_g_single)
+                    if modelo_mcp:
+                        p_hw = st.session_state.precos_banco.get(modelo_mcp, 1650.0)
+                        linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"{modelo_mcp} ({g['nome_grupo']} - {p['nome']})", "Preço Unit.": p_hw, "Qtd": mult, "Custo Total": mult * p_hw})
+                        custo_base_mercato += (mult * p_hw)
+                    else:
+                        linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"⚠️ ALERTA: Capacidade MCP Excedida ({g['nome_grupo']} - {p['nome']})", "Preço Unit.": 0.0, "Qtd": mult, "Custo Total": 0.0})
 
             tot_io_painel = total_ai_painel + total_ao_painel + total_di_painel + total_do_painel
             
@@ -1020,12 +1062,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     nome_caixa, preco_caixa = calcular_painel_fisico(qtd_equipamentos_painel)
                     linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Estrutura Física: {nome_caixa} ({p['nome']})", "Preço Unit.": preco_caixa, "Qtd": 1, "Custo Total": preco_caixa})
                     custo_base_mercato += preco_caixa
-                    
-                    for g in p['grupos_equipamentos']:
-                        mult_hw = g.get('multiplicador', 1)
-                        p_hw = st.session_state.precos_banco.get("Mercato - Controlador MCP", 1650.0)
-                        linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Controlador Parametrizável MCP ({g['nome_grupo']} - {p['nome']})", "Preço Unit.": p_hw, "Qtd": mult_hw, "Custo Total": mult_hw * p_hw})
-                        custo_base_mercato += (mult_hw * p_hw)
                         
                 else:
                     nome_caixa, preco_caixa = calcular_painel_fisico(tot_io_painel/15)
