@@ -461,9 +461,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     }
 
     # ==========================================
-    # DICIONÁRIOS ESTÁTICOS DE PREÇOS (SEPARADOS)
+    # DICIONÁRIOS ESTÁTICOS DE PREÇOS (SEPARADOS DE VERDADE)
     # ==========================================
-    # 1. Base Schneider e Itens Comuns
+    # 1. Base Schneider e Itens Comuns (NÃO entra IHM aqui)
     banco_schneider_comum = {
         "Transmissor de pressão Dif. Para ar (Vazão de ar) (PDIT)": 1490.00,
         "Transmissor de temperatura e umidade para duto (TT/MT)": 2050.00,
@@ -529,7 +529,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Siemens - Serviço Custo DI/DO": 180.00
     }
 
-    # 3. Base Mercato
+    # 3. Base Mercato (IHM EXCLUSIVA AQUI)
     banco_mercato = {
         "Mercato - Controlador MCP-4 (2AO, 3DO, 4UI)": 950.00,
         "Mercato - Controlador MCP-8 (4AO, 5DO, 8UI, 2DI)": 1400.00,
@@ -541,7 +541,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Mercato - IHM Básica 4.3\"": 1700.00
     }
 
-    # Junta tudo num banco consolidado pro processamento
+    # Junta tudo num banco consolidado pro processamento geral do app
     banco_padrao_precos = {**banco_schneider_comum, **banco_siemens, **banco_mercato}
 
     if 'precos_banco' not in st.session_state:
@@ -556,7 +556,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             except: pass
         except: pass
 
-    # Trava de segurança para novos itens inseridos no código
     for k_n, v_n in banco_padrao_precos.items():
         if k_n not in st.session_state.precos_banco: st.session_state.precos_banco[k_n] = v_n
 
@@ -687,6 +686,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 
                 arquitetura_opt = st.radio("1. Selecione a Arquitetura do Hardware do Quadro:", ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "S7-1500 (Siemens)", "MCP Parametrizável (Mercato - Linha mais econômica)"], horizontal=True)
                 is_mercato_arch = "Mercato" in arquitetura_opt
+                is_siemens_arch = "Siemens" in arquitetura_opt
                 
                 tipo_q = st.radio("2. Selecione o Tipo do Quadro:", ["Controle (HVAC/Máquinas)", "CAG (Central de Água Gelada)"], horizontal=True)
                 
@@ -698,7 +698,13 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     sup_opt = st.radio("3. Este quadro fará parte de um Sistema de Supervisório?", ["Não", "Sim"], horizontal=True)
                     soft_sel = "Sem Supervisório"
                     if sup_opt == "Sim":
-                        soft_sel = st.selectbox("Selecione o Software de Supervisão:", ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21", "Sistema de monitoramento Schneider EBO"])
+                        # Lógica dinâmica do Software baseado na Arquitetura!
+                        if is_siemens_arch:
+                            opcoes_soft = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21"]
+                        else:
+                            opcoes_soft = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21", "Sistema de monitoramento Schneider EBO"]
+                            
+                        soft_sel = st.selectbox("Selecione o Software de Supervisão:", opcoes_soft)
                 
                 tag_q = st.text_input("4. Insira a TAG / Identificação do Quadro (Ex: QTA-01, QD-CAG):")
                 config_opt = st.radio("5. Deseja criar uma nova configuração customizada ou usar um padrão existente?", ["Usar Padrão Existente (Kits)", "Criar Nova Configuração Customizada (Em Branco)"], horizontal=True)
@@ -725,7 +731,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         else:
                             grupos_equip.append({"nome_grupo": "Equipamento Customizado", "multiplicador": 1, "instrumentos": novos_instrumentos, "tags_lista": [""]})
                             
-                        # IHM Default lógica: Mercato pode ter IHM. Schneider/Siemens NÃO pelo assistente (ficam cegas padrão)
                         ihm_default = "Sem Interface (Cego)"
                         if is_mercato_arch:
                             ihm_default = "Mercato - IHM Básica 4.3\""
@@ -752,7 +757,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 c_icone.markdown("## 🎛️")
                 p_data['nome'] = c_nome_painel.text_input("Identificação do Quadro", value=p_data['nome'], key=f"n_p_{p_idx}", label_visibility="collapsed")
                 
-                # Regra de Exclusividade da IHM na tela do Painel
+                # Exclusividade da IHM - Só na arquitetura Mercato
                 if is_mercato_quadro:
                     opcoes_ihm = ["Mercato - IHM Básica 4.3\"", "Sem Interface (Cego)"]
                     ihm_salva = p_data.get('ihm', "Sem Interface (Cego)")
@@ -904,7 +909,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             except Exception as e: st.write("A aba 'Historico_Orcamentos' está vazia.")
 
     with aba_infra:
-        st.header("Cálculo de Infraestrutura Lançamento Manual")
+        st.header("Cálculo de Infraestrutura")
         st.write("Insira lançamentos avulsos de infraestrutura caso não estejam contemplados nos quadros:")
         with st.form("form_infra_manual"):
             col_i1, col_i2, col_i3 = st.columns([2,1,1])
@@ -1092,7 +1097,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Controlador MP-C-15A ({p['nome']})", "Preço Unit.": st.session_state.precos_banco.get("MP-C-15A", 4649.0), "Qtd": c15, "Custo Total": c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0)})
                             custo_base_schneider += (c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0))
                 
-                # IHM se aplica a Mercato e cego para os outros via painel de visualizacao. Se tiver valor > 0.
                 if p.get('ihm') and "Cego" not in p['ihm']:
                     preco_ihm = st.session_state.precos_banco.get(p['ihm'], 0.0)
                     if preco_ihm > 0: 
