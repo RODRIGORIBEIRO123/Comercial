@@ -700,7 +700,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     else: opcoes_kits_filtrados = [k for k in KITS_PADRAO.keys() if "CAG" not in k]
                     kit_final_selecionado = st.selectbox("Selecione o Modelo Padrão SIARCON:", ["Selecione..."] + opcoes_kits_filtrados)
                 
-                # --- NOVA PERGUNTA DE RESERVA (20%) ---
                 sobra_opt = st.radio("7. Deseja considerar 20% de sobra nas I/O (Reserva Técnica)?", ["Não", "Sim"], horizontal=True)
                 
                 c_conf, c_canc = st.columns(2)
@@ -761,7 +760,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
                     total_ai_g_single = total_ao_g_single = total_di_g_single = total_do_g_single = 0
                     
-                    open_p_hvac = True if "HVAC" in g_data['nome_grupo'].upper() else False
+                    open_p_hvac = False # Mantém os equipamentos fechados visualmente por padrão
                     with st.expander(f"📦 {g_data['nome_grupo']}", expanded=open_p_hvac):
                         qtd_key = f"m_g_{p_idx}_{g_idx}"
                         qtd_atual = st.session_state.get(qtd_key, g_data.get('multiplicador', 1))
@@ -789,7 +788,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 
                             if is_mercato_quadro:
                                 ui_nec = total_ai_g_single + total_di_g_single
-                                # Adicionando a sobra para checagem visual individual se aplicável
                                 ui_check = math.ceil(ui_nec * 1.2) if tem_sobra_20 else ui_nec
                                 ao_check = math.ceil(total_ao_g_single * 1.2) if tem_sobra_20 else total_ao_g_single
                                 do_check = math.ceil(total_do_g_single * 1.2) if tem_sobra_20 else total_do_g_single
@@ -802,7 +800,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
                         with st.expander("⚙️ Ajuste Fino de Instrumentos (Engenharia)"):
                             for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
-                                open_p_eng = True if "HVAC" in grupo_nome.upper() else False
+                                open_p_eng = False
                                 with st.expander(grupo_nome, expanded=open_p_eng):
                                     cols_inst = st.columns(2)
                                     for i, inst in enumerate(lista_itens):
@@ -820,7 +818,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         raw_di_painel += q * io_vals["DI"] * qtd_atual
                         raw_do_painel += q * io_vals["DO"] * qtd_atual
 
-                # --- LÓGICA DA SOBRA DE 20% ---
                 reserva_ai = math.ceil(raw_ai_painel * 0.2) if tem_sobra_20 else 0
                 reserva_ao = math.ceil(raw_ao_painel * 0.2) if tem_sobra_20 else 0
                 reserva_di = math.ceil(raw_di_painel * 0.2) if tem_sobra_20 else 0
@@ -880,14 +877,24 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         usuario_registro = linha[7] if len(linha) > 7 else "rodrigo.ribeiro"
                         if usuario_registro.strip().lower() != st.session_state.usuario_logado.strip().lower(): continue
                         with st.container():
-                            c1, c2, c3, c4 = st.columns([1.5, 3, 1.5, 1])
+                            c1, c2, c3, c4, c5 = st.columns([1.5, 3, 1.5, 1, 1])
                             c1.write(f"📅 {linha[0]}")
                             c2.write(f"**{linha[1]}** `({linha[2] if len(linha)>=7 else 'R-00'})`")
                             c3.write(linha[5] if len(linha)>=7 else linha[4])
                             if c4.button("📂 Carregar", key=f"btn_abrir_{idx_real}"):
                                 st.session_state.projeto_para_abrir = idx_real
                                 st.session_state.dados_projeto_abrir = {'nome': linha[1], 'json': linha[6] if len(linha)>=7 else linha[5]}
+                            if c5.button("🗑️ Excluir", key=f"btn_del_hist_{idx_real}", type="secondary"):
+                                try:
+                                    ws_hist_orc = sh.worksheet("Historico_Orcamentos")
+                                    ws_hist_orc.delete_rows(idx_real + 2)
+                                    st.cache_data.clear()
+                                    st.toast("🗑️ Orçamento excluído do histórico com sucesso!", icon="✅")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Erro ao excluir: {e}")
                             st.markdown("---")
+                            
                     if st.session_state.get('projeto_para_abrir') is not None:
                         d_a = st.session_state.get('dados_projeto_abrir', {})
                         st.warning(f"⚠️ Carregar os dados de '{d_a['nome']}' irá substituir as configurações atuais.")
@@ -978,7 +985,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         
         softwares_incluidos = {}
         
-        # Estas variáveis controlam os serviços lógicos que são baseados SOMENTE nos pontos brutos (usados)
         total_ai_schneider = total_ao_schneider = total_di_schneider = total_do_schneider = 0
         total_ai_siemens = total_ao_siemens = total_di_siemens = total_do_siemens = 0
         total_io_mercato = 0
@@ -986,6 +992,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         custo_base_schneider = 0.0
         custo_base_siemens = 0.0
         custo_base_mercato = 0.0
+
+        # VARIÁVEL PARA O DESCRITIVO
+        descritivo_linhas = ["DESCRIÇÃO SIMPLIFICADA DO ESCOPO CONTEMPLADO:"]
 
         for p in st.session_state.paineis_auto:
             arquitetura_atual = p.get('arquitetura', 'SpaceLogic (Schneider)')
@@ -998,9 +1007,18 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
             qtd_equipamentos_painel = 0
             
+            # Variáveis para o descritivo
+            lista_equip_nomes = []
+            tem_resistencia = False
+            lista_instrumentos_nomes = set()
+            controladores_desc_lista = []
+            
             for g in p['grupos_equipamentos']:
                 mult = g.get('multiplicador', 1)
                 qtd_equipamentos_painel += mult
+                
+                lista_equip_nomes.append(f"{mult}x {g['nome_grupo']}")
+                
                 lista_tags = [t for t in g.get('tags_lista', []) if t.strip() != ""]
                 str_tags = f" (TAGs: {', '.join(lista_tags)})" if len(lista_tags) > 0 else ""
                 nome_equip = f"{g['nome_grupo']}{str_tags}"
@@ -1016,6 +1034,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             elif "Transmissor de temperatura Ambiente (TT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC (Ambiente)"
                             elif "Transmissor de temperatura ambiente com display (TIT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC com Display (Ambiente)"
                         
+                        # Add a set for description
+                        nome_curto_inst = item_nome_real.split(' (')[0].replace("Mercato - ", "").replace("Siemens - ", "")
+                        lista_instrumentos_nomes.add(nome_curto_inst)
+                        if "resistência" in inst.lower() or "raq" in inst.lower():
+                            tem_resistencia = True
+
                         preco_item = st.session_state.precos_banco.get(item_nome_real, st.session_state.precos_banco.get(inst, 0.0))
                         io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
                         
@@ -1041,20 +1065,19 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     reserva_g_ui = math.ceil((raw_ai_g_single + raw_di_g_single) * 0.2) if tem_sobra_20 else 0
                     reserva_g_ao = math.ceil(raw_ao_g_single * 0.2) if tem_sobra_20 else 0
                     reserva_g_do = math.ceil(raw_do_g_single * 0.2) if tem_sobra_20 else 0
-                    
                     ui_nec = raw_ai_g_single + raw_di_g_single + reserva_g_ui
                     ao_nec = raw_ao_g_single + reserva_g_ao
                     do_nec = raw_do_g_single + reserva_g_do
                     
                     modelo_mcp = dimensionar_mercato(ui_nec, ao_nec, do_nec)
                     if modelo_mcp:
+                        controladores_desc_lista.append(f"{mult}x {modelo_mcp}")
                         p_hw = st.session_state.precos_banco.get(modelo_mcp, 1650.0)
                         linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"{modelo_mcp} ({g['nome_grupo']} - {p['nome']})", "Preço Unit.": p_hw, "Qtd": mult, "Custo Total": mult * p_hw})
                         custo_base_mercato += (mult * p_hw)
                     else:
                         linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"⚠️ ALERTA: Capacidade MCP Excedida ({g['nome_grupo']} - {p['nome']})", "Preço Unit.": 0.0, "Qtd": mult, "Custo Total": 0.0})
 
-            # Calcula a sobra de IO no Painel como um todo para Siemens e Schneider
             reserva_ai_painel = math.ceil(raw_ai_painel * 0.2) if tem_sobra_20 else 0
             reserva_ao_painel = math.ceil(raw_ao_painel * 0.2) if tem_sobra_20 else 0
             reserva_di_painel = math.ceil(raw_di_painel * 0.2) if tem_sobra_20 else 0
@@ -1068,13 +1091,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             tot_io_painel_hw = hw_ai_painel + hw_ao_painel + hw_di_painel + hw_do_painel
             
             if reserva_ai_painel > 0 or reserva_ao_painel > 0 or reserva_di_painel > 0 or reserva_do_painel > 0:
-                linhas_pontos.append({
-                    "Painel": p['nome'], "Grupo/Equipamento": "Reserva Técnica (20%)", "Instrumento": "Pontos de Sobra Física", 
-                    "Quantidade Total": "-", "Entrada Digital (DI)": reserva_di_painel, "Saída Digital (DO)": reserva_do_painel, 
-                    "Entrada Analógica (AI)": reserva_ai_painel, "Saída Analógica (AO)": reserva_ao_painel
-                })
+                linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": "Reserva Técnica (20%)", "Instrumento": "Pontos de Sobra Física do Quadro", "Quantidade Total": "-", "Entrada Digital (DI)": reserva_di_painel, "Saída Digital (DO)": reserva_do_painel, "Entrada Analógica (AI)": reserva_ai_painel, "Saída Analógica (AO)": reserva_ao_painel})
 
-            # Os serviços baseiam-se na contagem RAW (sem reserva)
             if is_siemens:
                 total_ai_siemens += raw_ai_painel
                 total_ao_siemens += raw_ao_painel
@@ -1104,6 +1122,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         else: hw_s = dimensionar_siemens_1500(hw_ai_painel, hw_ao_painel, hw_di_painel, hw_do_painel)
                         for i_hw, q_hw in hw_s.items():
                             if q_hw > 0:
+                                controladores_desc_lista.append(f"{q_hw}x {i_hw}")
                                 p_hw = st.session_state.precos_banco.get(i_hw, 0.0)
                                 linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"{i_hw} ({p['nome']})", "Preço Unit.": p_hw, "Qtd": q_hw, "Custo Total": q_hw * p_hw})
                                 custo_base_siemens += (q_hw * p_hw)
@@ -1111,15 +1130,19 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         custo_base_schneider += preco_caixa
                         c36, c24, c18, c15 = dimensionar_controladores(tot_io_painel_hw)
                         if c36 > 0: 
+                            controladores_desc_lista.append(f"{c36}x Controlador MP-C-36A")
                             linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Controlador MP-C-36A ({p['nome']})", "Preço Unit.": st.session_state.precos_banco.get("MP-C-36A", 9459.0), "Qtd": c36, "Custo Total": c36 * st.session_state.precos_banco.get("MP-C-36A", 9459.0)})
                             custo_base_schneider += (c36 * st.session_state.precos_banco.get("MP-C-36A", 9459.0))
                         if c24 > 0: 
+                            controladores_desc_lista.append(f"{c24}x Controlador MP-C-24A")
                             linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Controlador MP-C-24A ({p['nome']})", "Preço Unit.": st.session_state.precos_banco.get("MP-C-24A", 7290.0), "Qtd": c24, "Custo Total": c24 * st.session_state.precos_banco.get("MP-C-24A", 7290.0)})
                             custo_base_schneider += (c24 * st.session_state.precos_banco.get("MP-C-24A", 7290.0))
                         if c18 > 0: 
+                            controladores_desc_lista.append(f"{c18}x Controlador MP-C-18A")
                             linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Controlador MP-C-18A ({p['nome']})", "Preço Unit.": st.session_state.precos_banco.get("MP-C-18A", 5185.0), "Qtd": c18, "Custo Total": c18 * st.session_state.precos_banco.get("MP-C-18A", 5185.0)})
                             custo_base_schneider += (c18 * st.session_state.precos_banco.get("MP-C-18A", 5185.0))
                         if c15 > 0: 
+                            controladores_desc_lista.append(f"{c15}x Controlador MP-C-15A")
                             linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Controlador MP-C-15A ({p['nome']})", "Preço Unit.": st.session_state.precos_banco.get("MP-C-15A", 4649.0), "Qtd": c15, "Custo Total": c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0)})
                             custo_base_schneider += (c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0))
                 
@@ -1134,7 +1157,23 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 s_type = p.get('supervisorio', "Sem Supervisório")
                 if s_type != "Sem Supervisório":
                     if s_type not in softwares_incluidos: softwares_incluidos[s_type] = 0
-                    softwares_incluidos[s_type] += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel) # Licença é baseada nos pontos RAW em uso!
+                    softwares_incluidos[s_type] += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel)
+
+            # --- Constrói o texto do painel para o resumo no Excel ---
+            ihm_desc = f"com {p['ihm'].replace('Mercato - ', '')}" if "Cego" not in p['ihm'] else "sem IHM local"
+            sup_desc = f"e com Sistema de Supervisão ({p['supervisorio']})" if p['supervisorio'] != "Sem Supervisório" else "e sem supervisório integrado"
+            res_desc = "com resistências de aquecimento integradas" if tem_resistencia else "sem resistências"
+            sobra_desc = "incluindo +20% de reserva técnica de I/O" if tem_sobra_20 else "sem sobra de I/O"
+            eq_desc = ", ".join(lista_equip_nomes)
+            inst_desc = ", ".join(list(lista_instrumentos_nomes))
+            ctrl_desc = ", ".join(controladores_desc_lista) if controladores_desc_lista else "Controlador a definir"
+            
+            texto_p = (f"• Fornecimento de 01x Quadro de Automação/Comando [TAG: {p['nome']}], baseado na tecnologia {arquitetura_atual} ({ctrl_desc}), "
+                       f"{ihm_desc} {sup_desc}. Dimensionado para atender as seguintes máquinas/sistemas: {eq_desc}, {res_desc}, {sobra_desc}. "
+                       f"Instrumentação contemplada: {inst_desc}.")
+            descritivo_linhas.append(texto_p)
+
+        texto_descritivo_final = "\n\n".join(descritivo_linhas)
 
         for s_name, pts_total in softwares_incluidos.items():
             b_k, p_k = "", ""
@@ -1226,16 +1265,27 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             ws1 = wb.active
             ws1.title = "Detalhamento Financeiro"
             ws1.views.sheetView[0].showGridLines = True
-            start_row = 1
+            
+            # Formatação do Cabeçalho de Auditoria do Excel
+            ws1.row_dimensions[1].height = 20
+            ws1.row_dimensions[2].height = 20
+            ws1.row_dimensions[3].height = 20
+            
+            nome_projeto_header = st.session_state.nome_projeto_orcamento if st.session_state.nome_projeto_orcamento else "PROJETO NÃO NOMEADO"
+            ws1.merge_cells("E1:G1"); ws1.cell(row=1, column=5, value=f"PROJETO: {nome_projeto_header.upper()}").font = Font(name="Arial", size=11, bold=True, color="1C8590")
+            ws1.merge_cells("E2:G2"); ws1.cell(row=2, column=5, value=f"DATA/HORA EMISSÃO: {datetime.now(fuso_br).strftime('%d/%m/%Y %H:%M:%S')}").font = Font(name="Arial", size=10, color="555555")
+            ws1.merge_cells("E3:G3"); ws1.cell(row=3, column=5, value=f"RESPONSÁVEL: {st.session_state.nome_exibicao.upper()}").font = Font(name="Arial", size=10, color="555555")
+            
+            start_row = 5
             if ARQUIVO_LOGO:
                 try:
                     from openpyxl.drawing.image import Image as OpenpyxlImage
                     img = OpenpyxlImage(ARQUIVO_LOGO)
-                    img.width = 150
-                    img.height = 42
-                    ws1.add_image(img, "A1")
-                    start_row = 4
+                    img.width = 170
+                    img.height = 45
+                    ws1.add_image(img, "B1")
                 except: pass
+                
             fill_header = PatternFill(start_color="1C8590", end_color="1C8590", fill_type="solid")
             font_header = Font(name="Arial", size=11, bold=True, color="FFFFFF")
             border_thin = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
@@ -1255,8 +1305,20 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 except: pass
                             cell.alignment = Alignment(horizontal="right")
                         elif c_idx == 4: cell.alignment = Alignment(horizontal="center")
+            
+            # Adiciona o Descritivo Abaixo da Tabela
+            end_row_table = start_row + len(df_exportacao) + 2
+            ws1.merge_cells(start_row=end_row_table, start_column=1, end_row=end_row_table+6, end_column=5)
+            cell_desc = ws1.cell(row=end_row_table, column=1, value=texto_descritivo_final)
+            cell_desc.font = Font(name="Arial", size=10, italic=True, color="333333")
+            cell_desc.alignment = Alignment(vertical="top", wrap_text=True)
+            cell_desc.fill = PatternFill(start_color="F2F4F4", end_color="F2F4F4", fill_type="solid")
+            for r in range(end_row_table, end_row_table+7):
+                for c in range(1, 6):
+                    ws1.cell(row=r, column=c).border = border_thin
+            
             for col in ws1.columns:
-                max_len = max(len(str(cell.value or '')) for cell in col)
+                max_len = max(len(str(cell.value or '')) for cell in col if cell.row <= start_row + len(df_exportacao))
                 ws1.column_dimensions[get_column_letter(col[0].column)].width = max(max_len + 4, 12)
 
             if not df_pontos.empty:
