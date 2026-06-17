@@ -5,11 +5,11 @@ import io
 import json
 import math
 import re
+import uuid
 from datetime import date, datetime, timezone, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import os
-import google.generativeai as genai
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
@@ -59,6 +59,7 @@ if 'projeto_para_abrir' not in st.session_state: st.session_state.projeto_para_a
 if 'dados_projeto_abrir' not in st.session_state: st.session_state.dados_projeto_abrir = {}
 if 'wizard_ativo' not in st.session_state: st.session_state.wizard_ativo = False
 if 'paineis_auto' not in st.session_state: st.session_state.paineis_auto = []
+if 'confirmar_limpar' not in st.session_state: st.session_state.confirmar_limpar = False
 
 # ==========================================
 # TELA DE LOGIN
@@ -105,7 +106,7 @@ if st.session_state.usuario_logado is None:
             if submit_login:
                 usuarios_validos = {
                     "giovanna.ribeiro": "1234", "aline.ferraz": "1234", "janaina.dias": "1234",
-                    "victor.hugo": "1234", "rodrigo.ribeiro": "1234", "engenharia": "1234",
+                    "victor.hugo": "1234", "rodrigo.ribeiro": "1234", "rodrigo": "1234", "engenharia": "1234",
                     "suprimentos": "1234", "obras": "1234"
                 }
                 user_limpo = c_user.lower().strip()
@@ -464,7 +465,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Transmissor de temperatura Ambiente (TT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de temperatura ambiente com display (TIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de temperatura e umidade ambiente (TT/MT)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura e umidade ambiente com display (TT/MT)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0}
+        "Transmissor de temperatura e umidade ambiente com display (TIT/MIT)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de CO2 ambiente (AT/AIT)": {"AI": 1, "AO": 1, "DI": 0, "DO": 1},
+        "Transmissor de temperatura de imersão (TT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de temperatura de imersão com display (TIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0}
     }
 
     banco_schneider_comum = {
@@ -503,7 +507,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Transmissor de temperatura Ambiente (TT)": 2050.00,
         "Transmissor de temperatura ambiente com display (TIT)": 2650.00,
         "Transmissor de temperatura e umidade ambiente (TT/MT)": 2050.00,
-        "Transmissor de temperatura e umidade ambiente com display (TT/MT)": 2650.00,
+        "Transmissor de temperatura e umidade ambiente com display (TIT/MIT)": 2650.00,
+        "Transmissor de CO2 ambiente (AT/AIT)": 0.00,
+        "Transmissor de temperatura de imersão (TT)": 0.00,
+        "Transmissor de temperatura de imersão com display (TIT)": 0.00,
         "Custo AI/AO": 565.00, "Custo DI/DO": 120.00,
         "Licença Supervisório - SEM CFR-21 (Base)": 23000.00, "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)": 100.00,
         "Licença Supervisório - COM CFR-21 (Base)": 23000.00, "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
@@ -536,10 +543,23 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Mercato - Serviço Parametrização por Ponto": 80.00,
         "Mercato - IHM Básica 4.3\"": 1700.00
     }
+    
+    banco_cfr_servicos = {
+        "CFR21 Qualificável - Até 100 pts": 70.00,
+        "CFR21 Qualificável - 101 a 250 pts": 50.00,
+        "CFR21 Qualificável - Acima de 250 pts": 30.00,
+        "CFR21 Qualificado - Até 30 pts": 400.00,
+        "CFR21 Qualificado - 31 a 60 pts": 350.00,
+        "CFR21 Qualificado - 61 a 99 pts": 320.00,
+        "CFR21 Qualificado - 100 a 150 pts": 290.00,
+        "CFR21 Qualificado - 151 a 200 pts": 250.00,
+        "CFR21 Qualificado - 201 a 250 pts": 220.00,
+        "CFR21 Qualificado - Acima de 250 pts": 200.00
+    }
 
     banco_ihm = { "IHM Padrão 7\"": 3400.00, "IHM Premium 10\"": 8500.00, "Sem Interface (Cego)": 0.00 }
 
-    banco_padrao_precos = {**banco_schneider_comum, **banco_siemens, **banco_mercato, **banco_ihm}
+    banco_padrao_precos = {**banco_schneider_comum, **banco_siemens, **banco_mercato, **banco_ihm, **banco_cfr_servicos}
 
     if 'precos_banco' not in st.session_state:
         st.session_state.precos_banco = banco_padrao_precos.copy()
@@ -569,17 +589,19 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             "Válvula motorizada Bypass Proporcional (até 2.1/2\") (TCV)", "Válvula motorizada Bypass Proporcional (3\" ou 4\") (TCV)",
             "Válvula motorizada Bypass Proporcional (5\") (TCV)", "Válvula motorizada Bypass Proporcional (6\") (TCV)",
             "Válvula motorizada Bypass Proporcional (8\") (TCV)", "Transmissor de pressão para água (PIT)",
-            "Transmissor de vazão para água (FIT)", "Válvula bloqueio motorizada (XV)", "Chave de fluxo (FS)", "Bombas (I/O para controlador)", "Tanques (I/O para controlador)"
+            "Transmissor de vazão para água (FIT)", "Transmissor de temperatura de imersão (TT)", "Transmissor de temperatura de imersão com display (TIT)",
+            "Válvula bloqueio motorizada (XV)", "Chave de fluxo (FS)", "Bombas (I/O para controlador)", "Tanques (I/O para controlador)"
         ],
         "🔸 Monitoramento (Filtros e Status)": [
             "Pressostato para monitorar os filtros G4 (PSH)", "Pressostato para monitorar os filtros F9 (PSH)", "Pressostato para monitorar os filtros H13/H14 (PSH)",
             "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", "Transmissor de pressão diferencial (monitorar os filtros G4) (PDIT)",
             "Transmissor de pressão diferencial (monitorar os filtros F9) (PDIT)", "Transmissor de pressão diferencial (monitorar os filtros H13) (PDIT)"
         ],
-        "🟢 Monitoramento de Ambiente (Salas)": [
+        "🟢 Monitoramento e Controle de Ambientes": [
             "Transmissor de pressão diferencial entre salas (PDT)", "Transmissor de pressão diferencial entre salas com display (PDIT)",
             "Transmissor de temperatura Ambiente (TT)", "Transmissor de temperatura ambiente com display (TIT)",
-            "Transmissor de temperatura e umidade ambiente (TT/MT)", "Transmissor de temperatura e umidade ambiente com display (TT/MT)"
+            "Transmissor de temperatura e umidade ambiente (TT/MT)", "Transmissor de temperatura e umidade ambiente com display (TIT/MIT)",
+            "Transmissor de CO2 ambiente (AT/AIT)", "Resistência de aquecimento (Duto) (RAQ)"
         ]
     }
     
@@ -684,6 +706,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 
                 tipo_q = st.radio("3. Selecione o Tipo do Quadro:", ["Controle (HVAC/Máquinas)", "CAG (Central de Água Gelada)"], horizontal=True)
                 
+                tipo_cfr_wizard = "Não Aplicável"
                 if is_mercato_arch:
                     sup_opt = "Não"
                     soft_sel = "Sem Supervisório"
@@ -695,6 +718,13 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         if is_siemens_arch: opcoes_soft = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21"]
                         else: opcoes_soft = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21", "Sistema de monitoramento Schneider EBO"]
                         soft_sel = st.selectbox("Selecione o Software de Supervisão:", opcoes_soft)
+                        
+                        if "COM certificação" in soft_sel:
+                            tipo_cfr_wizard = st.radio(
+                                "Selecione a Modalidade do CFR-21 Part 11:",
+                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"],
+                                help="**Qualificável:** Onde a SIARCON após receber todos os requisitos de usuário, irá fornecer o sistema de automação com todos os pré requisitos para que o cliente possa realizar a qualificação.\n\n**Qualificado:** A SIARCON entregará todos os protocolos e testes que qualifiquem o sistema supervisório."
+                            )
                 
                 tag_q = st.text_input("5. Insira a TAG / Identificação do Quadro (Ex: QTA-01, QD-CAG):")
                 config_opt = st.radio("6. Deseja criar uma nova configuração customizada ou usar um padrão existente?", ["Usar Padrão Existente (Kits)", "Criar Nova Configuração Customizada (Em Branco)"], horizontal=True)
@@ -723,11 +753,15 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         else:
                             grupos_equip.append({"nome_grupo": "Equipamento Novo", "multiplicador": 1, "instrumentos": novos_instrumentos, "tags_lista": [""]})
 
-                        st.session_state.paineis_auto.append({
-                            "id": len(st.session_state.paineis_auto),
+                        novo_quadro = {
+                            "id": str(uuid.uuid4()),
                             "nome": tag_q, "tipo": tipo_q, "supervisorio": soft_sel, "arquitetura": arquitetura_opt,
+                            "tipo_cfr": tipo_cfr_wizard,
                             "modo_config": config_opt, "ihm": ihm_selecionada, "sobra_20": sobra_opt, "grupos_equipamentos": grupos_equip
-                        })
+                        }
+                        
+                        # Insere invertido (o mais novo fica no topo da tela)
+                        st.session_state.paineis_auto.insert(0, novo_quadro)
                         st.session_state.wizard_ativo = False
                         st.rerun()
                         
@@ -737,29 +771,47 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
         st.write("")
 
+        # Tratamento da exclusão/limpeza total
+        if st.session_state.confirmar_limpar:
+            st.warning("⚠️ Tem certeza que deseja sair e PERDER todo o preenchimento não salvo nesta tela?")
+            c_sim, c_nao = st.columns(2)
+            if c_sim.button("✔️ Sim, Apagar Tudo e Sair"):
+                st.session_state.paineis_auto = []
+                st.session_state.nome_projeto_orcamento = ""
+                st.session_state.confirmar_limpar = False
+                st.rerun()
+            if c_nao.button("❌ Não, Cancelar e Voltar"):
+                st.session_state.confirmar_limpar = False
+                st.rerun()
+
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
             is_mercato_quadro = ('Mercato' in p_data.get('arquitetura', ''))
             is_schneider_quadro = ('Schneider' in p_data.get('arquitetura', ''))
             tem_sobra_20 = (p_data.get('sobra_20', 'Não') == 'Sim')
             
-            with st.container(border=True):
+            # Utilizar st.expander em vez de st.container. O primeiro (p_idx == 0) fica expandido, os antigos ficam recolhidos
+            with st.expander(f"🎛️ Quadro: {p_data['nome']} - {p_data.get('arquitetura', '')}", expanded=(p_idx == 0)):
                 c_icone, c_nome_painel, c_ihm_painel = st.columns([0.5, 4, 2])
                 c_icone.markdown("## 🎛️")
-                p_data['nome'] = c_nome_painel.text_input("Identificação do Quadro", value=p_data['nome'], key=f"n_p_{p_idx}", label_visibility="collapsed")
+                p_data['nome'] = c_nome_painel.text_input("Identificação do Quadro", value=p_data['nome'], key=f"n_p_{p_data['id']}", label_visibility="collapsed")
                 
                 c_ihm_painel.markdown(f"<div style='padding-top:10px; color:#555;'><b>IHM:</b> {p_data.get('ihm', 'Sem Interface (Cego)')}</div>", unsafe_allow_html=True)
-                st.caption(f"**Arquitetura:** {p_data.get('arquitetura', 'SpaceLogic (Schneider)')} | **Supervisão:** {p_data.get('supervisorio', 'Sem Supervisório')} | **Reserva 20%:** {p_data.get('sobra_20', 'Não')}")
+                st.caption(f"**Arquitetura:** {p_data.get('arquitetura', 'SpaceLogic (Schneider)')} | **Supervisão:** {p_data.get('supervisorio', 'Sem Supervisório')} | **CFR-21:** {p_data.get('tipo_cfr', 'Não Aplicável')} | **Reserva 20%:** {p_data.get('sobra_20', 'Não')}")
                 
                 with st.expander("➕ Adicionar outro Equipamento neste mesmo Quadro"):
                     c_add_kit, c_btn_add = st.columns([3, 1])
-                    sub_kit = c_add_kit.selectbox("Escolha o Equipamento:", ["Selecione..."] + list(KITS_PADRAO.keys()), key=f"sub_kit_{p_idx}")
-                    if c_btn_add.button("Adicionar", key=f"btn_sub_add_{p_idx}", use_container_width=True):
+                    sub_kit = c_add_kit.selectbox("Escolha o Equipamento / Kit:", ["Selecione...", "Equipamento Novo (Em Branco)"] + list(KITS_PADRAO.keys()), key=f"sub_kit_{p_data['id']}")
+                    if c_btn_add.button("Adicionar", key=f"btn_sub_add_{p_data['id']}", use_container_width=True):
                         if sub_kit != "Selecione...":
                             novos_inst = {k: 0 for k in REGRA_IO.keys()}
-                            for item_nome, qtd_padrao in KITS_PADRAO[sub_kit].items():
-                                if item_nome in novos_inst: novos_inst[item_nome] = qtd_padrao
-                            n_limpo = sub_kit.split(" ", 1)[1] if " " in sub_kit else sub_kit
-                            p_data['grupos_equipamentos'].append({"nome_grupo": f"{n_limpo}", "multiplicador": 1, "instrumentos": novos_inst, "tags_lista": [""]})
+                            
+                            if sub_kit == "Equipamento Novo (Em Branco)":
+                                p_data['grupos_equipamentos'].append({"nome_grupo": "Equipamento Novo", "multiplicador": 1, "instrumentos": novos_inst, "tags_lista": [""]})
+                            else:
+                                for item_nome, qtd_padrao in KITS_PADRAO[sub_kit].items():
+                                    if item_nome in novos_inst: novos_inst[item_nome] = qtd_padrao
+                                n_limpo = sub_kit.split(" ", 1)[1] if " " in sub_kit else sub_kit
+                                p_data['grupos_equipamentos'].append({"nome_grupo": f"{n_limpo}", "multiplicador": 1, "instrumentos": novos_inst, "tags_lista": [""]})
                             st.rerun()
 
                 raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
@@ -769,7 +821,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     
                     open_p_hvac = False 
                     with st.expander(f"📦 {g_data['nome_grupo']}", expanded=open_p_hvac):
-                        qtd_key = f"m_g_{p_idx}_{g_idx}"
+                        qtd_key = f"m_g_{p_data['id']}_{g_idx}"
                         qtd_atual = st.session_state.get(qtd_key, g_data.get('multiplicador', 1))
                         if 'tags_lista' not in g_data: g_data['tags_lista'] = [""] * qtd_atual
                         elif len(g_data['tags_lista']) != qtd_atual:
@@ -779,8 +831,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         render_qtd = min(qtd_atual, 5) 
                         col_ratios = [3] + [1.5] * render_qtd + [1]
                         cols = st.columns(col_ratios)
-                        g_data['nome_grupo'] = cols[0].text_input("Equipamento", value=g_data['nome_grupo'], key=f"n_g_{p_idx}_{g_idx}")
-                        for i in range(render_qtd): g_data['tags_lista'][i] = cols[i+1].text_input(f"TAG {i+1}", value=g_data['tags_lista'][i], key=f"t_g_{p_idx}_{g_idx}_{i}")
+                        g_data['nome_grupo'] = cols[0].text_input("Equipamento", value=g_data['nome_grupo'], key=f"n_g_{p_data['id']}_{g_idx}")
+                        for i in range(render_qtd): g_data['tags_lista'][i] = cols[i+1].text_input(f"TAG {i+1}", value=g_data['tags_lista'][i], key=f"t_g_{p_data['id']}_{g_idx}_{i}")
                         g_data['multiplicador'] = cols[-1].number_input("Qtd", min_value=1, value=qtd_atual, key=qtd_key)
                         
                         if qtd_atual > 5: st.caption("⚠️ Para mais de 5 equipamentos, as TAGs extras podem ser inseridas como anotações no final do projeto.")
@@ -816,20 +868,22 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                     for i, inst in enumerate(lista_itens):
                                         if inst not in g_data['instrumentos']: g_data['instrumentos'][inst] = 0
                                         with cols_inst[i % 2]:
-                                            g_data['instrumentos'][inst] = st.number_input(inst, min_value=0, step=1, value=g_data['instrumentos'][inst], key=f"inst_{p_idx}_{g_idx}_{inst}")
-                            if st.button("🗑️ Remover Máquina", key=f"del_{p_idx}_{g_idx}"):
-                                p_data['grupos_equipamentos'].pop(g_idx)
-                                st.rerun()
+                                            g_data['instrumentos'][inst] = st.number_input(inst, min_value=0, step=1, value=g_data['instrumentos'][inst], key=f"inst_{p_data['id']}_{g_idx}_{inst}")
+                        if st.button("🗑️ Remover Máquina", key=f"del_{p_data['id']}_{g_idx}"):
+                            p_data['grupos_equipamentos'].pop(g_idx)
+                            st.rerun()
 
+                for g_data in p_data['grupos_equipamentos']:
+                    qtd_atual_calc = g_data.get('multiplicador', 1)
                     for inst, q in g_data['instrumentos'].items():
                         io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
-                        raw_ai_painel += q * io_vals["AI"] * qtd_atual
-                        raw_ao_painel += q * io_vals["AO"] * qtd_atual
-                        raw_di_painel += q * io_vals["DI"] * qtd_atual
-                        raw_do_painel += q * io_vals["DO"] * qtd_atual
+                        raw_ai_painel += q * io_vals["AI"] * qtd_atual_calc
+                        raw_ao_painel += q * io_vals["AO"] * qtd_atual_calc
+                        raw_di_painel += q * io_vals["DI"] * qtd_atual_calc
+                        raw_do_painel += q * io_vals["DO"] * qtd_atual_calc
 
                     # Adiciona as DIs invisíveis de cada máquina no painel global
-                    raw_di_painel += (2 * qtd_atual)
+                    raw_di_painel += (2 * qtd_atual_calc)
 
                 reserva_ai = math.ceil(raw_ai_painel * 0.2) if tem_sobra_20 else 0
                 reserva_ao = math.ceil(raw_ao_painel * 0.2) if tem_sobra_20 else 0
@@ -852,13 +906,16 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 m4.metric("DI / UI", hw_di_painel)
                 m5.metric("DO", hw_do_painel)
                 
-                if st.button("🗑️ Deletar Todo este Quadro", key=f"del_quadro_{p_idx}"):
+                if st.button("🗑️ Deletar Todo este Quadro", key=f"del_quadro_{p_data['id']}"):
                     st.session_state.paineis_auto.pop(p_idx)
                     st.rerun()
         
         if st.session_state.paineis_auto:
             st.markdown("---")
-            if st.button("💾 Salvar Rascunho e Sair (Retomar depois)", type="secondary", use_container_width=True):
+            
+            c_bot_salvar, c_bot_sair = st.columns(2)
+            
+            if c_bot_salvar.button("💾 Salvar Rascunho e Sair (Retomar depois)", type="primary", use_container_width=True):
                 if not st.session_state.nome_projeto_orcamento: st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento / Projeto' no topo da página antes de salvar o rascunho.")
                 else:
                     try:
@@ -878,6 +935,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         st.toast("📝 Rascunho salvo na nuvem com sucesso! Tela limpa.", icon="💾")
                         st.rerun()
                     except Exception as e: st.error(f"Erro ao salvar: {e}")
+
+            if c_bot_sair.button("🗑️ Somente Sair (Limpar Tela)", type="secondary", use_container_width=True):
+                st.session_state.confirmar_limpar = True
+                st.rerun()
 
         st.markdown("---")
         with st.expander(f"📂 Abrir Orçamento Existente (Histórico de {st.session_state.nome_exibicao})"):
@@ -906,7 +967,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Erro ao excluir: {e}")
-                            st.markdown("---")
+                        st.markdown("---")
                             
                     if st.session_state.get('projeto_para_abrir') is not None:
                         d_a = st.session_state.get('dados_projeto_abrir', {})
@@ -914,6 +975,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         c_sim, c_nao = st.columns(2)
                         if c_sim.button("✔️ Sim, substituir tela", use_container_width=True):
                             st.session_state.paineis_auto = json.loads(d_a['json'])
+                            # Previnir quadros antigos sem id:
+                            for p in st.session_state.paineis_auto: 
+                                if 'id' not in p: p['id'] = str(uuid.uuid4())
                             st.session_state.nome_projeto_orcamento = d_a['nome']
                             st.session_state.projeto_para_abrir = None
                             st.rerun()
@@ -939,8 +1003,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         st.header("Gestão da Base de Preços")
         st.write("Altere os valores e salve na nuvem para manter a equipe comercial sincronizada.")
         
-        df_precos_total = pd.DataFrame(list(st.session_state.precos_banco.items()), columns=["Item / Equipamento", "Valor Atual (R$)"])
-        
         st.subheader("Base Geral e Schneider")
         lista_schneider = list(banco_schneider_comum.keys())
         lista_schneider.extend(["IHM Padrão 7\"", "IHM Premium 10\""])
@@ -957,10 +1019,15 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         df_mercato = pd.DataFrame([{"Item / Equipamento": k, "Valor Atual (R$)": st.session_state.precos_banco.get(k, 0.0)} for k in lista_mercato if k in st.session_state.precos_banco])
         edited_mercato = st.data_editor(df_mercato, use_container_width=True, hide_index=True, key="ed_merc")
         
+        st.subheader("Serviços CFR-21 e Qualificação")
+        lista_cfr = list(banco_cfr_servicos.keys())
+        df_cfr = pd.DataFrame([{"Item / Equipamento": k, "Valor Atual (R$)": st.session_state.precos_banco.get(k, 0.0)} for k in lista_cfr if k in st.session_state.precos_banco])
+        edited_cfr = st.data_editor(df_cfr, use_container_width=True, hide_index=True, key="ed_cfr")
+        
         if st.button("💾 Salvar Novos Preços no Banco de Dados", type="primary"):
             alterou_algo = False
             novos_historicos = []
-            edited_total = pd.concat([edited_geral, edited_siemens, edited_mercato], ignore_index=True)
+            edited_total = pd.concat([edited_geral, edited_siemens, edited_mercato, edited_cfr], ignore_index=True)
             for idx, row in edited_total.iterrows():
                 item = row['Item / Equipamento']
                 novo_valor = row['Valor Atual (R$)']
@@ -995,6 +1062,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         linhas_hardware = []
         linhas_software = []
         linhas_pontos = []
+        linhas_servicos = []
         
         softwares_incluidos = {}
         
@@ -1017,6 +1085,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             is_mercato = ('Mercato' in arquitetura_atual)
             is_schneider = ('Schneider' in arquitetura_atual)
             tem_sobra_20 = (p.get('sobra_20', 'Não') == 'Sim')
+            tipo_cfr_painel = p.get('tipo_cfr', 'Não Aplicável')
             
             raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
             qtd_equipamentos_painel = 0
@@ -1055,7 +1124,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         if is_mercato:
                             if "Transmissor de temperatura para duto (TT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC (Duto)"
                             elif "Transmissor de temperatura Ambiente (TT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC (Ambiente)"
-                            elif "Transmissor de temperatura ambiente com display (TIT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC com Display (Ambiente)"
+                            elif "Transmissor de temperatura ambiente com display" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC com Display (Ambiente)"
                         elif is_schneider:
                             if "Transmissor de temperatura para duto (TT)" in inst: item_nome_real = "Schneider - Sensor de Temperatura NTC (Duto)"
                             elif "Transmissor de temperatura Ambiente (TT)" in inst: item_nome_real = "Schneider - Sensor de Temperatura NTC (Ambiente)"
@@ -1083,6 +1152,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         elif "pressostato para monitorar" in inst.lower(): func_inst = "Alarme de Saturação de Filtro"
                         elif "transmissor de pressão diferencial (monitorar" in inst.lower(): func_inst = "Monitoramento da Saturação do Filtro"
                         elif "funcionamento ventilador" in inst.lower(): func_inst = "Status de Operação do Ventilador"
+                        elif "co2" in inst.lower(): func_inst = "Medição da Qualidade do Ar (CO2)"
                         
                         lista_instrumentos_detalhados.append((nome_curto_inst, qtd_final, func_inst))
 
@@ -1207,8 +1277,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Servidor de Automação AS-P/AS-B ({p['nome']})", "Preço Unit.": pr_as, "Qtd": 1, "Custo Total": pr_as})
                         custo_base_schneider += pr_as
                         
-                    if s_type not in softwares_incluidos: softwares_incluidos[s_type] = 0
-                    softwares_incluidos[s_type] += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel)
+                    chave_soft = (s_type, tipo_cfr_painel)
+                    if chave_soft not in softwares_incluidos: softwares_incluidos[chave_soft] = 0
+                    softwares_incluidos[chave_soft] += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel)
 
             # --- CONSTRUÇÃO DOS TEXTOS E DESCRITIVOS (RESUMIDO E COMERCIAL) ---
             ihm_desc = f"com IHM instalada na porta, com display de {p['ihm'].replace('Mercato - ', '').replace('IHM Padrão ', '').replace('IHM Premium ', '').replace('IHM Básica ', '')}" if "Cego" not in p['ihm'] else "sem interface IHM instalada"
@@ -1252,10 +1323,22 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 f"• Condições gerais de funcionamento.\n\n"
                 f"A solução proporciona maior confiabilidade operacional, facilidade de manutenção e gestão eficiente dos ativos térmicos e de controle de ar."
             )
+            
+            if tipo_cfr_painel == 'CFR21 Part 11 - Qualificável':
+                texto_p += "\n\nO sistema será fornecido de forma Qualificável conforme normas CFR 21 Part 11, atendendo a todos os requisitos técnicos e de software para que o cliente realize a qualificação posterior."
+            elif tipo_cfr_painel == 'CFR21 Part 11 - Qualificado':
+                texto_p += "\n\nO sistema será integralmente Qualificado conforme normas CFR 21 Part 11, com a entrega de todos os protocolos pela equipe especializada da SIARCON."
+
             descritivo_linhas_excel.append(texto_p)
             
             # Descritivo Detalhado (Proposta Comercial)
             txt_com = f"**Sistema completo de automação [TAG: {p['nome']}]**, construído com arquitetura de controladores **{nome_arquitetura}** ({ctrl_desc}). O sistema operará de forma **{sup_desc}**, {ihm_desc}.\n\n"
+            
+            if tipo_cfr_painel == 'CFR21 Part 11 - Qualificável':
+                txt_com += "O sistema fornecido possuirá as licenças e os parâmetros necessários para ser totalmente **Qualificável (CFR 21 Part 11)**. A SIARCON garantirá todos os requisitos técnicos de software, deixando o ambiente pronto para que a qualificação final seja realizada por empresa à escolha do cliente.\n\n"
+            elif tipo_cfr_painel == 'CFR21 Part 11 - Qualificado':
+                txt_com += "O sistema contemplado será integralmente **Qualificado (CFR 21 Part 11)**. A SIARCON executará e entregará toda a documentação comprobatória e a execução dos protocolos e validações pertinentes, garantindo a certificação total do ambiente de supervisão.\n\n"
+            
             txt_com += "O quadro de automação será responsável pela aquisição de dados e controle da seguinte instrumentação de campo:\n\n"
             
             for desc_inst, qt_inst, func_inst in lista_instrumentos_detalhados:
@@ -1271,7 +1354,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
         texto_descritivo_final = "\n\n----------------------------------------------------\n\n".join(descritivo_linhas_excel)
 
-        for s_name, pts_total in softwares_incluidos.items():
+        # Trata o Software e as Regras de Cobrança do CFR-21
+        for (s_name, t_cfr), pts_total in softwares_incluidos.items():
             b_k, p_k = "", ""
             if "SEM certificação" in s_name: b_k, p_k = "Licença Supervisório - SEM CFR-21 (Base)", "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)"
             elif "COM certificação" in s_name: b_k, p_k = "Licença Supervisório - COM CFR-21 (Base)", "Licença Supervisório - COM CFR-21 (Por Ponto I/O)"
@@ -1282,6 +1366,27 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             linhas_software.append({"Categoria": "Software de Supervisão", "Item": f"Licença Base: {s_name}", "Preço Unit.": p_base, "Qtd": 1, "Custo Total": p_base})
             if p_pto > 0 and pts_total > 0:
                 linhas_software.append({"Categoria": "Software de Supervisão", "Item": f"Pontos Licenciados no Software ({pts_total} canais ativos)", "Preço Unit.": p_pto, "Qtd": pts_total, "Custo Total": pts_total * p_pto})
+
+            # Lógica de Cobrança do Serviço CFR-21 (Registrado em Serviços de Lógica)
+            if "COM certificação" in s_name:
+                custo_cfr_unit = 0.0
+                if t_cfr == "CFR21 Part 11 - Qualificável":
+                    if pts_total <= 100: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificável - Até 100 pts", 70.0)
+                    elif pts_total <= 250: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificável - 101 a 250 pts", 50.0)
+                    else: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificável - Acima de 250 pts", 30.0)
+                    
+                    linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": f"Preparação do Sistema Qualificável (CFR21) - Por Ponto", "Preço Unit.": custo_cfr_unit, "Qtd": pts_total, "Custo Total": pts_total * custo_cfr_unit})
+                    
+                elif t_cfr == "CFR21 Part 11 - Qualificado":
+                    if pts_total <= 30: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificado - Até 30 pts", 400.0)
+                    elif pts_total <= 60: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificado - 31 a 60 pts", 350.0)
+                    elif pts_total <= 99: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificado - 61 a 99 pts", 320.0)
+                    elif pts_total <= 150: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificado - 100 a 150 pts", 290.0)
+                    elif pts_total <= 200: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificado - 151 a 200 pts", 250.0)
+                    elif pts_total <= 250: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificado - 201 a 250 pts", 220.0)
+                    else: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificado - Acima de 250 pts", 200.0)
+
+                    linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": f"Execução de Qualificação Integral (CFR21) - Por Ponto", "Preço Unit.": custo_cfr_unit, "Qtd": pts_total, "Custo Total": pts_total * custo_cfr_unit})
 
         for infra_avulsa in st.session_state.orcamento:
             linhas_inst_campo.append({"Categoria": "Instrumentação de Campo", "Item": infra_avulsa['Item'], "Preço Unit.": infra_avulsa['Custo_Total']/infra_avulsa['Quantidade'] if infra_avulsa['Quantidade'] > 0 else 0, "Qtd": infra_avulsa['Quantidade'], "Custo Total": infra_avulsa['Custo_Total']})
@@ -1294,7 +1399,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         subtotal_hw = df_hw['Custo Total'].sum() if not df_hw.empty else 0
         subtotal_sw = df_sw['Custo Total'].sum() if not df_sw.empty else 0
         
-        linhas_servicos = []
         if (total_ai_schneider + total_ao_schneider) > 0:
             pr_ai_sch = st.session_state.precos_banco.get("Custo AI/AO", 565.0)
             linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Serviços de lógica: Pontos Analógicos", "Preço Unit.": pr_ai_sch, "Qtd": (total_ai_schneider + total_ao_schneider), "Custo Total": (total_ai_schneider + total_ao_schneider) * pr_ai_sch})
