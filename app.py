@@ -803,12 +803,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             novos_inst = {k: 0 for k in REGRA_IO.keys()}
                             
                             if sub_kit == "Equipamento Novo (Em Branco)":
-                                p_data['grupos_equipamentos'].append({"nome_grupo": "Equipamento Novo", "multiplicador": 1, "instrumentos": novos_inst, "tags_lista": [""]})
+                                p_data['grupos_equipamentos'].insert(0, {"nome_grupo": "Equipamento Novo", "multiplicador": 1, "instrumentos": novos_inst, "tags_lista": [""]})
                             else:
                                 for item_nome, qtd_padrao in KITS_PADRAO[sub_kit].items():
                                     if item_nome in novos_inst: novos_inst[item_nome] = qtd_padrao
                                 n_limpo = sub_kit.split(" ", 1)[1] if " " in sub_kit else sub_kit
-                                p_data['grupos_equipamentos'].append({"nome_grupo": f"{n_limpo}", "multiplicador": 1, "instrumentos": novos_inst, "tags_lista": [""]})
+                                p_data['grupos_equipamentos'].insert(0, {"nome_grupo": f"{n_limpo}", "multiplicador": 1, "instrumentos": novos_inst, "tags_lista": [""]})
                             st.rerun()
 
                 raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
@@ -816,7 +816,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
                     total_ai_g_single = total_ao_g_single = total_di_g_single = total_do_g_single = 0
                     
-                    open_p_hvac = False 
+                    open_p_hvac = (g_idx == 0) 
                     with st.expander(f"📦 {g_data['nome_grupo']}", expanded=open_p_hvac):
                         qtd_key = f"m_g_{p_data['id']}_{g_idx}"
                         qtd_atual = st.session_state.get(qtd_key, g_data.get('multiplicador', 1))
@@ -1421,15 +1421,19 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
             df_export_list = []
             if not df_inst.empty:
+                df_export_list.append(pd.DataFrame([{"Categoria": "", "Item": "INSTRUMENTAÇÃO DE CAMPO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}]))
                 df_export_list.append(df_inst.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
                 df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "INSTRUMENTAÇÃO DE CAMPO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_inst}]))
             if not df_hw.empty:
+                df_export_list.append(pd.DataFrame([{"Categoria": "", "Item": "HARDWARE E PAINÉIS", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}]))
                 df_export_list.append(df_hw.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
                 df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "HARDWARE E PAINÉIS", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_hw}]))
             if not df_sw.empty:
+                df_export_list.append(pd.DataFrame([{"Categoria": "", "Item": "SOFTWARE", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}]))
                 df_export_list.append(df_sw.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
                 df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "SOFTWARE", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_sw}]))
             if not df_serv.empty:
+                df_export_list.append(pd.DataFrame([{"Categoria": "", "Item": "SERVIÇOS E LÓGICA", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}]))
                 df_export_list.append(df_serv)
                 df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "SERVIÇOS E LÓGICA", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_serv}]))
             df_export_list.append(pd.DataFrame([{"Categoria": "TOTAL GERAL", "Item": "ORÇAMENTO COMPLETO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": total_geral}]))
@@ -1497,18 +1501,48 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 for c_idx, value in enumerate(row, start=1):
                     cell = ws1.cell(row=r_idx, column=c_idx, value=value)
                     cell.border = border_thin
-                    if r_idx == start_row:
-                        cell.fill = fill_header; cell.font = font_header; cell.alignment = Alignment(horizontal="center", vertical="center")
-                    else:
-                        is_subtotal = "SUBTOTAL" in str(ws1.cell(row=r_idx, column=1).value) or "TOTAL GERAL" in str(ws1.cell(row=r_idx, column=1).value)
-                        cell.font = Font(name="Arial", size=10, bold=is_subtotal)
-                        if is_subtotal: cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-                        if c_idx in [3, 5]: 
-                            if str(value).strip() != "-": 
-                                try: cell.value = float(value); cell.number_format = '"R$" #,##0.00'
-                                except: pass
-                            cell.alignment = Alignment(horizontal="right")
-                        elif c_idx == 4: cell.alignment = Alignment(horizontal="center")
+                
+                if r_idx == start_row:
+                    for c in range(1, 6):
+                        ws1.cell(row=r_idx, column=c).fill = fill_header
+                        ws1.cell(row=r_idx, column=c).font = font_header
+                        ws1.cell(row=r_idx, column=c).alignment = Alignment(horizontal="center", vertical="center")
+                else:
+                    is_subtotal = "SUBTOTAL" in str(ws1.cell(row=r_idx, column=1).value) or "TOTAL GERAL" in str(ws1.cell(row=r_idx, column=1).value)
+                    is_title = (str(ws1.cell(row=r_idx, column=1).value) == "" and str(ws1.cell(row=r_idx, column=2).value) in ["INSTRUMENTAÇÃO DE CAMPO", "HARDWARE E PAINÉIS", "SOFTWARE", "SERVIÇOS E LÓGICA"])
+                    
+                    for c_idx in range(1, 6):
+                        c_cell = ws1.cell(row=r_idx, column=c_idx)
+                        c_cell.font = Font(name="Arial", size=10, bold=(is_subtotal or is_title))
+                        
+                        if is_title:
+                            c_cell.fill = PatternFill(start_color="C6E0B4", end_color="C6E0B4", fill_type="solid")
+                            if c_idx == 2:
+                                c_cell.alignment = Alignment(horizontal="center", vertical="center")
+                            elif c_idx > 2:
+                                c_cell.value = ""
+                        elif is_subtotal:
+                            c_cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+                            if c_idx in [3, 5]:
+                                if str(c_cell.value).strip() != "-":
+                                    try: 
+                                        c_cell.value = float(c_cell.value)
+                                        c_cell.number_format = '"R$" #,##0.00'
+                                    except: pass
+                                c_cell.alignment = Alignment(horizontal="right")
+                        else:
+                            if c_idx in [3, 5]:
+                                if str(c_cell.value).strip() != "-":
+                                    try: 
+                                        c_cell.value = float(c_cell.value)
+                                        c_cell.number_format = '"R$" #,##0.00'
+                                    except: pass
+                                c_cell.alignment = Alignment(horizontal="right")
+                            elif c_idx == 4:
+                                c_cell.alignment = Alignment(horizontal="center")
+                                
+                    if is_title:
+                        ws1.merge_cells(start_row=r_idx, start_column=2, end_row=r_idx, end_column=5)
             
             end_row_table = start_row + len(df_exportacao) + 2
             num_linhas_texto = len(texto_descritivo_final.split('\n'))
