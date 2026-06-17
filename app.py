@@ -420,6 +420,18 @@ elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
 # MÓDULO 2: LEVANTAMENTO DE AUTOMAÇÃO
 # ==============================================================================
 elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
+    
+    # Injeção de CSS para melhorar a visualização e quebrar a monotonia
+    st.markdown("""
+        <style>
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            border-radius: 8px;
+            border-left: 4px solid #1C8590 !important;
+            background-color: rgba(28, 133, 144, 0.03); 
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
     st.title("🔌 Engenharia e Custos - Automação e Infra")
     st.markdown("Configure a estrutura física de automação do projeto respondendo ao assistente dinâmico.")
     
@@ -694,7 +706,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
         if st.session_state.wizard_ativo:
             with st.container(border=True):
-                st.markdown("### 🧙‍♂️ Assistente de Configuração de Quadro")
+                st.markdown("<div style='background-color: rgba(28, 133, 144, 0.15); padding: 15px; border-radius: 8px;'><h3 style='margin:0; color: #1C8590;'>🧙‍♂️ Assistente de Configuração de Quadro</h3></div><br>", unsafe_allow_html=True)
                 
                 arquitetura_opt = st.radio("1. Selecione a Arquitetura do Hardware do Quadro:", ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "S7-1500 (Siemens)", "MCP Parametrizável (Mercato - Linha mais econômica)"], horizontal=True)
                 is_mercato_arch = "Mercato" in arquitetura_opt
@@ -727,7 +739,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             )
                 
                 tag_q = st.text_input("5. Insira a TAG / Identificação do Quadro (Ex: QTA-01, QD-CAG):")
-                config_opt = st.radio("6. Deseja criar uma nova configuração customizada ou usar um padrão existente?", ["Usar Padrão Existente (Kits)", "Criar Nova Configuração Customizada (Em Branco)"], horizontal=True)
+                
+                # Pergunta 6 inicia VAZIA.
+                config_opt = st.radio("6. Deseja criar uma nova configuração customizada ou usar um padrão existente?", 
+                                      ["Usar Padrão Existente (Kits)", "Criar Nova Configuração Customizada (Em Branco)"], 
+                                      horizontal=True, index=None)
                 
                 kit_final_selecionado = None
                 if config_opt == "Usar Padrão Existente (Kits)":
@@ -741,6 +757,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 c_conf, c_canc = st.columns(2)
                 if c_conf.button("🚀 Confirmar e Montar Quadro", use_container_width=True):
                     if not tag_q: st.warning("⚠️ Insira uma TAG válida para identificar o quadro.")
+                    elif config_opt is None: st.warning("⚠️ Responda a pergunta 6: Selecione se deseja usar um padrão existente ou criar um novo.")
                     elif config_opt == "Usar Padrão Existente (Kits)" and kit_final_selecionado == "Selecione...": st.warning("⚠️ Selecione um kit padrão.")
                     else:
                         novos_instrumentos = {k: 0 for k in REGRA_IO.keys()}
@@ -789,7 +806,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             
             with st.expander(f"🎛️ Quadro: {p_data['nome']} - {p_data.get('arquitetura', '')}", expanded=(p_idx == 0)):
                 c_icone, c_nome_painel, c_ihm_painel = st.columns([0.5, 4, 2])
-                c_icone.markdown("## 🎛️")
+                c_icone.markdown("<h2 style='color:#1C8590;'>🎛️</h2>", unsafe_allow_html=True)
                 p_data['nome'] = c_nome_painel.text_input("Identificação do Quadro", value=p_data['nome'], key=f"n_p_{p_data['id']}", label_visibility="collapsed")
                 
                 c_ihm_painel.markdown(f"<div style='padding-top:10px; color:#555;'><b>IHM:</b> {p_data.get('ihm', 'Sem Interface (Cego)')}</div>", unsafe_allow_html=True)
@@ -852,7 +869,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 
                                 modelo_mcp = dimensionar_mercato(ui_check, ao_check, do_check)
                                 if not modelo_mcp:
-                                    st.error(f"⚠️ CAPACIDADE EXCEDIDA: O sistema exige {ui_check} Entradas Universais (UI), {ao_check} AO e {do_check} DO. Isso ultrapassa a capacidade máxima do maior controlador da linha MCP Mercato. Configuração não recomendada, divida o sistema ou use arquiteturas modulares (Schneider/Siemens).")
+                                    st.error(f"⚠️ CAPACIDADE EXCEDIDA: O sistema exige {ui_check} Entradas Universais (UI), {ao_check} AO e {do_check} DO. Isso ultrapassa a capacidade máxima do maior controlador da linha MCP Mercato.\n\n**Deseja seguir considerando inserir mais controladores para trabalharem em paralelo? (Não recomendável)**")
                                 else:
                                     st.success(f"✅ OK! Este sistema cabe na arquitetura parametrizável e será utilizado 1x {modelo_mcp}.")
 
@@ -893,7 +910,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
                 total_io_pontos_hw = hw_ai_painel + hw_ao_painel + hw_di_painel + hw_do_painel
                 
-                st.markdown("##### 🧠 Estrutura Total de I/O do Quadro")
+                st.markdown("<div style='background-color: rgba(28, 133, 144, 0.1); padding: 10px; border-radius: 5px;'><h5 style='margin:0;'>🧠 Estrutura Total de I/O do Quadro</h5></div><br>", unsafe_allow_html=True)
                 m1, m2, m3, m4, m5 = st.columns(5)
                 titulo_total = "Total I/O Físico (Com Reserva)" if tem_sobra_20 else "Total I/O Físico"
                 m1.metric(titulo_total, str(total_io_pontos_hw)) 
