@@ -583,7 +583,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             "Válvula de controle proporcional com atuador (TCV)", "Válvula de controle de água gelada proporcional (TCV)",
             "Válvula de controle de água quente proporcional (TCV)", "Válvula de controle de vapor proporcional (TCV)",
             "Relé de Corrente - Status Compressor (TC)", "Termostato de segurança (TSH)",
-            "Pressostato diferencial para ar (PSH)", "Resistência de aquecimento (Equipamento) (RAQ)", "Resistência de aquecimento (Duto) (RAQ)"
+            "Pressostato diferencial para ar (PSH)", "Resistência de aquecimento (Equipamento) (RAQ)"
         ],
         "💧 Controle (Central de Água Gelada - CAG)": [
             "Válvula motorizada Bypass Proporcional (até 2.1/2\") (TCV)", "Válvula motorizada Bypass Proporcional (3\" ou 4\") (TCV)",
@@ -760,7 +760,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             "modo_config": config_opt, "ihm": ihm_selecionada, "sobra_20": sobra_opt, "grupos_equipamentos": grupos_equip
                         }
                         
-                        # Insere invertido (o mais novo fica no topo da tela)
                         st.session_state.paineis_auto.insert(0, novo_quadro)
                         st.session_state.wizard_ativo = False
                         st.rerun()
@@ -771,7 +770,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
         st.write("")
 
-        # Tratamento da exclusão/limpeza total
         if st.session_state.confirmar_limpar:
             st.warning("⚠️ Tem certeza que deseja sair e PERDER todo o preenchimento não salvo nesta tela?")
             c_sim, c_nao = st.columns(2)
@@ -789,7 +787,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             is_schneider_quadro = ('Schneider' in p_data.get('arquitetura', ''))
             tem_sobra_20 = (p_data.get('sobra_20', 'Não') == 'Sim')
             
-            # Utilizar st.expander em vez de st.container. O primeiro (p_idx == 0) fica expandido, os antigos ficam recolhidos
             with st.expander(f"🎛️ Quadro: {p_data['nome']} - {p_data.get('arquitetura', '')}", expanded=(p_idx == 0)):
                 c_icone, c_nome_painel, c_ihm_painel = st.columns([0.5, 4, 2])
                 c_icone.markdown("## 🎛️")
@@ -845,7 +842,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 total_di_g_single += q * io_vals["DI"]
                                 total_do_g_single += q * io_vals["DO"]
                                 
-                            # +2 DI's da Seletora de Painel por equipamento contabilizado
                             total_di_g_single += 2
                                 
                             if is_mercato_quadro:
@@ -868,7 +864,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                     for i, inst in enumerate(lista_itens):
                                         if inst not in g_data['instrumentos']: g_data['instrumentos'][inst] = 0
                                         with cols_inst[i % 2]:
-                                            g_data['instrumentos'][inst] = st.number_input(inst, min_value=0, step=1, value=g_data['instrumentos'][inst], key=f"inst_{p_data['id']}_{g_idx}_{inst}")
+                                            chave_unica = f"inst_{p_data['id']}_{g_idx}_{grupo_nome}_{inst}"
+                                            g_data['instrumentos'][inst] = st.number_input(inst, min_value=0, step=1, value=g_data['instrumentos'][inst], key=chave_unica)
                         if st.button("🗑️ Remover Máquina", key=f"del_{p_data['id']}_{g_idx}"):
                             p_data['grupos_equipamentos'].pop(g_idx)
                             st.rerun()
@@ -882,7 +879,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         raw_di_painel += q * io_vals["DI"] * qtd_atual_calc
                         raw_do_painel += q * io_vals["DO"] * qtd_atual_calc
 
-                    # Adiciona as DIs invisíveis de cada máquina no painel global
                     raw_di_painel += (2 * qtd_atual_calc)
 
                 reserva_ai = math.ceil(raw_ai_painel * 0.2) if tem_sobra_20 else 0
@@ -975,7 +971,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         c_sim, c_nao = st.columns(2)
                         if c_sim.button("✔️ Sim, substituir tela", use_container_width=True):
                             st.session_state.paineis_auto = json.loads(d_a['json'])
-                            # Previnir quadros antigos sem id:
                             for p in st.session_state.paineis_auto: 
                                 if 'id' not in p: p['id'] = str(uuid.uuid4())
                             st.session_state.nome_projeto_orcamento = d_a['nome']
@@ -1177,7 +1172,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         elif is_mercato: custo_base_mercato += custo_tot_inst
                         else: custo_base_schneider += custo_tot_inst
                 
-                # ADIÇÃO DA CHAVE SELETORA AUTO/MANUAL POR EQUIPAMENTO (2 DIs)
                 raw_di_painel += (2 * mult)
                 raw_di_g_single += 2
                 linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": nome_equip, "Instrumento": "Chave Seletora Auto/Manual (Painel Elétrico)", "Quantidade Total": mult, "Entrada Digital (DI)": 2 * mult, "Saída Digital (DO)": 0, "Entrada Analógica (AI)": 0, "Saída Analógica (AO)": 0})
@@ -1281,7 +1275,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     if chave_soft not in softwares_incluidos: softwares_incluidos[chave_soft] = 0
                     softwares_incluidos[chave_soft] += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel)
 
-            # --- CONSTRUÇÃO DOS TEXTOS E DESCRITIVOS (RESUMIDO E COMERCIAL) ---
             ihm_desc = f"com IHM instalada na porta, com display de {p['ihm'].replace('Mercato - ', '').replace('IHM Padrão ', '').replace('IHM Premium ', '').replace('IHM Básica ', '')}" if "Cego" not in p['ihm'] else "sem interface IHM instalada"
             
             if "Sem" in p['supervisorio']: sup_desc = "Stand-alone (sem supervisório)"
@@ -1308,7 +1301,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             if res_desc_intro: componentes_intro.append(res_desc_intro)
             texto_intro_extra = ", incluindo " + " e ".join(componentes_intro) if componentes_intro else ""
 
-            # Descritivo Resumido (Excel)
             texto_p = (
                 f"Sistema de automação dedicado para controle de {eq_desc}{texto_intro_extra}.\n\n"
                 f"O sistema contempla quadro de automação [TAG: {p['nome']}] {ihm_desc}, "
@@ -1331,7 +1323,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
             descritivo_linhas_excel.append(texto_p)
             
-            # Descritivo Detalhado (Proposta Comercial)
             txt_com = f"**Sistema completo de automação [TAG: {p['nome']}]**, construído com arquitetura de controladores **{nome_arquitetura}** ({ctrl_desc}). O sistema operará de forma **{sup_desc}**, {ihm_desc}.\n\n"
             
             if tipo_cfr_painel == 'CFR21 Part 11 - Qualificável':
@@ -1354,7 +1345,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
         texto_descritivo_final = "\n\n----------------------------------------------------\n\n".join(descritivo_linhas_excel)
 
-        # Trata o Software e as Regras de Cobrança do CFR-21
         for (s_name, t_cfr), pts_total in softwares_incluidos.items():
             b_k, p_k = "", ""
             if "SEM certificação" in s_name: b_k, p_k = "Licença Supervisório - SEM CFR-21 (Base)", "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)"
@@ -1367,7 +1357,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             if p_pto > 0 and pts_total > 0:
                 linhas_software.append({"Categoria": "Software de Supervisão", "Item": f"Pontos Licenciados no Software ({pts_total} canais ativos)", "Preço Unit.": p_pto, "Qtd": pts_total, "Custo Total": pts_total * p_pto})
 
-            # Lógica de Cobrança do Serviço CFR-21 (Registrado em Serviços de Lógica)
             if "COM certificação" in s_name:
                 custo_cfr_unit = 0.0
                 if t_cfr == "CFR21 Part 11 - Qualificável":
@@ -1454,7 +1443,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             df_display['Custo Total'] = df_display['Custo Total'].apply(format_currency)
             st.dataframe(df_display, use_container_width=True)
             
-            # --- EXPANDER PARA O DESCRITIVO COMERCIAL ---
             with st.expander("📄 Gerar Descritivo Detalhado para Proposta Comercial", expanded=False):
                 st.markdown("<div style='background-color:#E3F2FD; padding:20px; border-radius:10px;'>", unsafe_allow_html=True)
                 for t_com in descritivo_comercial_linhas:
@@ -1474,7 +1462,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             ws1.title = "Detalhamento Financeiro"
             ws1.views.sheetView[0].showGridLines = True
             
-            # --- NOVO CABEÇALHO DO EXCEL (Mais largo) ---
             ws1.row_dimensions[1].height = 35
             ws1.row_dimensions[2].height = 25
             ws1.row_dimensions[3].height = 25
@@ -1523,7 +1510,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             cell.alignment = Alignment(horizontal="right")
                         elif c_idx == 4: cell.alignment = Alignment(horizontal="center")
             
-            # --- CAIXA DE TEXTO DESCRITIVO NO EXCEL ---
             end_row_table = start_row + len(df_exportacao) + 2
             num_linhas_texto = len(texto_descritivo_final.split('\n'))
             tamanho_caixa = max(10, num_linhas_texto + 2) 
@@ -1574,6 +1560,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         revisao_atual = f"R-{contagem_revisoes:02d}"
                         nova_linha = [datetime.now(fuso_br).strftime("%d/%m/%Y %H:%M:%S"), st.session_state.nome_projeto_orcamento, revisao_atual, f"R$ {subtotal_hw:.2f}".replace('.', ','), f"R$ {subtotal_serv:.2f}".replace('.', ','), f"R$ {total_geral:.2f}".replace('.', ','), json.dumps(st.session_state.paineis_auto), st.session_state.usuario_logado]
                         ws_hist_orc.append_row(nova_linha)
-                        st.cache_data.clear() # Limpa o cache para que a tabela do banco recarregue no visual
+                        st.cache_data.clear()
                         st.success(f"✅ Sucesso! Orçamento para '{st.session_state.nome_projeto_orcamento}' salvo com a revisão {revisao_atual}!")
                     except Exception as e: st.error(f"Erro ao salvar: {e}")
