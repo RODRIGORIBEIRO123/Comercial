@@ -62,27 +62,29 @@ if 'paineis_auto' not in st.session_state: st.session_state.paineis_auto = []
 if 'confirmar_limpar' not in st.session_state: st.session_state.confirmar_limpar = False
 if 'data_precos_atualizada' not in st.session_state: st.session_state.data_precos_atualizada = "Buscando metadados da nuvem..."
 
-# Inicializa o dicionário customizado de nomes P&ID na sessão
+# DICIONÁRIO DE NOMES DO DIAGRAMA (Padronizado conforme planilha do usuário de 5 colunas)
 if 'de_para_diagrama' not in st.session_state:
     st.session_state.de_para_diagrama = {
-        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": "Transmissor Pressão Dif. Ar",
-        "Transmissor de temperatura e umidade para duto (TT/MT)": "Transmissor Temp/Umid Duto",
-        "Transmissor de temperatura para duto (TT)": "Transmissor Temperatura Duto",
-        "Válvula de controle de água gelada proporcional (TCV)": "Válvula Água Gelada",
-        "Válvula de controle de água quente proporcional (TCV)": "Válvula Água Quente",
-        "Relé de Corrente - Status Compressor (TC)": "Comando/Status Compressores",
-        "Termostato de segurança (TSH)": "Termostato de Segurança",
-        "Pressostato diferencial para ar (PSH)": "Pressostato de Fluxo (Ar)",
-        "Resistência de aquecimento (Equipamento) (RAQ)": "Resistência de Aquecimento",
-        "Pressostato para monitorar os filtros G4 (PSH)": "Monitor Saturação Filtro G4",
-        "Pressostato para monitorar os filtros F9 (PSH)": "Monitor Saturação Filtro F9",
-        "Pressostato para monitorar os filtros H13/H14 (PSH)": "Monitor Saturação Filtro Absoluto",
-        "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": "Status/Comando Exaustor",
-        "Transmissor de pressão diferencial entre salas (PDT)": "Transmissor Pressão Dif. Salas",
-        "Transmissor de temperatura Ambiente (TT)": "Transmissor Temperatura Ambiente",
-        "Transmissor de temperatura e umidade ambiente (TT/MT)": "Transmissor Temp/Umid Ambiente"
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": {"in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "", "out_comp": ""},
+        "Transmissor de temperatura e umidade para duto (TT/MT)": {"in_agua": "Trans. Temp. e Umid. (TT/MT)", "in_comp": "Trans. Temp. e Umid. (TT/MT)", "out_agua": "", "out_comp": ""},
+        "Transmissor de temperatura para duto (TT)": {"in_agua": "Trans. Temp. (TT)", "in_comp": "Trans. Temp. (TT)", "out_agua": "", "out_comp": ""},
+        "Válvula de controle de água gelada proporcional (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Modula VAG", "out_comp": "Habilta Compressor"},
+        "Válvula de controle de água quente proporcional (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Modula VAQ", "out_comp": ""},
+        "Relé de Corrente - Status Compressor (TC)": {"in_agua": "", "in_comp": "Status Compressor", "out_agua": "", "out_comp": "Habilita Compressor"},
+        "Termostato de segurança (TSH)": {"in_agua": "Termostato Seg. RAQ (TSH)", "in_comp": "Termostato Seg. RAQ (TSH)", "out_agua": "Status RAQ", "out_comp": "Status RAQ"},
+        "Pressostato diferencial para ar (PSH)": {"in_agua": "Pressostato Seg. RAQ (PSH)", "in_comp": "Pressostato Seg. RAQ (PSH)", "out_agua": "Status RAQ", "out_comp": "Status RAQ"},
+        "Resistência de aquecimento (Equipamento) (RAQ)": {"in_agua": "", "in_comp": "", "out_agua": "Habilita RAQ", "out_comp": "Habilita RAQ"},
+        "Pressostato para monitorar os filtros G4 (PSH)": {"in_agua": "Pressostato G4 (PSH)", "in_comp": "Pressostato G4 (PSH)", "out_agua": "Alarme G4 Saturado", "out_comp": "Alarme G4 Saturado"},
+        "Pressostato para monitorar os filtros F9 (PSH)": {"in_agua": "Pressostato F9 (PSH)", "in_comp": "Pressostato F9 (PSH)", "out_agua": "Alarme F9 Saturado", "out_comp": "Alarme F9 Saturado"},
+        "Pressostato para monitorar os filtros H13/H14 (PSH)": {"in_agua": "Pressostato H13/14 (PSH)", "in_comp": "Pressostato H13/14 (PSH)", "out_agua": "Alarme H13/14 Saturado", "out_comp": "Alarme H13/14 Saturado"},
+        "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": {"in_agua": "Status Func. Partida Direta (PSH)", "in_comp": "Status Func. Partida Direta (PSH)", "out_agua": "", "out_comp": ""},
+        "Transmissor de pressão diferencial entre salas (PDT)": {"in_agua": "Pressão Dif. Salas (PDT)", "in_comp": "Pressão Dif. Salas (PDT)", "out_agua": "", "out_comp": ""},
+        "Transmissor de temperatura Ambiente (TT)": {"in_agua": "Temp. Salas (TT)", "in_comp": "Temp. Salas (TT)", "out_agua": "", "out_comp": ""},
+        "Transmissor de temperatura e umidade ambiente (TT/MT)": {"in_agua": "Temp. / Umid. (TT/MT)", "in_comp": "Temp. / Umid. (TT/MT)", "out_agua": "", "out_comp": ""},
+        "Chave Seletora Auto/Manual (Painel Elétrico)": {"in_agua": "Chave Auto / Manual", "in_comp": "Chave Auto / Manual", "out_agua": "Habilita Equipamento (TAG)", "out_comp": "Habilita Equipamento (TAG)"}
     }
 
+# Tentar buscar a última data de modificação dos preços no Sheets
 if st.session_state.data_precos_atualizada == "Buscando metadados da nuvem...":
     try:
         sh_init = conectar_google_sheets()
@@ -356,10 +358,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "CFR21 Qualificável - Acima de 250 pts": 30.00,
         "CFR21 Qualificado - Até 30 pts": 400.00,
         "CFR21 Qualificado - 31 a 60 pts": 350.00,
-        "CFR21 Qualificado - 61 a 99 pts": 320.00,
-        "CFR21 Qualificado - 100 a 150 pts": 290.00,
-        "CFR21 Qualificado - 151 a 200 pts": 250.00,
-        "CFR21 Qualificado - 201 a 250 pts": 220.00,
         "CFR21 Qualificado - Acima de 250 pts": 200.00
     }
 
@@ -734,13 +732,15 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 else:
                                     st.success(f"✅ OK! Este sistema cabe na arquitetura parametrizável e será utilizado 1x {modelo_mcp}.")
 
-                        # 1. FLUXOGRAMA DINÂMICO VISUAL (Graphviz) SEM CÓDIGO APARENTE
+                        # 1. FLUXOGRAMA DINÂMICO VISUAL (Graphviz) INTELIGENTE BASEADO NA PLANILHA
                         with st.expander("👁️ Visualizar Diagrama P&ID (Lógica e TAGs)", expanded=True):
                             try:
                                 dot = f'digraph G {{\n'
                                 dot += f'  rankdir=LR;\n'
                                 dot += f'  node [fontname="Arial", fontsize=10, shape=box, style=rounded];\n'
                                 dot += f'  "Controlador" [label="{p_data.get("arquitetura", "Controlador")}\\n({g_data["nome_grupo"]})", fillcolor="#1C8590", style=filled, fontcolor=white, shape=ellipse];\n'
+                                
+                                is_compressor_sys = "COMPRESSOR" in g_data['nome_grupo'].upper() or "DIRETA" in g_data['nome_grupo'].upper() or "DX" in g_data['nome_grupo'].upper()
                                 
                                 has_inputs = False
                                 has_outputs = False
@@ -749,41 +749,76 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 for inst_f, q_f in g_data['instrumentos'].items():
                                     if q_f > 0:
                                         io_v = REGRA_IO.get(inst_f, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
-                                        
-                                        # Usa o dicionário que está na sessão
-                                        lbl_curto = st.session_state.de_para_diagrama.get(inst_f, inst_f.split('(')[0].strip())
-                                        if len(lbl_curto) > 30: lbl_curto = lbl_curto[:30] + "..."
-                                        
                                         tag_inst = inst_f.split('(')[-1].replace(')', '').strip() if '(' in inst_f else 'TAG'
                                         
-                                        if "Relé de Corrente" in inst_f and q_f == 2:
-                                            # Caso especial para representar os 2 compressores detectados na IA
-                                            dot += f'  "in_comp1" [label="Falha Comp. 1\\nTAG: DI", color="#2B7BC4"];\n'
-                                            dot += f'  "in_comp2" [label="Falha Comp. 2\\nTAG: DI", color="#2B7BC4"];\n'
-                                            dot += f'  "in_comp1" -> "Controlador" [color="#2B7BC4"];\n'
-                                            dot += f'  "in_comp2" -> "Controlador" [color="#2B7BC4"];\n'
-                                            
-                                            dot += f'  "out_comp1" [label="Comando Compressor 1\\nTAG: DO", color="#E14D2A"];\n'
-                                            dot += f'  "out_comp2" [label="Comando Compressor 2\\nTAG: DO", color="#E14D2A"];\n'
-                                            dot += f'  "Controlador" -> "out_comp1" [color="#E14D2A"];\n'
-                                            dot += f'  "Controlador" -> "out_comp2" [color="#E14D2A"];\n'
-                                            has_inputs = True
-                                            has_outputs = True
-                                            continue
+                                        # Leitura da Tabela do Usuário na Memória
+                                        c_names = st.session_state.de_para_diagrama.get(inst_f, {})
+                                        if isinstance(c_names, str):
+                                            lbl_in = lbl_out = c_names
+                                        else:
+                                            if is_compressor_sys:
+                                                lbl_in = c_names.get("in_comp", "")
+                                                lbl_out = c_names.get("out_comp", "")
+                                                if not lbl_in: lbl_in = c_names.get("in_agua", "")
+                                                if not lbl_out: lbl_out = c_names.get("out_agua", "")
+                                            else:
+                                                lbl_in = c_names.get("in_agua", "")
+                                                lbl_out = c_names.get("out_agua", "")
+                                                if not lbl_in: lbl_in = c_names.get("in_comp", "")
+                                                if not lbl_out: lbl_out = c_names.get("out_comp", "")
+                                        
+                                        # Fallback default se estiver em branco no Excel
+                                        if not lbl_in: lbl_in = inst_f.split('(')[0].strip()
+                                        if not lbl_out: lbl_out = inst_f.split('(')[0].strip()
+                                        
+                                        if len(lbl_in) > 35: lbl_in = lbl_in[:35] + "..."
+                                        if len(lbl_out) > 35: lbl_out = lbl_out[:35] + "..."
+                                        
+                                        force_out = isinstance(c_names, dict) and (c_names.get("out_agua", "") != "" or c_names.get("out_comp", "") != "")
+                                        force_in = isinstance(c_names, dict) and (c_names.get("in_agua", "") != "" or c_names.get("in_comp", "") != "")
 
-                                        node_name = f"node_{node_idx}"
+                                        has_in_pin = io_v["AI"] > 0 or io_v["DI"] > 0 or force_in
+                                        has_out_pin = io_v["AO"] > 0 or io_v["DO"] > 0 or force_out
+                                        
+                                        if not has_in_pin and not has_out_pin: continue
+                                        
+                                        # Renderização de caixas individuais se Qtd for entre 1 e 4 (ex: Compressor 1 e 2)
+                                        for idx_q in range(int(q_f)):
+                                            node_name = f"node_{node_idx}_{idx_q}"
+                                            
+                                            # Se for mais que 4, não polui a tela com dezenas de caixas, coloca "4x" na frente
+                                            if int(q_f) > 4 and idx_q > 0: break
+                                            
+                                            lbl_suf = f" {idx_q+1}" if int(q_f) > 1 and int(q_f) <= 4 else ""
+                                            prefix = f"{q_f}x " if int(q_f) > 4 else ""
+                                            
+                                            if has_in_pin and lbl_in:
+                                                dot += f'  "{node_name}_in" [label="{prefix}{lbl_in}{lbl_suf}\\nTAG: {tag_inst}", color="#2B7BC4"];\n'
+                                                dot += f'  "{node_name}_in" -> "Controlador" [color="#2B7BC4"];\n'
+                                                has_inputs = True
+                                                
+                                            if has_out_pin and lbl_out:
+                                                dot += f'  "{node_name}_out" [label="{prefix}{lbl_out}{lbl_suf}\\nTAG: {tag_inst}", color="#E14D2A"];\n'
+                                                dot += f'  "Controlador" -> "{node_name}_out" [color="#E14D2A"];\n'
+                                                has_outputs = True
+                                                
                                         node_idx += 1
                                         
-                                        if io_v["AI"] > 0 or io_v["DI"] > 0:
-                                            dot += f'  "{node_name}_in" [label="{lbl_curto}\\nTAG: {tag_inst}", color="#2B7BC4"];\n'
-                                            dot += f'  "{node_name}_in" -> "Controlador" [color="#2B7BC4"];\n'
-                                            has_inputs = True
-                                            
-                                        if io_v["AO"] > 0 or io_v["DO"] > 0:
-                                            dot += f'  "{node_name}_out" [label="{lbl_curto}\\nTAG: {tag_inst}", color="#E14D2A"];\n'
-                                            dot += f'  "Controlador" -> "{node_name}_out" [color="#E14D2A"];\n'
-                                            has_outputs = True
-                                            
+                                # Chave Manual/Automática
+                                inst_chave = "Chave Seletora Auto/Manual (Painel Elétrico)"
+                                c_names = st.session_state.de_para_diagrama.get(inst_chave, {})
+                                lbl_in_c = c_names.get("in_comp", "Chave Auto/Manual") if is_compressor_sys else c_names.get("in_agua", "Chave Auto/Manual")
+                                lbl_out_c = c_names.get("out_comp", "Habilita Equipamento (TAG)") if is_compressor_sys else c_names.get("out_agua", "Habilita Equipamento (TAG)")
+                                
+                                if lbl_in_c:
+                                    dot += f'  "chave_in" [label="{lbl_in_c}\\nTAG: CH", color="#2B7BC4"];\n'
+                                    dot += f'  "chave_in" -> "Controlador" [color="#2B7BC4"];\n'
+                                    has_inputs = True
+                                if lbl_out_c:
+                                    dot += f'  "chave_out" [label="{lbl_out_c}\\nTAG: CH", color="#E14D2A"];\n'
+                                    dot += f'  "Controlador" -> "chave_out" [color="#E14D2A"];\n'
+                                    has_outputs = True
+                                
                                 if not has_inputs: dot += '  "Sinais de Campo" -> "Controlador" [style=dashed];\n'
                                 if not has_outputs: dot += '  "Controlador" -> "Atuadores" [style=dashed];\n'
                                 dot += '}'
@@ -938,9 +973,16 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         st.markdown("### 🏷️ Padronização de Nomes para o Diagrama P&ID")
         st.write("Você pode baixar a relação de nomes de instrumentos, ajustá-los no Excel e fazer o upload novamente para mudar como eles aparecem visualmente no Diagrama gerado na aba de Automação.")
         
-        # DOWNLOAD DA PLANILHA
+        # DOWNLOAD DA PLANILHA DE DICIONÁRIO
         buffer_nomes = io.BytesIO()
-        df_nomes = pd.DataFrame(list(st.session_state.de_para_diagrama.items()), columns=['Nome Original (Base de Preços)', 'Nome Exibido no Diagrama Visual'])
+        df_nomes = pd.DataFrame([
+            {"Nome Original (Base de Preços)": k, 
+             "Nome Exibido - Entrada (Se água  gelada)": v.get("in_agua", ""), 
+             "Nome Exibido Entrada (Se compressor)": v.get("in_comp", ""), 
+             "Nome Exibido Saída (Se Água Gelada)": v.get("out_agua", ""), 
+             "Nome Exibido Saída (Se Compressor)": v.get("out_comp", "")}
+            for k, v in st.session_state.de_para_diagrama.items()
+        ])
         df_nomes.to_excel(buffer_nomes, index=False)
         buffer_nomes.seek(0)
         st.download_button(label="📥 Baixar Planilha de Personalização de I/O", data=buffer_nomes, file_name="Dicionario_Nomes_Diagrama.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -950,13 +992,21 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         if upload_nomes is not None:
             try:
                 df_novo = pd.read_excel(upload_nomes)
-                # Verifica se as colunas estão corretas
-                if 'Nome Original (Base de Preços)' in df_novo.columns and 'Nome Exibido no Diagrama Visual' in df_novo.columns:
-                    novo_dict = dict(zip(df_novo['Nome Original (Base de Preços)'], df_novo['Nome Exibido no Diagrama Visual']))
+                df_novo = df_novo.dropna(subset=[df_novo.columns[0]])
+                if len(df_novo.columns) >= 5:
+                    novo_dict = {}
+                    for _, row in df_novo.iterrows():
+                        orig = str(row[df_novo.columns[0]]).strip()
+                        novo_dict[orig] = {
+                            "in_agua": str(row[df_novo.columns[1]]).strip() if pd.notna(row[df_novo.columns[1]]) and str(row[df_novo.columns[1]]).strip() != 'nan' else "",
+                            "in_comp": str(row[df_novo.columns[2]]).strip() if pd.notna(row[df_novo.columns[2]]) and str(row[df_novo.columns[2]]).strip() != 'nan' else "",
+                            "out_agua": str(row[df_novo.columns[3]]).strip() if pd.notna(row[df_novo.columns[3]]) and str(row[df_novo.columns[3]]).strip() != 'nan' else "",
+                            "out_comp": str(row[df_novo.columns[4]]).strip() if pd.notna(row[df_novo.columns[4]]) and str(row[df_novo.columns[4]]).strip() != 'nan' else ""
+                        }
                     st.session_state.de_para_diagrama.update(novo_dict)
-                    st.success("✅ Nomes atualizados com sucesso! Os próximos diagramas já usarão o novo padrão.")
+                    st.success("✅ Nomes e Condições atualizados com sucesso! Os próximos diagramas usarão a nova lógica.")
                 else:
-                    st.error("⚠️ As colunas do arquivo não correspondem ao padrão original.")
+                    st.error("⚠️ As colunas do arquivo não correspondem ao padrão original (5 colunas esperadas).")
             except Exception as e:
                 st.error(f"Erro ao ler arquivo: {e}")
                 
