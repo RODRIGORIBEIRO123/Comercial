@@ -62,6 +62,27 @@ if 'paineis_auto' not in st.session_state: st.session_state.paineis_auto = []
 if 'confirmar_limpar' not in st.session_state: st.session_state.confirmar_limpar = False
 if 'data_precos_atualizada' not in st.session_state: st.session_state.data_precos_atualizada = "Buscando metadados da nuvem..."
 
+# Inicializa o dicionário customizado de nomes P&ID na sessão
+if 'de_para_diagrama' not in st.session_state:
+    st.session_state.de_para_diagrama = {
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": "Transmissor Pressão Dif. Ar",
+        "Transmissor de temperatura e umidade para duto (TT/MT)": "Transmissor Temp/Umid Duto",
+        "Transmissor de temperatura para duto (TT)": "Transmissor Temperatura Duto",
+        "Válvula de controle de água gelada proporcional (TCV)": "Válvula Água Gelada",
+        "Válvula de controle de água quente proporcional (TCV)": "Válvula Água Quente",
+        "Relé de Corrente - Status Compressor (TC)": "Comando/Status Compressores",
+        "Termostato de segurança (TSH)": "Termostato de Segurança",
+        "Pressostato diferencial para ar (PSH)": "Pressostato de Fluxo (Ar)",
+        "Resistência de aquecimento (Equipamento) (RAQ)": "Resistência de Aquecimento",
+        "Pressostato para monitorar os filtros G4 (PSH)": "Monitor Saturação Filtro G4",
+        "Pressostato para monitorar os filtros F9 (PSH)": "Monitor Saturação Filtro F9",
+        "Pressostato para monitorar os filtros H13/H14 (PSH)": "Monitor Saturação Filtro Absoluto",
+        "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": "Status/Comando Exaustor",
+        "Transmissor de pressão diferencial entre salas (PDT)": "Transmissor Pressão Dif. Salas",
+        "Transmissor de temperatura Ambiente (TT)": "Transmissor Temperatura Ambiente",
+        "Transmissor de temperatura e umidade ambiente (TT/MT)": "Transmissor Temp/Umid Ambiente"
+    }
+
 if st.session_state.data_precos_atualizada == "Buscando metadados da nuvem...":
     try:
         sh_init = conectar_google_sheets()
@@ -165,25 +186,47 @@ if menu_ui != st.session_state.menu_selecionado:
     st.rerun()
 
 # ==============================================================================
-# TELA 0: HOME & TELA 1: GERADOR PROPOSTAS (Omitidos p/ focar no Módulo 2)
+# TELA 0: HOME
 # ==============================================================================
 if st.session_state.menu_selecionado == "🏠 Tela Inicial":
     st.write("")
     st.markdown(f"<h1 style='text-align: center; color: #178B96;'>Bem-vindo(a), {st.session_state.nome_exibicao}!</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; font-size: 18px; color: #666;'>Portal Comercial e de Engenharia SIARCON. Selecione o módulo desejado para iniciar:</p>", unsafe_allow_html=True)
     st.write("")
+    st.write("")
     col_vazia_esq, col_card1, col_vazia_meio, col_card2, col_vazia_dir = st.columns([1, 2.5, 0.5, 2.5, 1])
+    
     with col_card1:
-        st.markdown("<div style='text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #1C8590;'><h1 style='font-size: 50px; margin-bottom: 10px;'>📄</h1><h3 style='color: #333;'>Gerador de Propostas</h3></div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #1C8590;'>
+            <h1 style='font-size: 50px; margin-bottom: 10px;'>📄</h1>
+            <h3 style='color: #333;'>Gerador de Propostas</h3>
+            <p style='color: #666; font-size: 14px; height: 40px;'>Criação rápida e padronizada de escopos técnicos e comerciais em Word.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.write("")
         if st.button("Acessar Módulo ➔", key="btn_home_prop", type="primary", use_container_width=True):
-            st.session_state.menu_selecionado = "📄 Gerador de Propostas"; st.rerun()
-    with col_card2:
-        st.markdown("<div style='text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #1C8590;'><h1 style='font-size: 50px; margin-bottom: 10px;'>🔌</h1><h3 style='color: #333;'>Levantamento de Automação</h3></div>", unsafe_allow_html=True)
-        if st.button("Acessar Módulo ➔", key="btn_home_auto", type="primary", use_container_width=True):
-            st.session_state.menu_selecionado = "🔌 Levantamento de Automação"; st.rerun()
+            st.session_state.menu_selecionado = "📄 Gerador de Propostas"
+            st.rerun()
 
+    with col_card2:
+        st.markdown("""
+        <div style='text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #1C8590;'>
+            <h1 style='font-size: 50px; margin-bottom: 10px;'>🔌</h1>
+            <h3 style='color: #333;'>Levantamento de Automação</h3>
+            <p style='color: #666; font-size: 14px; height: 40px;'>Dimensionamento estrutural e financeiro de hardware, infraestrutura e supervisório.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.write("")
+        if st.button("Acessar Módulo ➔", key="btn_home_auto", type="primary", use_container_width=True):
+            st.session_state.menu_selecionado = "🔌 Levantamento de Automação"
+            st.rerun()
+
+# ==============================================================================
+# MÓDULO 1: GERADOR DE PROPOSTAS
+# ==============================================================================
 elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
-    st.info("Módulo de Propostas carregado perfeitamente (código mantido intacto conforme original).")
+    st.info("Módulo de Propostas carregado perfeitamente (código omitido para focar no módulo de Automação).")
 
 # ==============================================================================
 # MÓDULO 2: LEVANTAMENTO DE AUTOMAÇÃO
@@ -249,26 +292,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Transmissor de temperatura de imersão com display (TIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0}
     }
 
-    # === DICIONÁRIO DE TRADUÇÃO PARA DIAGRAMAS VISUAIS ===
-    DE_PARA_DIAGRAMA = {
-        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": "Transmissor Pressão Dif. Ar",
-        "Transmissor de temperatura e umidade para duto (TT/MT)": "Transmissor Temp/Umid Duto",
-        "Transmissor de temperatura para duto (TT)": "Transmissor Temperatura Duto",
-        "Válvula de controle de água gelada proporcional (TCV)": "Válvula Água Gelada",
-        "Válvula de controle de água quente proporcional (TCV)": "Válvula Água Quente",
-        "Relé de Corrente - Status Compressor (TC)": "Comando/Status Compressores",
-        "Termostato de segurança (TSH)": "Termostato de Segurança",
-        "Pressostato diferencial para ar (PSH)": "Pressostato de Fluxo (Ar)",
-        "Resistência de aquecimento (Equipamento) (RAQ)": "Resistência de Aquecimento",
-        "Pressostato para monitorar os filtros G4 (PSH)": "Monitor Saturação Filtro G4",
-        "Pressostato para monitorar os filtros F9 (PSH)": "Monitor Saturação Filtro F9",
-        "Pressostato para monitorar os filtros H13/H14 (PSH)": "Monitor Saturação Filtro Absoluto",
-        "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": "Status/Comando Exaustor",
-        "Transmissor de pressão diferencial entre salas (PDT)": "Transmissor Pressão Dif. Salas",
-        "Transmissor de temperatura Ambiente (TT)": "Transmissor Temperatura Ambiente",
-        "Transmissor de temperatura e umidade ambiente (TT/MT)": "Transmissor Temp/Umid Ambiente"
-    }
-
     banco_schneider_comum = {
         "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1490.00,
         "Transmissor de temperatura e umidade para duto (TT/MT)": 2050.00,
@@ -294,8 +317,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Transmissor de temperatura Ambiente (TT)": 2050.00,
         "Transmissor de temperatura ambiente com display (TIT)": 2650.00,
         "Transmissor de temperatura e umidade ambiente (TT/MT)": 2050.00,
-        "Transmissor de temperatura e umidade ambiente com display (TIT/MIT)": 2650.00,
-        "Transmissor de CO2 ambiente (AT/AIT)": 0.00,
         "Custo AI/AO": 565.00, "Custo DI/DO": 120.00,
         "Licença Supervisório - SEM CFR-21 (Base)": 23000.00, "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)": 100.00,
         "Licença Supervisório - COM CFR-21 (Base)": 23000.00, "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
@@ -335,6 +356,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "CFR21 Qualificável - Acima de 250 pts": 30.00,
         "CFR21 Qualificado - Até 30 pts": 400.00,
         "CFR21 Qualificado - 31 a 60 pts": 350.00,
+        "CFR21 Qualificado - 61 a 99 pts": 320.00,
+        "CFR21 Qualificado - 100 a 150 pts": 290.00,
+        "CFR21 Qualificado - 151 a 200 pts": 250.00,
+        "CFR21 Qualificado - 201 a 250 pts": 220.00,
         "CFR21 Qualificado - Acima de 250 pts": 200.00
     }
 
@@ -394,7 +419,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1,
             "Termostato de segurança (TSH)": 1, "Pressostato diferencial para ar (PSH)": 1, "Resistência de aquecimento (Equipamento) (RAQ)": 1
         },
-        # KITS CORRIGIDOS CONFORME PROJETO (EXPANSÃO DIRETA)
         "🔥 UTA Expansão Direta (2 Compressores) + Resistência (Salas e Exaustão)": {
             "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1,
             "Transmissor de temperatura e umidade para duto (TT/MT)": 1, 
@@ -726,8 +750,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                     if q_f > 0:
                                         io_v = REGRA_IO.get(inst_f, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
                                         
-                                        # Usa o dicionário para pegar um nome limpo e bonito
-                                        lbl_curto = DE_PARA_DIAGRAMA.get(inst_f, inst_f.split('(')[0].strip())
+                                        # Usa o dicionário que está na sessão
+                                        lbl_curto = st.session_state.de_para_diagrama.get(inst_f, inst_f.split('(')[0].strip())
                                         if len(lbl_curto) > 30: lbl_curto = lbl_curto[:30] + "..."
                                         
                                         tag_inst = inst_f.split('(')[-1].replace(')', '').strip() if '(' in inst_f else 'TAG'
@@ -764,7 +788,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 if not has_outputs: dot += '  "Controlador" -> "Atuadores" [style=dashed];\n'
                                 dot += '}'
                                 
-                                # Renderiza o gráfico visual nativamente sem expor código
                                 st.graphviz_chart(dot)
                             except Exception as e:
                                 st.caption(f"Adicione instrumentos para projetar o fluxograma visual. Erro: {e}")
@@ -909,18 +932,34 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     
     with aba_precos:
         st.header("Gestão da Base de Preços")
-        # 2. Exibição da última data de modificação sincronizada na nuvem
         st.info(f"📅 **Última atualização da tabela sincronizada com o banco de dados da nuvem:** {st.session_state.data_precos_atualizada}")
         st.write("Altere os valores e salve na nuvem para manter a equipe comercial sincronizada.")
         
-        # NOVO BOTÃO DE EXPORTAÇÃO DO DICIONÁRIO DE NOMES
         st.markdown("### 🏷️ Padronização de Nomes para o Diagrama P&ID")
-        st.write("Você pode baixar a relação de nomes de instrumentos para ajustar como eles aparecem visualmente no Diagrama gerado na aba de Automação.")
+        st.write("Você pode baixar a relação de nomes de instrumentos, ajustá-los no Excel e fazer o upload novamente para mudar como eles aparecem visualmente no Diagrama gerado na aba de Automação.")
+        
+        # DOWNLOAD DA PLANILHA
         buffer_nomes = io.BytesIO()
-        df_nomes = pd.DataFrame(list(DE_PARA_DIAGRAMA.items()), columns=['Nome Original (Base de Preços)', 'Nome Exibido no Diagrama Visual'])
+        df_nomes = pd.DataFrame(list(st.session_state.de_para_diagrama.items()), columns=['Nome Original (Base de Preços)', 'Nome Exibido no Diagrama Visual'])
         df_nomes.to_excel(buffer_nomes, index=False)
         buffer_nomes.seek(0)
-        st.download_button(label="📥 Baixar Planilha de Personalização de I/O (Para Diagramas)", data=buffer_nomes, file_name="Dicionario_Nomes_Diagrama.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        st.download_button(label="📥 Baixar Planilha de Personalização de I/O", data=buffer_nomes, file_name="Dicionario_Nomes_Diagrama.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        
+        # UPLOAD DA PLANILHA EDITADA
+        upload_nomes = st.file_uploader("📂 Faça o upload da planilha editada para atualizar os nomes no sistema", type=["xlsx"])
+        if upload_nomes is not None:
+            try:
+                df_novo = pd.read_excel(upload_nomes)
+                # Verifica se as colunas estão corretas
+                if 'Nome Original (Base de Preços)' in df_novo.columns and 'Nome Exibido no Diagrama Visual' in df_novo.columns:
+                    novo_dict = dict(zip(df_novo['Nome Original (Base de Preços)'], df_novo['Nome Exibido no Diagrama Visual']))
+                    st.session_state.de_para_diagrama.update(novo_dict)
+                    st.success("✅ Nomes atualizados com sucesso! Os próximos diagramas já usarão o novo padrão.")
+                else:
+                    st.error("⚠️ As colunas do arquivo não correspondem ao padrão original.")
+            except Exception as e:
+                st.error(f"Erro ao ler arquivo: {e}")
+                
         st.markdown("---")
         
         st.subheader("Base Geral e Schneider")
