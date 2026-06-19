@@ -729,8 +729,35 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             
             if arquivo_diagrama is not None:
                 st.info("💡 Diagrama detectado! Identificamos o perfil: **UTA com Resistência + 4 Salas Limpas + Captador de Pó/Exaustores**.")
-                arquitetura_ia = st.radio("Qual marca de controlador você deseja utilizar?", ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "MCP Parametrizável (Mercato - Linha mais econômica)"], horizontal=True)
                 
+                st.markdown("##### ⚙️ Configurações do Quadro Gerado")
+                c_ia1, c_ia2 = st.columns(2)
+                
+                arquitetura_ia = c_ia1.radio("Qual marca de controlador você deseja utilizar?", ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "S7-1500 (Siemens)", "MCP Parametrizável (Mercato - Linha mais econômica)"])
+                tag_ia = c_ia2.text_input("Insira a TAG do Quadro:", value="QTA-Geral")
+                
+                is_mercato_ia = "Mercato" in arquitetura_ia
+                is_siemens_ia = "Siemens" in arquitetura_ia
+                
+                if is_mercato_ia: opcoes_ihm_ia = ["Sem Interface (Cego)", "Mercato - IHM Básica 4.3\""]
+                else: opcoes_ihm_ia = ["Sem Interface (Cego)", "IHM Padrão 7\"", "IHM Premium 10\""]
+                ihm_ia = c_ia1.radio("O quadro possuirá IHM local?", opcoes_ihm_ia)
+                
+                tipo_cfr_ia = "Não Aplicável"
+                if is_mercato_ia:
+                    soft_sel_ia = "Sem Supervisório"
+                    c_ia2.info("ℹ️ A arquitetura Mercato não contempla supervisório nativo.")
+                else:
+                    sup_opt_ia = c_ia2.radio("Terá Sistema de Supervisório?", ["Não", "Sim"])
+                    soft_sel_ia = "Sem Supervisório"
+                    if sup_opt_ia == "Sim":
+                        if is_siemens_ia: opcoes_soft_ia = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21"]
+                        else: opcoes_soft_ia = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21", "Sistema de monitoramento Schneider EBO"]
+                        soft_sel_ia = c_ia2.selectbox("Software de Supervisão:", opcoes_soft_ia)
+                        
+                        if "COM certificação" in soft_sel_ia:
+                            tipo_cfr_ia = c_ia2.radio("Modalidade do CFR-21 Part 11:", ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"])
+                            
                 if st.button("🪄 Executar Engenharia Reversa e Gerar Quadro", type="primary"):
                     with st.spinner("Analisando topologia, salas e instrumentos..."):
                         
@@ -741,13 +768,13 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 
                         novo_quadro_ia = {
                             "id": str(uuid.uuid4()),
-                            "nome": "QTA-Geral (IA Gerado)",
+                            "nome": tag_ia,
                             "tipo": "Controle (HVAC/Máquinas)",
-                            "supervisorio": "Sistema supervisório SEM certificação CFR-21" if "Mercato" not in arquitetura_ia else "Sem Supervisório",
+                            "supervisorio": soft_sel_ia,
                             "arquitetura": arquitetura_ia,
-                            "tipo_cfr": "Não Aplicável",
+                            "tipo_cfr": tipo_cfr_ia,
                             "modo_config": "Usar Padrão Existente (Kits)",
-                            "ihm": "Sem Interface (Cego)" if "Mercato" in arquitetura_ia else "IHM Padrão 7\"",
+                            "ihm": ihm_ia,
                             "sobra_20": "Não",
                             "tags_nao_reconhecidas": ["PT-08 (Sala Químicos)", "FQI-01 (Duto Exaustão)"],
                             "grupos_equipamentos": [
@@ -941,53 +968,46 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 else:
                                     st.success(f"✅ OK! Este sistema cabe na arquitetura parametrizável e será utilizado 1x {modelo_mcp}.")
 
-                        # 1. FLUXOGRAMA DINÂMICO VIA MERMAID (Com TAGs e Layout Muralha)
+                        # 1. FLUXOGRAMA DINÂMICO VISUAL (Graphviz)
                         with st.expander("👁️ Visualizar Diagrama P&ID (Lógica e TAGs)"):
                             try:
-                                mermaid_str = "```mermaid\ngraph LR\n"
-                                mermaid_str += "  subgraph Entradas [ENTRADAS - SINAIS DE CAMPO]\n    direction TB\n"
+                                dot = f'digraph G {{\n'
+                                dot += f'  rankdir=LR;\n'
+                                dot += f'  node [fontname="Arial", fontsize=10, shape=box, style=rounded];\n'
+                                dot += f'  "Controlador" [label="{p_data.get("arquitetura", "Controlador")}\\n({g_data["nome_grupo"]})", fillcolor="#1C8590", style=filled, fontcolor=white, shape=ellipse];\n'
                                 
-                                in_nodes = []
-                                out_nodes = []
-                                connections = []
+                                has_inputs = False
+                                has_outputs = False
+                                node_idx = 0
                                 
-                                node_idx = 1
                                 for inst_f, q_f in g_data['instrumentos'].items():
                                     if q_f > 0:
                                         io_v = REGRA_IO.get(inst_f, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
-                                        lbl = inst_f.split('(')[0].strip()
-                                        tag_inst = inst_f.split('(')[-1].replace(')', '').strip() if '(' in inst_f else 'TAG'
+                                        # Limpar o nome para o grafico nao ficar gigante
+                                        lbl_curto = inst_f.split('(')[0].strip()
+                                        if len(lbl_curto) > 30: lbl_curto = lbl_curto[:30] + "..."
                                         
-                                        if io_v["AI"] > 0 or io_v["DI"] > 0:
-                                            n_id = f"I{node_idx}"
-                                            signal = "0-10V/PT1000" if io_v["AI"] > 0 else "Contato"
-                                            mermaid_str += f"    {n_id}[\"{lbl}<br/><b>TAG: {tag_inst}</b>\"]\n"
-                                            connections.append(f"    {n_id} -. {signal} .-> C\n")
-                                            in_nodes.append(n_id)
-                                            
-                                        if io_v["AO"] > 0 or io_v["DO"] > 0:
-                                            n_id = f"O{node_idx}"
-                                            signal = "0-10V" if io_v["AO"] > 0 else "Comando"
-                                            out_nodes.append((n_id, lbl, tag_inst, signal))
-                                            
+                                        tag_inst = inst_f.split('(')[-1].replace(')', '').strip() if '(' in inst_f else 'TAG'
+                                        node_name = f"node_{node_idx}"
                                         node_idx += 1
                                         
-                                mermaid_str += "  end\n\n"
-                                mermaid_str += f"  C{{{{{p_data.get('arquitetura', 'Controlador')}<br/>({g_data['nome_grupo']})}}}}\n\n"
+                                        if io_v["AI"] > 0 or io_v["DI"] > 0:
+                                            dot += f'  "{node_name}_in" [label="{lbl_curto}\\nTAG: {tag_inst}", color="#2B7BC4"];\n'
+                                            dot += f'  "{node_name}_in" -> "Controlador" [color="#2B7BC4"];\n'
+                                            has_inputs = True
+                                            
+                                        if io_v["AO"] > 0 or io_v["DO"] > 0:
+                                            dot += f'  "{node_name}_out" [label="{lbl_curto}\\nTAG: {tag_inst}", color="#E14D2A"];\n'
+                                            dot += f'  "Controlador" -> "{node_name}_out" [color="#E14D2A"];\n'
+                                            has_outputs = True
+                                            
+                                if not has_inputs: dot += '  "Sinais de Campo" -> "Controlador" [style=dashed];\n'
+                                if not has_outputs: dot += '  "Controlador" -> "Atuadores" [style=dashed];\n'
+                                dot += '}'
                                 
-                                mermaid_str += "  subgraph Saidas [SAÍDAS - ATUADORES E COMANDOS]\n    direction TB\n"
-                                for n_id, lbl, tag_inst, signal in out_nodes:
-                                    mermaid_str += f"    {n_id}[\"{lbl}<br/><b>TAG: {tag_inst}</b>\"]\n"
-                                    connections.append(f"    C ==>|{signal}| {n_id}\n")
-                                mermaid_str += "  end\n\n"
-                                
-                                for conn in connections:
-                                    mermaid_str += conn
-                                    
-                                mermaid_str += "```"
-                                st.markdown(mermaid_str)
+                                st.graphviz_chart(dot)
                             except Exception as e:
-                                st.caption(f"Configure os instrumentos abaixo para projetar o fluxograma. Erro: {e}")
+                                st.caption(f"Adicione instrumentos para projetar o fluxograma visual. Erro: {e}")
 
                         with st.expander("⚙️ Ajuste Fino de Instrumentos (Engenharia)"):
                             for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
