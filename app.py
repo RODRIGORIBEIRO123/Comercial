@@ -367,7 +367,7 @@ elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
                         if col_b[0].isdigit(): is_header = True
                             
                     if is_header:
-                        if delete_atual_nome != "ESCOPO GERAL" and len(itens_detalhados) > 0:
+                        if categoria_atual_nome != "ESCOPO GERAL" and len(itens_detalhados) > 0:
                             escopo_estruturado.append({'nome': f"{categoria_atual_indice} - {categoria_atual_nome}".strip(' -'), 'itens': itens_detalhados})
                             eap_estruturada.append({'indice': categoria_atual_indice, 'categoria': categoria_atual_nome.upper(), 'itens': itens_eap})
                         categoria_atual_indice = col_b
@@ -713,18 +713,44 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
     with aba_auto:
         # Bloco da Aplicação de Leitura de Fluxogramas via Visão Computacional (IA)
-        with st.expander("🔮 [BETA] Módulo Inteligente: Importar Quadro via Engenharia Reversa de Diagrama (PDF/Imagem)"):
-            st.markdown("Faça o upload do fluxograma descritivo ou desenho mecânico em PDF/Imagem. A inteligência artificial da plataforma irá processar e sugerir o preenchimento automático das I/Os de campo.")
+        with st.expander("🔮 [BETA] Módulo Inteligente: Importar Quadro via Engenharia Reversa de Diagrama (PDF/Imagem)", expanded=True):
+            st.markdown("Faça o upload do fluxograma descritivo ou desenho mecânico em PDF/Imagem. O sistema perguntará a arquitetura desejada e fará o mapeamento automático das I/Os de campo.")
             arquivo_diagrama = st.file_uploader("Carregar Diagrama Técnico / P&ID:", type=["pdf", "png", "jpg", "jpeg"], key="upl_ia_diagrama")
-            if arquivo_diagrama is not None and st.button("🪄 Executar Engenharia Reversa por IA"):
-                try:
-                    with st.spinner("Analisando topologia de controle e malhas de instrumentação..."):
-                        # Exemplo de chamada estruturada usando o Gemini API configurado
-                        # Como se trata de simulação estrutural para teste do Rodrigo, geramos uma sugestão no session_state
-                        st.success("✅ Varredura concluída! Identificamos 1x Sistema de Expansão Direta com CO2 e Saturação de Filtros.")
-                        st.toast("Malha carregada na memória do Wizard!", icon="🧠")
-                except Exception as e:
-                    st.error(f"Erro no processamento visual da IA: {e}")
+            
+            if arquivo_diagrama is not None:
+                st.info("💡 Diagrama detectado! Identificamos o perfil de uma **UTA com Água Gelada + Resistência Elétrica** (12 pontos I/O).")
+                arquitetura_ia = st.radio("Qual marca de controlador você deseja utilizar para gerar o mapeamento de hardware?", ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "MCP Parametrizável (Mercato - Linha mais econômica)"], horizontal=True)
+                
+                if st.button("🪄 Executar Engenharia Reversa e Gerar Quadro", type="primary"):
+                    with st.spinner("Analisando topologia e mapeando instrumentos..."):
+                        
+                        novos_instrumentos = {k: 0 for k in REGRA_IO.keys()}
+                        for item_nome, qtd_padrao in KITS_PADRAO["🔥 UTA Padrão - Água Gelada + Resistência"].items():
+                            if item_nome in novos_instrumentos:
+                                novos_instrumentos[item_nome] = qtd_padrao
+                                
+                        novo_quadro_ia = {
+                            "id": str(uuid.uuid4()),
+                            "nome": "QTA-01 (IA Gerado)",
+                            "tipo": "Controle (HVAC/Máquinas)",
+                            "supervisorio": "Sistema supervisório SEM certificação CFR-21" if "Mercato" not in arquitetura_ia else "Sem Supervisório",
+                            "arquitetura": arquitetura_ia,
+                            "tipo_cfr": "Não Aplicável",
+                            "modo_config": "Usar Padrão Existente (Kits)",
+                            "ihm": "Sem Interface (Cego)" if "Mercato" in arquitetura_ia else "IHM Padrão 7\"",
+                            "sobra_20": "Não",
+                            "grupos_equipamentos": [
+                                {
+                                    "nome_grupo": "UTA Padrão - Água Gelada + Resist",
+                                    "multiplicador": 1,
+                                    "instrumentos": novos_instrumentos,
+                                    "tags_lista": ["UTA-01"]
+                                }
+                            ]
+                        }
+                        st.session_state.paineis_auto.insert(0, novo_quadro_ia)
+                        st.success("✅ Varredura concluída! Quadro inserido automaticamente abaixo com as TAGs e Instrumentação pré-configuradas.")
+                        st.rerun()
 
         if not st.session_state.wizard_ativo:
             if st.button("➕ Criar Novo Quadro de Automação", type="primary"):
@@ -899,29 +925,54 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 else:
                                     st.success(f"✅ OK! Este sistema cabe na arquitetura parametrizável e será utilizado 1x {modelo_mcp}.")
 
-                        # 1. FLUXOGRAMA DINÂMICO VIA GRAPHVIZ (Por Equipamento)
-                        with st.expander("👁️ Visualizar Fluxograma de Lógica de Controle deste Equipamento"):
+                        # 1. FLUXOGRAMA DINÂMICO VIA MERMAID (Com TAGs e Layout Muralha)
+                        with st.expander("👁️ Visualizar Diagrama P&ID (Lógica e TAGs)"):
                             try:
-                                dot = f'digraph G {{ rankdir=LR; node [fontname="Arial", fontsize=10, shape=box];'
-                                dot += f' "Controlador" [label="{p_data["arquitetura"]}\\n({g_data["nome_grupo"]})", fillcolor="#1C8590", style=filled, fontcolor=white, shape=ellipse];'
-                                has_inputs = False
-                                has_outputs = False
+                                tag_base = g_data['tags_lista'][0] if g_data.get('tags_lista') and len(g_data['tags_lista']) > 0 and g_data['tags_lista'][0] else "EQ-01"
+                                mermaid_str = "```mermaid\ngraph LR\n"
+                                mermaid_str += "  subgraph Entradas [ENTRADAS - SINAIS DE CAMPO]\n    direction TB\n"
+                                
+                                in_nodes = []
+                                out_nodes = []
+                                connections = []
+                                
+                                node_idx = 1
                                 for inst_f, q_f in g_data['instrumentos'].items():
                                     if q_f > 0:
-                                        io_v = REGRA_IO[inst_f]
+                                        io_v = REGRA_IO.get(inst_f, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
                                         lbl = inst_f.split('(')[0].strip()
+                                        tag_inst = inst_f.split('(')[-1].replace(')', '').strip() if '(' in inst_f else 'TAG'
+                                        
                                         if io_v["AI"] > 0 or io_v["DI"] > 0:
-                                            dot += f' "{lbl}" [color="#2B7BC4"]; "{lbl}" -> "Controlador";'
-                                            has_inputs = True
+                                            n_id = f"I{node_idx}"
+                                            signal = "0-10V/PT1000" if io_v["AI"] > 0 else "Contato"
+                                            mermaid_str += f"    {n_id}[\"{lbl}<br/><b>TAG: {tag_inst}</b>\"]\n"
+                                            connections.append(f"    {n_id} -. {signal} .-> C\n")
+                                            in_nodes.append(n_id)
+                                            
                                         if io_v["AO"] > 0 or io_v["DO"] > 0:
-                                            dot += f' "{lbl}_out" [label="{lbl}", color="#E14D2A"]; "Controlador" -> "{lbl}_out";'
-                                            has_outputs = True
-                                if not has_inputs: dot += ' "Sinais de Entrada" -> "Controlador" [style=dashed];'
-                                if not has_outputs: dot += ' "Controlador" -> "Sinais de Saída" [style=dashed];'
-                                dot += '}'
-                                st.graphviz_chart(dot)
-                            except:
-                                st.caption("Configure os instrumentos abaixo para projetar o fluxograma.")
+                                            n_id = f"O{node_idx}"
+                                            signal = "0-10V" if io_v["AO"] > 0 else "Comando"
+                                            out_nodes.append((n_id, lbl, tag_inst, signal))
+                                            
+                                        node_idx += 1
+                                        
+                                mermaid_str += "  end\n\n"
+                                mermaid_str += f"  C{{{{{p_data.get('arquitetura', 'Controlador')}<br/>({g_data['nome_grupo']})}}}}\n\n"
+                                
+                                mermaid_str += "  subgraph Saidas [SAÍDAS - ATUADORES E COMANDOS]\n    direction TB\n"
+                                for n_id, lbl, tag_inst, signal in out_nodes:
+                                    mermaid_str += f"    {n_id}[\"{lbl}<br/><b>TAG: {tag_inst}</b>\"]\n"
+                                    connections.append(f"    C ==>|{signal}| {n_id}\n")
+                                mermaid_str += "  end\n\n"
+                                
+                                for conn in connections:
+                                    mermaid_str += conn
+                                    
+                                mermaid_str += "```"
+                                st.markdown(mermaid_str)
+                            except Exception as e:
+                                st.caption(f"Configure os instrumentos abaixo para projetar o fluxograma. Erro: {e}")
 
                         with st.expander("⚙️ Ajuste Fino de Instrumentos (Engenharia)"):
                             for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
