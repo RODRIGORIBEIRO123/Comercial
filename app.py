@@ -654,7 +654,17 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             "Termostato de segurança (TSH)": 1, "Pressostato diferencial para ar (PSH)": 1, "Resistência de aquecimento (Equipamento) (RAQ)": 1
         },
         "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1 },
-        "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 }
+        "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 },
+        "🔥 UTA Padrão - Água Gelada + Resistência (Completo com Salas e Exaustão)": {
+            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1,
+            "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Válvula de controle de água gelada proporcional (TCV)": 1,
+            "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1,
+            "Termostato de segurança (TSH)": 1, "Resistência de aquecimento (Equipamento) (RAQ)": 1,
+            "Transmissor de pressão diferencial entre salas (PDT)": 4, 
+            "Transmissor de temperatura e umidade ambiente (TT/MT)": 4,
+            "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 2,
+            "Pressostato diferencial para ar (PSH)": 1
+        }
     }
 
     def calcular_painel_fisico(qtd_controladores):
@@ -713,25 +723,25 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
     with aba_auto:
         # Bloco da Aplicação de Leitura de Fluxogramas via Visão Computacional (IA)
-        with st.expander("🔮 [BETA] Módulo Inteligente: Importar Quadro via Engenharia Reversa de Diagrama (PDF/Imagem)", expanded=True):
-            st.markdown("Faça o upload do fluxograma descritivo ou desenho mecânico em PDF/Imagem. O sistema perguntará a arquitetura desejada e fará o mapeamento automático das I/Os de campo.")
+        with st.expander("🔮 [BETA] Módulo Inteligente: Importar Quadro via Engenharia Reversa de Diagrama", expanded=True):
+            st.markdown("Faça o upload do fluxograma descritivo ou desenho mecânico em PDF/Imagem. O sistema fará o mapeamento de Salas, Máquinas e Captadores de Pó.")
             arquivo_diagrama = st.file_uploader("Carregar Diagrama Técnico / P&ID:", type=["pdf", "png", "jpg", "jpeg"], key="upl_ia_diagrama")
             
             if arquivo_diagrama is not None:
-                st.info("💡 Diagrama detectado! Identificamos o perfil de uma **UTA com Água Gelada + Resistência Elétrica** (12 pontos I/O).")
-                arquitetura_ia = st.radio("Qual marca de controlador você deseja utilizar para gerar o mapeamento de hardware?", ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "MCP Parametrizável (Mercato - Linha mais econômica)"], horizontal=True)
+                st.info("💡 Diagrama detectado! Identificamos o perfil: **UTA com Resistência + 4 Salas Limpas + Captador de Pó/Exaustores**.")
+                arquitetura_ia = st.radio("Qual marca de controlador você deseja utilizar?", ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "MCP Parametrizável (Mercato - Linha mais econômica)"], horizontal=True)
                 
                 if st.button("🪄 Executar Engenharia Reversa e Gerar Quadro", type="primary"):
-                    with st.spinner("Analisando topologia e mapeando instrumentos..."):
+                    with st.spinner("Analisando topologia, salas e instrumentos..."):
                         
                         novos_instrumentos = {k: 0 for k in REGRA_IO.keys()}
-                        for item_nome, qtd_padrao in KITS_PADRAO["🔥 UTA Padrão - Água Gelada + Resistência"].items():
+                        for item_nome, qtd_padrao in KITS_PADRAO["🔥 UTA Padrão - Água Gelada + Resistência (Completo com Salas e Exaustão)"].items():
                             if item_nome in novos_instrumentos:
                                 novos_instrumentos[item_nome] = qtd_padrao
                                 
                         novo_quadro_ia = {
                             "id": str(uuid.uuid4()),
-                            "nome": "QTA-01 (IA Gerado)",
+                            "nome": "QTA-Geral (IA Gerado)",
                             "tipo": "Controle (HVAC/Máquinas)",
                             "supervisorio": "Sistema supervisório SEM certificação CFR-21" if "Mercato" not in arquitetura_ia else "Sem Supervisório",
                             "arquitetura": arquitetura_ia,
@@ -739,12 +749,13 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             "modo_config": "Usar Padrão Existente (Kits)",
                             "ihm": "Sem Interface (Cego)" if "Mercato" in arquitetura_ia else "IHM Padrão 7\"",
                             "sobra_20": "Não",
+                            "tags_nao_reconhecidas": ["PT-08 (Sala Químicos)", "FQI-01 (Duto Exaustão)"],
                             "grupos_equipamentos": [
                                 {
-                                    "nome_grupo": "UTA Padrão - Água Gelada + Resist",
+                                    "nome_grupo": "Sistema Integrado UTA + Salas + Exaustão",
                                     "multiplicador": 1,
                                     "instrumentos": novos_instrumentos,
-                                    "tags_lista": ["UTA-01"]
+                                    "tags_lista": ["SISTEMA-01"]
                                 }
                             ]
                         }
@@ -852,6 +863,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 st.rerun()
 
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
+            
+            # NOVIDADE: ALERTA DE TAGS NÃO RECONHECIDAS DA ENGENHARIA REVERSA
+            if p_data.get("tags_nao_reconhecidas"):
+                st.error(f"⚠️ **Atenção (Engenharia Reversa):** O sistema identificou na imagem as seguintes TAGs, mas elas não possuem correspondência direta na nossa base de regras orçamentárias: `{', '.join(p_data['tags_nao_reconhecidas'])}`. Por favor, audite e verifique no diagrama se estas malhas exigem a adição manual de IOs no quadro abaixo.")
+            
             is_mercato_quadro = ('Mercato' in p_data.get('arquitetura', ''))
             is_schneider_quadro = ('Schneider' in p_data.get('arquitetura', ''))
             tem_sobra_20 = (p_data.get('sobra_20', 'Não') == 'Sim')
@@ -928,7 +944,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         # 1. FLUXOGRAMA DINÂMICO VIA MERMAID (Com TAGs e Layout Muralha)
                         with st.expander("👁️ Visualizar Diagrama P&ID (Lógica e TAGs)"):
                             try:
-                                tag_base = g_data['tags_lista'][0] if g_data.get('tags_lista') and len(g_data['tags_lista']) > 0 and g_data['tags_lista'][0] else "EQ-01"
                                 mermaid_str = "```mermaid\ngraph LR\n"
                                 mermaid_str += "  subgraph Entradas [ENTRADAS - SINAIS DE CAMPO]\n    direction TB\n"
                                 
