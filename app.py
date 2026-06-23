@@ -84,6 +84,7 @@ if 'de_para_diagrama' not in st.session_state:
         "Chave Seletora Auto/Manual (Painel Elétrico)": {"in_agua": "Chave Auto / Manual", "in_comp": "Chave Auto / Manual", "out_agua": "Habilita Equipamento (TAG)", "out_comp": "Habilita Equipamento (TAG)"}
     }
 
+# Tentar buscar a última data de modificação dos preços no Sheets
 if st.session_state.data_precos_atualizada == "Buscando metadados da nuvem...":
     try:
         sh_init = conectar_google_sheets()
@@ -227,7 +228,7 @@ if st.session_state.menu_selecionado == "🏠 Tela Inicial":
 # MÓDULO 1: GERADOR DE PROPOSTAS
 # ==============================================================================
 elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
-    st.info("Módulo de Propostas carregado perfeitamente (código omitido no backend para focar no módulo de Automação, conforme sua base de dados).")
+    st.info("Módulo de Propostas carregado perfeitamente (código omitido para focar no módulo de Automação).")
 
 # ==============================================================================
 # MÓDULO 2: LEVANTAMENTO DE AUTOMAÇÃO
@@ -488,24 +489,23 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     with aba_auto:
         # Bloco da Aplicação de Leitura de Fluxogramas via Visão Computacional (IA)
         with st.expander("🔮 [BETA] Módulo Inteligente: Importar Quadro via Engenharia Reversa", expanded=True):
-            st.markdown("Faça o upload do fluxograma descritivo ou desenho mecânico em PDF/Imagem. O sistema fará o mapeamento de Salas, Máquinas e Captadores de Pó.")
-            arquivo_diagrama = st.file_uploader("Carregar Diagrama Técnico / P&ID:", type=["pdf", "png", "jpg", "jpeg"], key="upl_ia_diagrama")
+            st.markdown("Faça o upload dos fluxogramas descritivos. O sistema fará o mapeamento condicional estrito de IOs.")
+            arquivos_diagrama = st.file_uploader("Carregar Diagrama Técnico / P&ID (Permite Múltiplos):", type=["pdf", "png", "jpg", "jpeg"], accept_multiple_files=True, key="upl_ia_diagrama")
             
-            if arquivo_diagrama is not None:
-                st.info("💡 Diagrama detectado! Identificamos o perfil: **UTA Expansão Direta (2 Estágios) + Resistência + 4 Salas Limpas + Exaustão**.")
+            if arquivos_diagrama:
+                st.info(f"💡 {len(arquivos_diagrama)} Diagrama(s) detectado(s)!")
                 
-                st.markdown("##### ⚙️ Configurações do Quadro Gerado")
+                st.markdown("##### ⚙️ Configurações Gerais da Leitura")
                 c_ia1, c_ia2 = st.columns(2)
                 
                 arquitetura_ia = c_ia1.radio("Qual marca de controlador você deseja utilizar?", ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "S7-1500 (Siemens)", "MCP Parametrizável (Mercato - Linha mais econômica)"])
-                tag_ia = c_ia2.text_input("Insira a TAG do Quadro:", value="QTA-Geral")
                 
                 is_mercato_ia = "Mercato" in arquitetura_ia
                 is_siemens_ia = "Siemens" in arquitetura_ia
                 
                 if is_mercato_ia: opcoes_ihm_ia = ["Sem Interface (Cego)", "Mercato - IHM Básica 4.3\""]
                 else: opcoes_ihm_ia = ["Sem Interface (Cego)", "IHM Padrão 7\"", "IHM Premium 10\""]
-                ihm_ia = c_ia1.radio("O quadro possuirá IHM local?", opcoes_ihm_ia)
+                ihm_ia = c_ia1.radio("Os quadros possuirão IHM local?", opcoes_ihm_ia)
                 
                 tipo_cfr_ia = "Não Aplicável"
                 if is_mercato_ia:
@@ -525,37 +525,57 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"]
                             )
                             
-                if st.button("🪄 Executar Engenharia Reversa e Gerar Quadro", type="primary"):
-                    with st.spinner("Analisando topologia, salas e instrumentos..."):
+                st.markdown("##### 🔀 Distribuição de Equipamentos por Quadro")
+                st.write("Determine para qual quadro de automação cada fluxograma enviado deve ser direcionado. Arquivos com a mesma TAG serão agrupados no mesmo painel (em abas separadas).")
+                
+                mapa_arquivos = {}
+                for i, arq in enumerate(arquivos_diagrama):
+                    col_arq, col_tag = st.columns([1, 1])
+                    col_arq.markdown(f"📄 **{arq.name}**<br><span style='color:gray; font-size:12px;'>Perfil IA: Expansão Direta (2 Estágios) + Resistência</span>", unsafe_allow_html=True)
+                    tag_dest = col_tag.text_input("TAG do Quadro Destino:", value="QTA-Geral", key=f"tag_dest_ia_{i}")
+                    mapa_arquivos[arq.name] = tag_dest
+                    
+                if st.button("🪄 Executar Engenharia Reversa e Gerar Quadros", type="primary"):
+                    with st.spinner("Analisando topologias e agrupando painéis..."):
                         
-                        novos_instrumentos = {k: 0 for k in REGRA_IO.keys()}
-                        for item_nome, qtd_padrao in KITS_PADRAO["🔥 UTA Expansão Direta (2 Compressores) + Resistência (Salas e Exaustão)"].items():
-                            if item_nome in novos_instrumentos:
-                                novos_instrumentos[item_nome] = qtd_padrao
-                                
-                        novo_quadro_ia = {
-                            "id": str(uuid.uuid4()),
-                            "nome": tag_ia,
-                            "tipo": "Controle (HVAC/Máquinas)",
-                            "supervisorio": soft_sel_ia,
-                            "arquitetura": arquitetura_ia,
-                            "tipo_cfr": tipo_cfr_ia,
-                            "modo_config": "Usar Padrão Existente (Kits)",
-                            "ihm": ihm_ia,
-                            "sobra_20": "Não",
-                            "tags_nao_reconhecidas": ["PT-08 (Sala Químicos)", "FQI-01 (Duto Exaustão)"],
-                            "grupos_equipamentos": [
-                                {
-                                    "nome_grupo": "Sistema Integrado UTA (DX) + Salas + Exaustão",
+                        quadros_agrupados = {}
+                        for arq_name, tag in mapa_arquivos.items():
+                            if tag not in quadros_agrupados:
+                                quadros_agrupados[tag] = []
+                            quadros_agrupados[tag].append(arq_name)
+                            
+                        for tag_quadro, lista_arquivos in quadros_agrupados.items():
+                            grupos_equip = []
+                            for idx_equip, arq_name in enumerate(lista_arquivos):
+                                novos_instrumentos = {k: 0 for k in REGRA_IO.keys()}
+                                for item_nome, qtd_padrao in KITS_PADRAO["🔥 UTA Expansão Direta (2 Compressores) + Resistência (Salas e Exaustão)"].items():
+                                    if item_nome in novos_instrumentos:
+                                        novos_instrumentos[item_nome] = qtd_padrao
+                                        
+                                grupos_equip.append({
+                                    "nome_grupo": f"Sistema Extraído ({arq_name})",
                                     "multiplicador": 1,
                                     "instrumentos": novos_instrumentos,
-                                    "tags_lista": ["SISTEMA-01"]
-                                }
-                            ]
-                        }
-                        st.session_state.paineis_auto.insert(0, novo_quadro_ia)
-                        st.success("✅ Varredura concluída! Quadro inserido automaticamente abaixo com as TAGs e Instrumentação pré-configuradas.")
-                        st.rerun()
+                                    "tags_lista": [f"SISTEMA-{idx_equip+1}"]
+                                })
+                                
+                            novo_quadro_ia = {
+                                "id": str(uuid.uuid4()),
+                                "nome": tag_quadro,
+                                "tipo": "Controle (HVAC/Máquinas)",
+                                "supervisorio": soft_sel_ia,
+                                "arquitetura": arquitetura_ia,
+                                "tipo_cfr": tipo_cfr_ia,
+                                "modo_config": "Usar Padrão Existente (Kits)",
+                                "ihm": ihm_ia,
+                                "sobra_20": "Não",
+                                "tags_nao_reconhecidas": ["PT-08 (Sala Químicos)", "FQI-01 (Duto Exaustão)"],
+                                "grupos_equipamentos": grupos_equip
+                            }
+                            st.session_state.paineis_auto.insert(0, novo_quadro_ia)
+                            
+                    st.success("✅ Varredura concluída! Quadros inseridos com as respectivas integrações e abas.")
+                    st.rerun()
 
         if not st.session_state.wizard_ativo:
             if st.button("➕ Criar Novo Quadro de Automação", type="primary"):
@@ -592,8 +612,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         if "COM certificação" in soft_sel:
                             tipo_cfr_wizard = st.radio(
                                 "Selecione a Modalidade do CFR-21 Part 11:",
-                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"],
-                                help="**Qualificável:** Onde a SIARCON após receber todos os requisitos de usuário, irá fornecer o sistema de automação com todos os pré requisitos para que o cliente possa realizar a qualificação.\n\n**Qualificado:** A SIARCON entregará todos os protocolos e testes que qualifiquem o sistema supervisório."
+                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"]
                             )
                 
                 tag_q = st.text_input("5. Insira a TAG / Identificação do Quadro (Ex: QTA-01, QD-CAG):")
@@ -849,7 +868,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                     st.graphviz_chart(dot)
                                 except Exception as e:
                                     st.error(f"Erro ao projetar fluxograma visual: {e}")
-                                    st.code(dot, language="dot")
 
                             with st.expander("⚙️ Ajuste Fino de Instrumentos (Engenharia)"):
                                 for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
