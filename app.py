@@ -62,10 +62,10 @@ if 'paineis_auto' not in st.session_state: st.session_state.paineis_auto = []
 if 'confirmar_limpar' not in st.session_state: st.session_state.confirmar_limpar = False
 if 'data_precos_atualizada' not in st.session_state: st.session_state.data_precos_atualizada = "Buscando metadados da nuvem..."
 
-# DICIONÁRIO DE NOMES DO DIAGRAMA (Padronizado conforme planilha do usuário de 5 colunas)
+# DICIONÁRIO DE NOMES DO DIAGRAMA (Padronizado 5 colunas estritas)
 if 'de_para_diagrama' not in st.session_state:
     st.session_state.de_para_diagrama = {
-        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {"in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "", "out_comp": ""},
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {"in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "Modula Inversor", "out_comp": "Modula Inversor"},
         "Transmissor de temperatura e umidade para duto (TT/MT)": {"in_agua": "Trans. Temp. e Umid. (TT/MT)", "in_comp": "Trans. Temp. e Umid. (TT/MT)", "out_agua": "", "out_comp": ""},
         "Transmissor de temperatura para duto (TT)": {"in_agua": "Trans. Temp. (TT)", "in_comp": "Trans. Temp. (TT)", "out_agua": "", "out_comp": ""},
         "Válvula de controle de água gelada proporcional (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Modula VAG", "out_comp": "Habilta Compressor"},
@@ -75,6 +75,7 @@ if 'de_para_diagrama' not in st.session_state:
         "Pressostato diferencial para ar (PSH)": {"in_agua": "Pressostato Seg. RAQ (PSH)", "in_comp": "Pressostato Seg. RAQ (PSH)", "out_agua": "Status RAQ", "out_comp": "Status RAQ"},
         "Resistência de aquecimento (Equipamento) (RAQ)": {"in_agua": "", "in_comp": "", "out_agua": "Habilita RAQ", "out_comp": "Habilita RAQ"},
         "Pressostato para monitorar os filtros G4 (PSH)": {"in_agua": "Pressostato G4 (PSH)", "in_comp": "Pressostato G4 (PSH)", "out_agua": "Alarme G4 Saturado", "out_comp": "Alarme G4 Saturado"},
+        "Pressostato para monitorar os filtros M5 (PSH)": {"in_agua": "Pressostato M5 (PSH)", "in_comp": "Pressostato M5 (PSH)", "out_agua": "Alarme M5 Saturado", "out_comp": "Alarme M5 Saturado"},
         "Pressostato para monitorar os filtros F9 (PSH)": {"in_agua": "Pressostato F9 (PSH)", "in_comp": "Pressostato F9 (PSH)", "out_agua": "Alarme F9 Saturado", "out_comp": "Alarme F9 Saturado"},
         "Pressostato para monitorar os filtros H13/H14 (PSH)": {"in_agua": "Pressostato H13/14 (PSH)", "in_comp": "Pressostato H13/14 (PSH)", "out_agua": "Alarme H13/14 Saturado", "out_comp": "Alarme H13/14 Saturado"},
         "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": {"in_agua": "Status Func. Partida Direta (PSH)", "in_comp": "Status Func. Partida Direta (PSH)", "out_agua": "", "out_comp": ""},
@@ -84,7 +85,6 @@ if 'de_para_diagrama' not in st.session_state:
         "Chave Seletora Auto/Manual (Painel Elétrico)": {"in_agua": "Chave Auto / Manual", "in_comp": "Chave Auto / Manual", "out_agua": "Habilita Equipamento (TAG)", "out_comp": "Habilita Equipamento (TAG)"}
     }
 
-# Tentar buscar a última data de modificação dos preços no Sheets
 if st.session_state.data_precos_atualizada == "Buscando metadados da nuvem...":
     try:
         sh_init = conectar_google_sheets()
@@ -277,12 +277,13 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Bombas (I/O para controlador)": {"AI": 0, "AO": 1, "DI": 1, "DO": 1},
         "Tanques (I/O para controlador)": {"AI": 1, "AO": 0, "DI": 1, "DO": 1},
         "Pressostato para monitorar os filtros G4 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+        "Pressostato para monitorar os filtros M5 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
         "Pressostato para monitorar os filtros F9 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
         "Pressostato para monitorar os filtros H13/H14 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
         "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
-        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de pressão diferencial entre salas (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de pressão diferencial entre salas com display (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de temperatura Ambiente (TT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
@@ -311,12 +312,13 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Transmissor de pressão para água (PIT)": 1359.00,
         "Transmissor de vazão para água (FIT)": 3550.00,
         "Pressostato para monitorar os filtros G4 (PSH)": 349.00,
+        "Pressostato para monitorar os filtros M5 (PSH)": 349.00,
         "Pressostato para monitorar os filtros F9 (PSH)": 349.00,
         "Pressostato para monitorar os filtros H13/H14 (PSH)": 349.00,
         "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 349.00,
-        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)": 1490.00,
-        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)": 1490.00,
-        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)": 1490.00,
+        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDIT)": 1490.00,
+        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDIT)": 1490.00,
+        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDIT)": 1490.00,
         "Transmissor de pressão diferencial entre salas (PDT)": 1490.00,
         "Transmissor de pressão diferencial entre salas com display (PDIT)": 2110.00,
         "Transmissor de temperatura Ambiente (TT)": 2050.00,
@@ -393,8 +395,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             "Pressostato diferencial para ar (PSH)", "Resistência de aquecimento (Equipamento) (RAQ)"
         ],
         "🔸 Monitoramento (Filtros e Status)": [
-            "Pressostato para monitorar os filtros G4 (PSH)", "Pressostato para monitorar os filtros F9 (PSH)", "Pressostato para monitorar os filtros H13/H14 (PSH)",
-            "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)"
+            "Pressostato para monitorar os filtros G4 (PSH)", "Pressostato para monitorar os filtros M5 (PSH)", "Pressostato para monitorar os filtros F9 (PSH)", "Pressostato para monitorar os filtros H13/H14 (PSH)",
+            "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", "Transmissor de pressão diferencial (monitorar os filtros G4) (PDIT)"
         ],
         "🟢 Monitoramento e Controle de Ambientes": [
             "Transmissor de pressão diferencial entre salas (PDT)",
@@ -425,12 +427,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1,
             "Transmissor de temperatura e umidade para duto (TT/MT)": 1, 
             "Relé de Corrente - Status Compressor (TC)": 2,
-            "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1,
-            "Termostato de segurança (TSH)": 1, "Resistência de aquecimento (Equipamento) (RAQ)": 1,
-            "Transmissor de pressão diferencial entre salas (PDT)": 4, 
-            "Transmissor de temperatura e umidade ambiente (TT/MT)": 4,
-            "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 2,
-            "Pressostato diferencial para ar (PSH)": 1
+            "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros M5 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1,
+            "Termostato de segurança (TSH)": 1, "Resistência de aquecimento (Equipamento) (RAQ)": 1, "Pressostato diferencial para ar (PSH)": 1
         },
         "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1 },
         "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 }
@@ -512,7 +510,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
     with aba_auto:
         with st.expander("🔮 [BETA] Módulo Inteligente: Importar Quadro via Engenharia Reversa", expanded=True):
-            st.markdown("Faça o upload dos fluxogramas descritivos. O sistema fará o mapeamento condicional estrito de IOs.")
+            st.markdown("Faça o upload dos fluxogramas descritivos. O sistema fará o mapeamento condicional estrito de IOs de forma Inteligente e Separada (EAP).")
             arquivos_diagrama = st.file_uploader("Carregar Diagrama Técnico / P&ID (Permite Múltiplos):", type=["pdf", "png", "jpg", "jpeg"], accept_multiple_files=True, key="upl_ia_diagrama")
             
             if arquivos_diagrama:
@@ -572,17 +570,28 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         for tag_quadro, lista_arquivos in quadros_agrupados.items():
                             grupos_equip = []
                             for idx_equip, arq_name in enumerate(lista_arquivos):
-                                novos_instrumentos = {k: 0 for k in REGRA_IO.keys()}
-                                for item_nome, qtd_padrao in KITS_PADRAO["🔥 UTA Expansão Direta (2 Compressores) + Resistência (Salas e Exaustão)"].items():
-                                    if item_nome in novos_instrumentos:
-                                        novos_instrumentos[item_nome] = qtd_padrao
-                                        
-                                grupos_equip.append({
-                                    "nome_grupo": f"Sistema Extraído ({arq_name})",
-                                    "multiplicador": 1,
-                                    "instrumentos": novos_instrumentos,
-                                    "tags_lista": [f"SISTEMA-{idx_equip+1}"]
-                                })
+                                # 1. UTA Principal
+                                inst_uta = {k: 0 for k in REGRA_IO.keys()}
+                                inst_uta["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
+                                inst_uta["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
+                                inst_uta["Relé de Corrente - Status Compressor (TC)"] = 2
+                                inst_uta["Pressostato para monitorar os filtros G4 (PSH)"] = 1
+                                inst_uta["Pressostato para monitorar os filtros M5 (PSH)"] = 1
+                                inst_uta["Termostato de segurança (TSH)"] = 1
+                                inst_uta["Resistência de aquecimento (Equipamento) (RAQ)"] = 1
+                                inst_uta["Pressostato diferencial para ar (PSH)"] = 1
+                                grupos_equip.append({"nome_grupo": f"UTA Condensadora ({arq_name})", "multiplicador": 1, "instrumentos": inst_uta, "tags_lista": ["UTA-01"]})
+                                
+                                # 2. Exaustores
+                                inst_ex = {k: 0 for k in REGRA_IO.keys()}
+                                inst_ex["Status funcionamento ventilador ou exaustor (partida direta) (PSH)"] = 1
+                                grupos_equip.append({"nome_grupo": f"Linha de Exaustão ({arq_name})", "multiplicador": 2, "instrumentos": inst_ex, "tags_lista": ["EX-01", "EX-02"]})
+                                
+                                # 3. Salas Limpas
+                                inst_salas = {k: 0 for k in REGRA_IO.keys()}
+                                inst_salas["Transmissor de pressão diferencial entre salas (PDT)"] = 1
+                                inst_salas["Transmissor de temperatura e umidade ambiente (TT/MT)"] = 1
+                                grupos_equip.append({"nome_grupo": f"Monitoramento Salas ({arq_name})", "multiplicador": 4, "instrumentos": inst_salas, "tags_lista": ["SALA-01", "SALA-02", "SALA-03", "SALA-04"]})
                                 
                             novo_quadro_ia = {
                                 "id": str(uuid.uuid4()),
@@ -808,6 +817,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 has_outputs = False
                                 node_idx = 0
                                 
+                                # CRÍTICO: RENDERIZA O GRÁFICO 1 VEZ POR MÁQUINA (DENTRO DO LOOP DE INSTRUMENTOS APENAS ADICIONA NÓS)
                                 for inst_f, q_f in g_data['instrumentos'].items():
                                     if q_f > 0:
                                         io_v = REGRA_IO.get(inst_f, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
@@ -902,6 +912,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 if not has_outputs: dot += '  "Controlador" -> "Atuadores" [style=dashed];\n'
                                 dot += '}'
                                 
+                                # MOSTRA O DIAGRAMA UMA ÚNICA VEZ APÓS O LOOP (Evita Imagem Picotada e Múltipla)
                                 try:
                                     st.graphviz_chart(dot)
                                 except Exception as e:
@@ -1044,7 +1055,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 if qtd_infra > 0 and valor_infra > 0:
                     st.session_state.orcamento.append({"Categoria": "Infraestrutura (Avulsa)", "Item": desc_infra, "Quantidade": qtd_infra, "Custo_Total": qtd_infra * valor_infra})
                     st.success("Adicionado com sucesso.")
-                    
+
     with aba_precos:
         st.header("Gestão da Base de Preços")
         st.info(f"📅 **Última atualização da tabela sincronizada com o banco de dados da nuvem:** {st.session_state.data_precos_atualizada}")
@@ -1516,7 +1527,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 f"Sistema de automação dedicado para controle de {eq_desc}{texto_intro_extra}.\n\n"
                 f"O sistema contempla quadro de automação [TAG: {p['nome']}] {ihm_desc}, "
                 f"baseado na tecnologia {nome_arquitetura} ({ctrl_desc}), operando no modo {sup_desc}, "
-                f"permitindo a visualização em tempo real e o controle dos seguintes parâmetros operacionais gerais:\n\n"
+                f"permitindo a visualização em tempo real e o controle dos seguintes parameters operacionais gerais:\n\n"
                 f"• Status de operação dos equipamentos.\n"
                 f"{bullet_filtros}"
             )
