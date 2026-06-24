@@ -65,7 +65,7 @@ if 'data_precos_atualizada' not in st.session_state: st.session_state.data_preco
 # DICIONÁRIO DE NOMES DO DIAGRAMA (Padronizado conforme planilha do usuário de 5 colunas)
 if 'de_para_diagrama' not in st.session_state:
     st.session_state.de_para_diagrama = {
-        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {"in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "Modula Inversor", "out_comp": "Modula Inversor"},
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {"in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "", "out_comp": ""},
         "Transmissor de temperatura e umidade para duto (TT/MT)": {"in_agua": "Trans. Temp. e Umid. (TT/MT)", "in_comp": "Trans. Temp. e Umid. (TT/MT)", "out_agua": "", "out_comp": ""},
         "Transmissor de temperatura para duto (TT)": {"in_agua": "Trans. Temp. (TT)", "in_comp": "Trans. Temp. (TT)", "out_agua": "", "out_comp": ""},
         "Válvula de controle de água gelada proporcional (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Modula VAG", "out_comp": "Habilta Compressor"},
@@ -444,12 +444,13 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             if "VÁLVULA" in inst_upper or "TCV" in inst_upper: return "3x0,75mm² + Shield"
             if "INVERSOR" in inst_upper or "VAZÃO" in inst_upper: return "3x0,75mm² + Shield"
             if "CHAVE" in inst_upper: return "5x1,00mm²"
+            if "EXAUSTOR" in inst_upper or "VENTILADOR" in inst_upper or "COMPRESSOR" in inst_upper: return "2x1,00mm²"
             return "2x1,00mm²"
         else:
-            if "(TT/MT)" in inst_upper or "TIT/MIT" in inst_upper: return "5x0,75mm² + Shield"
-            if "(PDT)" in inst_upper or "(PDIT)" in inst_upper or "(TT)" in inst_upper or "(PIT)" in inst_upper or "(FIT)" in inst_upper or "(TIT)" in inst_upper or "(TCV)" in inst_upper: return "3x0,75mm² + Shield"
-            if "(PSH)" in inst_upper or "(TC)" in inst_upper or "(TSH)" in inst_upper: return "2x1,00mm²"
             if "CHAVE" in inst_upper: return "5x1,00mm²"
+            if "(TT/MT)" in inst_upper or "TIT/MIT" in inst_upper: return "5x0,75mm² + Shield"
+            if "(PDT)" in inst_upper or "(PDIT)" in inst_upper or "(TT)" in inst_upper or "(PIT)" in inst_upper or "(FIT)" in inst_upper or "(TIT)" in inst_upper or "(TCV)" in inst_upper or "VÁLVULA" in inst_upper or "INVERSOR" in inst_upper or "VAZÃO" in inst_upper: return "3x0,75mm² + Shield"
+            if "(PSH)" in inst_upper or "(TC)" in inst_upper or "(TSH)" in inst_upper or "RAQ" in inst_upper or "RESISTÊNCIA" in inst_upper or "EXAUSTOR" in inst_upper or "VENTILADOR" in inst_upper or "COMPRESSOR" in inst_upper: return "2x1,00mm²"
         return ""
 
     def calcular_painel_fisico(qtd_controladores):
@@ -637,8 +638,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         if "COM certificação" in soft_sel:
                             tipo_cfr_wizard = st.radio(
                                 "Selecione a Modalidade do CFR-21 Part 11:",
-                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"],
-                                help="**Qualificável:** Onde a SIARCON após receber todos os requisitos de usuário, irá fornecer o sistema de automação com todos os pré requisitos para que o cliente possa realizar a qualificação.\n\n**Qualificado:** A SIARCON entregará todos os protocolos e testes que qualifiquem o sistema supervisório."
+                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"]
                             )
                 
                 calibracao_opt = st.radio("5. Os instrumentos serão calibrados?", ["Não", "Sim"], horizontal=True)
@@ -879,33 +879,33 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                                     dot += f'  "Controlador" -> "{node_name}_out" [label="{cabo_out}", fontsize=8, color="#E14D2A"];\n'
                                                     has_outputs = True
                                                     
-                                            node_idx += 1
-                                            
-                                    inst_chave = "Chave Seletora Auto/Manual (Painel Elétrico)"
-                                    c_names = st.session_state.de_para_diagrama.get(inst_chave, {})
-                                    lbl_in_c = str(c_names.get("in_comp", "")) if is_compressor_sys else str(c_names.get("in_agua", ""))
-                                    lbl_out_c = str(c_names.get("out_comp", "")) if is_compressor_sys else str(c_names.get("out_agua", ""))
-                                    
-                                    lbl_in_c = limpa_str(lbl_in_c)
-                                    lbl_out_c = limpa_str(lbl_out_c)
-                                    
-                                    if lbl_in_c and str(lbl_in_c).strip() not in ["", "nan"]:
-                                        dot += f'  "chave_in" [label="{lbl_in_c}\\nTAG: CH", color="#2B7BC4"];\n'
-                                        dot += f'  "chave_in" -> "Controlador" [label="5x1,00mm²", fontsize=8, color="#2B7BC4"];\n'
-                                        has_inputs = True
-                                    if lbl_out_c and str(lbl_out_c).strip() not in ["", "nan"]:
-                                        dot += f'  "chave_out" [label="{lbl_out_c}\\nTAG: CH", color="#E14D2A"];\n'
-                                        dot += f'  "Controlador" -> "chave_out" [label="5x1,00mm²", fontsize=8, color="#E14D2A"];\n'
-                                        has_outputs = True
+                                        node_idx += 1
+                                        
+                                inst_chave = "Chave Seletora Auto/Manual (Painel Elétrico)"
+                                c_names = st.session_state.de_para_diagrama.get(inst_chave, {})
+                                lbl_in_c = str(c_names.get("in_comp", "")) if is_compressor_sys else str(c_names.get("in_agua", ""))
+                                lbl_out_c = str(c_names.get("out_comp", "")) if is_compressor_sys else str(c_names.get("out_agua", ""))
+                                
+                                lbl_in_c = limpa_str(lbl_in_c)
+                                lbl_out_c = limpa_str(lbl_out_c)
+                                
+                                if lbl_in_c and str(lbl_in_c).strip() not in ["", "nan"]:
+                                    dot += f'  "chave_in" [label="{lbl_in_c}\\nTAG: CH", color="#2B7BC4"];\n'
+                                    dot += f'  "chave_in" -> "Controlador" [label="5x1,00mm²", fontsize=8, color="#2B7BC4"];\n'
+                                    has_inputs = True
+                                if lbl_out_c and str(lbl_out_c).strip() not in ["", "nan"]:
+                                    dot += f'  "chave_out" [label="{lbl_out_c}\\nTAG: CH", color="#E14D2A"];\n'
+                                    dot += f'  "Controlador" -> "chave_out" [label="5x1,00mm²", fontsize=8, color="#E14D2A"];\n'
+                                    has_outputs = True
 
-                                    if not has_inputs: dot += '  "Sinais de Campo" -> "Controlador" [style=dashed];\n'
-                                    if not has_outputs: dot += '  "Controlador" -> "Atuadores" [style=dashed];\n'
-                                    dot += '}'
-                                    
-                                    try:
-                                        st.graphviz_chart(dot)
-                                    except Exception as e:
-                                        st.error(f"Erro ao projetar fluxograma visual: {e}")
+                                if not has_inputs: dot += '  "Sinais de Campo" -> "Controlador" [style=dashed];\n'
+                                if not has_outputs: dot += '  "Controlador" -> "Atuadores" [style=dashed];\n'
+                                dot += '}'
+                                
+                                try:
+                                    st.graphviz_chart(dot)
+                                except Exception as e:
+                                    st.error(f"Erro ao projetar fluxograma visual: {e}")
 
                             with st.expander("⚙️ Ajuste Fino de Instrumentos (Engenharia)"):
                                 for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
@@ -1044,7 +1044,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 if qtd_infra > 0 and valor_infra > 0:
                     st.session_state.orcamento.append({"Categoria": "Infraestrutura (Avulsa)", "Item": desc_infra, "Quantidade": qtd_infra, "Custo_Total": qtd_infra * valor_infra})
                     st.success("Adicionado com sucesso.")
-
+                    
     with aba_precos:
         st.header("Gestão da Base de Preços")
         st.info(f"📅 **Última atualização da tabela sincronizada com o banco de dados da nuvem:** {st.session_state.data_precos_atualizada}")
@@ -1310,7 +1310,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         qtd_final = qtd * mult
                         item_nome_real = inst
                         
-                        # NOVIDADE: CÁLCULO DE CALIBRAÇÃO (Apenas Analógicos)
+                        # CÁLCULO DE CALIBRAÇÃO (Apenas Analógicos)
                         if calibracao_ativa:
                             inst_up = inst.upper()
                             if "(TT/MT)" in inst_up or "(TIT/MIT)" in inst_up:
@@ -1527,7 +1527,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 f"A solução proporciona maior confiabilidade operacional, facilidade de manutenção e gestão eficiente dos ativos térmicos e de controle de ar."
             )
             
-            # NOVIDADE: INJEÇÃO DO TEXTO DE CALIBRAÇÃO NA PROPOSTA
             if calibracao_ativa:
                 texto_p += "\n\nDestaca-se que somente os instrumentos analógicos de medição passarão por processo de calibração aferida."
             
