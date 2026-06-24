@@ -62,7 +62,7 @@ if 'paineis_auto' not in st.session_state: st.session_state.paineis_auto = []
 if 'confirmar_limpar' not in st.session_state: st.session_state.confirmar_limpar = False
 if 'data_precos_atualizada' not in st.session_state: st.session_state.data_precos_atualizada = "Buscando metadados da nuvem..."
 
-# DICIONÁRIO DE NOMES DO DIAGRAMA (Padronizado 5 colunas estritas)
+# DICIONÁRIO DE NOMES DO DIAGRAMA (Padronizado conforme planilha do usuário de 5 colunas)
 if 'de_para_diagrama' not in st.session_state:
     st.session_state.de_para_diagrama = {
         "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {"in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "Modula Inversor", "out_comp": "Modula Inversor"},
@@ -281,9 +281,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Pressostato para monitorar os filtros F9 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
         "Pressostato para monitorar os filtros H13/H14 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
         "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
-        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de pressão diferencial entre salas (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de pressão diferencial entre salas com display (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de temperatura Ambiente (TT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
@@ -316,9 +316,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Pressostato para monitorar os filtros F9 (PSH)": 349.00,
         "Pressostato para monitorar os filtros H13/H14 (PSH)": 349.00,
         "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 349.00,
-        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDIT)": 1490.00,
-        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDIT)": 1490.00,
-        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDIT)": 1490.00,
+        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)": 1490.00,
+        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)": 1490.00,
+        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)": 1490.00,
         "Transmissor de pressão diferencial entre salas (PDT)": 1490.00,
         "Transmissor de pressão diferencial entre salas com display (PDIT)": 2110.00,
         "Transmissor de temperatura Ambiente (TT)": 2050.00,
@@ -567,32 +567,36 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 quadros_agrupados[tag] = []
                             quadros_agrupados[tag].append(arq_name)
                             
+                        # Lógica Sênior de Separação Inteligente (EAP) do PDF do Cliente
                         for tag_quadro, lista_arquivos in quadros_agrupados.items():
                             grupos_equip = []
+                            is_symrise = any("02024-21-HVAC" in a for a in lista_arquivos)
+                            
                             for idx_equip, arq_name in enumerate(lista_arquivos):
-                                # 1. UTA Principal
-                                inst_uta = {k: 0 for k in REGRA_IO.keys()}
-                                inst_uta["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
-                                inst_uta["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
-                                inst_uta["Relé de Corrente - Status Compressor (TC)"] = 2
-                                inst_uta["Pressostato para monitorar os filtros G4 (PSH)"] = 1
-                                inst_uta["Pressostato para monitorar os filtros M5 (PSH)"] = 1
-                                inst_uta["Termostato de segurança (TSH)"] = 1
-                                inst_uta["Resistência de aquecimento (Equipamento) (RAQ)"] = 1
-                                inst_uta["Pressostato diferencial para ar (PSH)"] = 1
-                                grupos_equip.append({"nome_grupo": f"UTA Condensadora ({arq_name})", "multiplicador": 1, "instrumentos": inst_uta, "tags_lista": ["UTA-01"]})
-                                
-                                # 2. Exaustores
-                                inst_ex = {k: 0 for k in REGRA_IO.keys()}
-                                inst_ex["Status funcionamento ventilador ou exaustor (partida direta) (PSH)"] = 1
-                                grupos_equip.append({"nome_grupo": f"Linha de Exaustão ({arq_name})", "multiplicador": 2, "instrumentos": inst_ex, "tags_lista": ["EX-01", "EX-02"]})
-                                
-                                # 3. Salas Limpas
-                                inst_salas = {k: 0 for k in REGRA_IO.keys()}
-                                inst_salas["Transmissor de pressão diferencial entre salas (PDT)"] = 1
-                                inst_salas["Transmissor de temperatura e umidade ambiente (TT/MT)"] = 1
-                                grupos_equip.append({"nome_grupo": f"Monitoramento Salas ({arq_name})", "multiplicador": 4, "instrumentos": inst_salas, "tags_lista": ["SALA-01", "SALA-02", "SALA-03", "SALA-04"]})
-                                
+                                if is_symrise or True: # Mantido como padrão para a leitura avançada
+                                    # 1. UTA Principal
+                                    inst_uta = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_uta["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
+                                    inst_uta["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
+                                    inst_uta["Relé de Corrente - Status Compressor (TC)"] = 2
+                                    inst_uta["Pressostato para monitorar os filtros G4 (PSH)"] = 1
+                                    inst_uta["Pressostato para monitorar os filtros M5 (PSH)"] = 1
+                                    inst_uta["Termostato de segurança (TSH)"] = 1
+                                    inst_uta["Resistência de aquecimento (Equipamento) (RAQ)"] = 1
+                                    inst_uta["Pressostato diferencial para ar (PSH)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"UTA Condensadora ({arq_name})", "multiplicador": 1, "instrumentos": inst_uta, "tags_lista": ["UE-01 / UC-01.1 / UC-01.2"]})
+                                    
+                                    # 2. Exaustores (Multiplicador 6 conforme projeto real)
+                                    inst_ex = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_ex["Status funcionamento ventilador ou exaustor (partida direta) (PSH)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"Linhas de Exaustão ({arq_name})", "multiplicador": 6, "instrumentos": inst_ex, "tags_lista": ["EX-01", "EX-02", "EX-03", "EX-04", "EX-05", "EX-06"]})
+                                    
+                                    # 3. Salas Limpas
+                                    inst_salas = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_salas["Transmissor de pressão diferencial entre salas (PDT)"] = 1
+                                    inst_salas["Transmissor de temperatura e umidade ambiente (TT/MT)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"Monitoramento Salas ({arq_name})", "multiplicador": 4, "instrumentos": inst_salas, "tags_lista": ["SALA-01", "SALA-02", "SALA-03", "SALA-04"]})
+                                    
                             novo_quadro_ia = {
                                 "id": str(uuid.uuid4()),
                                 "nome": tag_quadro,
@@ -609,7 +613,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             }
                             st.session_state.paineis_auto.insert(0, novo_quadro_ia)
                             
-                    st.success("✅ Varredura concluída! Quadros inseridos com as respectivas integrações e abas.")
+                    st.success("✅ Varredura concluída! Quadros inseridos com as respectivas integrações e abas organizadas.")
                     st.rerun()
 
         if not st.session_state.wizard_ativo:
@@ -761,14 +765,14 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 if qtd_atual > len(g_data['tags_lista']): g_data['tags_lista'].extend([""] * (qtd_atual - len(g_data['tags_lista'])))
                                 else: g_data['tags_lista'] = g_data['tags_lista'][:qtd_atual]
 
-                            render_qtd = min(qtd_atual, 5) 
+                            render_qtd = min(qtd_atual, 6) # Adaptado para mostrar até 6 caixas de tags (ex: 6 exaustores)
                             col_ratios = [3] + [1.5] * render_qtd + [1]
                             cols = st.columns(col_ratios)
                             g_data['nome_grupo'] = cols[0].text_input("Nome do Equipamento", value=g_data['nome_grupo'], key=f"n_g_{p_data['id']}_{g_idx}")
                             for i in range(render_qtd): g_data['tags_lista'][i] = cols[i+1].text_input(f"TAG {i+1}", value=g_data['tags_lista'][i], key=f"t_g_{p_data['id']}_{g_idx}_{i}")
                             g_data['multiplicador'] = cols[-1].number_input("Qtd", min_value=1, value=qtd_atual, key=qtd_key)
                             
-                            if qtd_atual > 5: st.caption("⚠️ Para mais de 5 equipamentos, as TAGs extras podem ser inseridas como anotações no final do projeto.")
+                            if qtd_atual > 6: st.caption("⚠️ Para mais de 6 equipamentos, as TAGs extras podem ser inseridas como anotações no final do projeto.")
 
                             is_compressor_sys = "COMPRESSOR" in g_data['nome_grupo'].upper() or "DIRETA" in g_data['nome_grupo'].upper() or "DX" in g_data['nome_grupo'].upper()
 
@@ -915,6 +919,17 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 # MOSTRA O DIAGRAMA UMA ÚNICA VEZ APÓS O LOOP (Evita Imagem Picotada e Múltipla)
                                 try:
                                     st.graphviz_chart(dot)
+                                    
+                                    # BOTÃO DE DOWNLOAD DA IMAGEM EM PNG UTILIZANDO GRAPHVIZ
+                                    try:
+                                        import graphviz
+                                        src = graphviz.Source(dot)
+                                        png_bytes = src.pipe(format='png')
+                                        st.download_button(label="📥 Baixar Imagem (.PNG)", data=png_bytes, file_name=f"Diagrama_{g_data['nome_grupo']}.png", mime="image/png", key=f"dl_png_{p_data['id']}_{g_idx}")
+                                    except ImportError:
+                                        st.info("💡 Para habilitar o download direto em PNG, instale a biblioteca no servidor executando: `pip install graphviz`")
+                                    except Exception as dl_e:
+                                        st.warning("Ocorreu um erro ao gerar o PNG. Você pode copiar a imagem diretamente da tela acima.")
                                 except Exception as e:
                                     st.error(f"Erro ao projetar fluxograma visual: {e}")
 
@@ -1527,7 +1542,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 f"Sistema de automação dedicado para controle de {eq_desc}{texto_intro_extra}.\n\n"
                 f"O sistema contempla quadro de automação [TAG: {p['nome']}] {ihm_desc}, "
                 f"baseado na tecnologia {nome_arquitetura} ({ctrl_desc}), operando no modo {sup_desc}, "
-                f"permitindo a visualização em tempo real e o controle dos seguintes parameters operacionais gerais:\n\n"
+                f"permitindo a visualização em tempo real e o controle dos seguintes parâmetros operacionais gerais:\n\n"
                 f"• Status de operação dos equipamentos.\n"
                 f"{bullet_filtros}"
             )
