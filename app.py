@@ -68,7 +68,7 @@ if 'de_para_diagrama' not in st.session_state:
         "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {"in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "Modula Inversor", "out_comp": "Modula Inversor"},
         "Transmissor de temperatura e umidade para duto (TT/MT)": {"in_agua": "Trans. Temp. e Umid. (TT/MT)", "in_comp": "Trans. Temp. e Umid. (TT/MT)", "out_agua": "", "out_comp": ""},
         "Transmissor de temperatura para duto (TT)": {"in_agua": "Trans. Temp. (TT)", "in_comp": "Trans. Temp. (TT)", "out_agua": "", "out_comp": ""},
-        "Válvula de controle de água gelada proporcional (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Modula VAG", "out_comp": "Habilta Compressor"},
+        "Válvula de controle de água gelada proporcional (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Modula VAG", "out_comp": "Habilita Compressor"},
         "Válvula de controle de água quente proporcional (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Modula VAQ", "out_comp": ""},
         "Relé de Corrente - Status Compressor (TC)": {"in_agua": "", "in_comp": "Status Compressor", "out_agua": "", "out_comp": "Habilita Compressor"},
         "Termostato de segurança (TSH)": {"in_agua": "Termostato Seg. RAQ (TSH)", "in_comp": "Termostato Seg. RAQ (TSH)", "out_agua": "Status RAQ", "out_comp": "Status RAQ"},
@@ -286,14 +286,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de pressão diferencial entre salas (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de pressão diferencial entre salas com display (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de temperatura Ambiente (TT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura ambiente com display (TIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de temperatura e umidade ambiente (TT/MT)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura e umidade ambiente com display (TIT/MIT)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de CO2 ambiente (AT/AIT)": {"AI": 1, "AO": 1, "DI": 0, "DO": 1},
-        "Transmissor de temperatura de imersão (TT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de temperatura de imersão com display (TIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0}
+        "Transmissor de CO2 ambiente (AT/AIT)": {"AI": 1, "AO": 1, "DI": 0, "DO": 1}
     }
 
     banco_schneider_comum = {
@@ -321,9 +316,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)": 1490.00,
         "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)": 1490.00,
         "Transmissor de pressão diferencial entre salas (PDT)": 1490.00,
-        "Transmissor de pressão diferencial entre salas com display (PDIT)": 2110.00,
         "Transmissor de temperatura Ambiente (TT)": 2050.00,
-        "Transmissor de temperatura ambiente com display (TIT)": 2650.00,
         "Transmissor de temperatura e umidade ambiente (TT/MT)": 2050.00,
         "Custo AI/AO": 565.00, "Custo DI/DO": 120.00,
         "Licença Supervisório - SEM CFR-21 (Base)": 23000.00, "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)": 100.00,
@@ -397,7 +390,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         ],
         "🔸 Monitoramento (Filtros e Status)": [
             "Pressostato para monitorar os filtros G4 (PSH)", "Pressostato para monitorar os filtros M5 (PSH)", "Pressostato para monitorar os filtros F9 (PSH)", "Pressostato para monitorar os filtros H13/H14 (PSH)",
-            "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", "Transmissor de pressão diferencial (monitorar os filtros G4) (PDIT)"
+            "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)"
         ],
         "🟢 Monitoramento e Controle de Ambientes": [
             "Transmissor de pressão diferencial entre salas (PDT)",
@@ -589,7 +582,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                     inst_uta["Termostato de segurança (TSH)"] = 1
                                     inst_uta["Resistência de aquecimento (Equipamento) (RAQ)"] = 1
                                     inst_uta["Pressostato diferencial para ar (PSH)"] = 1
-                                    grupos_equip.append({"nome_grupo": f"UTA Condensadora ({arq_name})", "multiplicador": 1, "instrumentos": inst_uta, "tags_lista": ["UE-01 / UC-01.1 / UC-01.2"]})
+                                    grupos_equip.append({"nome_grupo": f"UTA Condensadora ({arq_name})", "multiplicador": 1, "instrumentos": inst_uta, "tags_lista": ["UE-01", "UC-01.1", "UC-01.2"]})
                                     
                                     # 2. Exaustores (Multiplicador 6 conforme projeto real)
                                     inst_ex = {k: 0 for k in REGRA_IO.keys()}
@@ -677,7 +670,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 
                 c_conf, c_canc = st.columns(2)
                 if c_conf.button("🚀 Confirmar e Montar Quadro", use_container_width=True):
-                    if not tag_q: st.warning("⚠️ Insira uma TAG válida para identificar o quadro.")
+                    if not tag_q: st.warning("⚠️ Insira uma TAG válida para identifyicar o quadro.")
                     elif config_opt is None: st.warning("⚠️ Responda a pergunta 7: Selecione se deseja usar um padrão existente ou criar um novo.")
                     elif config_opt == "Usar Padrão Existente (Kits)" and kit_final_selecionado == "Selecione...": st.warning("⚠️ Selecione um kit padrão.")
                     else:
@@ -833,6 +826,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 # CRÍTICO: RENDERIZA O GRÁFICO 1 VEZ POR TIPO DE INSTRUMENTO (Agrupa Caixas)
                                 for inst_f, q_f in g_data['instrumentos'].items():
                                     if q_f > 0:
+                                        q_int = int(q_f)
                                         io_v = REGRA_IO.get(inst_f, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
                                         tag_hardware = inst_f.split('(')[-1].replace(')', '').strip() if '(' in inst_f else 'IO'
                                         tag_hardware = limpa_str(tag_hardware)
@@ -863,61 +857,88 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                         
                                         if not has_in_pin and not has_out_pin: continue
                                         
-                                        node_name = f"N_{node_idx}"
-                                        prefix = f"{int(q_f)}x " if int(q_f) > 1 else ""
-                                        
                                         # Agrupamento das TAGs do usuário
                                         tags_validas = [t for t in g_data['tags_lista'] if t.strip()]
-                                        if not tags_validas:
-                                            str_tag_ctx = ""
-                                        else:
-                                            if len(tags_validas) == 1:
-                                                tag_simples = tags_validas[0]
-                                                # Isola a TAG primária (ex: UE-01) para a vazão se houver mais de um equipamento listado na mesma string
-                                                if "vazão de ar" in inst_f.lower() and "/" in tag_simples:
-                                                    tag_simples = tag_simples.split('/')[0].strip()
-                                                str_tag_ctx = f"\\n({limpa_str(tag_simples)})"
+                                        tags_inst = tags_validas
+                                        
+                                        # Isolar UE e UC se for sistema de Expansão Direta integrado
+                                        if is_compressor_sys and ("UTA" in grupo_nome.upper() or "SISTEMA" in grupo_nome.upper()):
+                                            if "COMPRESSOR" in inst_f.upper() or "TC" in inst_f.upper():
+                                                tags_inst = [t for t in tags_validas if "UC" in t.upper() or "COND" in t.upper() or "COMP" in t.upper()]
                                             else:
-                                                # Limita visualização para 4 itens para não explodir a caixa
-                                                q_real = int(q_f)
-                                                tags_selecionadas = tags_validas[:q_real]
-                                                if len(tags_selecionadas) > 4:
-                                                    tags_formatadas = ", ".join(tags_selecionadas[:4]) + ", ..."
-                                                else:
-                                                    tags_formatadas = ", ".join(tags_selecionadas)
-                                                str_tag_ctx = f"\\n({limpa_str(tags_formatadas)})"
+                                                tags_inst = [t for t in tags_validas if "UE" in t.upper() or "EVAP" in t.upper() or "UTA" in t.upper()]
+                                            if not tags_inst: tags_inst = tags_validas
+                                        
+                                        group_boxes = (q_int > 4) or is_monitoramento
                                         
                                         lbl_in_limpo = limpa_str(lbl_in)
                                         lbl_out_limpo = limpa_str(lbl_out)
-                                        
                                         if len(lbl_in_limpo) > 35: lbl_in_limpo = lbl_in_limpo[:35] + "..."
                                         if len(lbl_out_limpo) > 35: lbl_out_limpo = lbl_out_limpo[:35] + "..."
                                         
-                                        # Desenha entrada apenas se tiver nome na planilha
-                                        if has_in_pin and lbl_in_limpo and str(lbl_in_limpo).strip() not in ["", "nan"]:
-                                            cabo_in = obter_cabo(inst_f, False)
-                                            dot += f'  "{node_name}_in" [label="{prefix}{lbl_in_limpo}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#2B7BC4"];\n'
-                                            dot += f'  "{node_name}_in" -> "Controlador" [label="{cabo_in}", fontsize=8, color="#2B7BC4"];\n'
-                                            has_inputs = True
+                                        if group_boxes:
+                                            # Desenha APENAS 1 CAIXA com prefixo
+                                            node_name = f"N_{node_idx}_grp"
+                                            prefix = f"{q_int}x "
                                             
-                                        # Desenha saída apenas se tiver nome na planilha
-                                        if has_out_pin and lbl_out_limpo and str(lbl_out_limpo).strip() not in ["", "nan"]:
-                                            if "Resistência de aquecimento" in inst_f:
-                                                dot += f'  "{node_name}_out_DO" [label="{prefix}Habilita RAQ{str_tag_ctx}\\nTAG: DO", color="#E14D2A"];\n'
-                                                dot += f'  "Controlador" -> "{node_name}_out_DO" [label="2x1,00mm²", fontsize=8, color="#E14D2A"];\n'
-                                                dot += f'  "{node_name}_out_AO" [label="{prefix}Modulação Resistência{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
-                                                dot += f'  "Controlador" -> "{node_name}_out_AO" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
-                                                has_outputs = True
-                                            elif "medição de vazão de ar" in inst_f:
-                                                dot += f'  "{node_name}_out" [label="{prefix}Modula Inversor{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
-                                                dot += f'  "Controlador" -> "{node_name}_out" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
-                                                has_outputs = True
-                                            else:
-                                                cabo_out = obter_cabo(inst_f, True)
-                                                dot += f'  "{node_name}_out" [label="{prefix}{lbl_out_limpo}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#E14D2A"];\n'
-                                                dot += f'  "Controlador" -> "{node_name}_out" [label="{cabo_out}", fontsize=8, color="#E14D2A"];\n'
-                                                has_outputs = True
+                                            str_tags = ", ".join(tags_inst)
+                                            if len(str_tags) > 40: str_tags = str_tags[:37] + "..."
+                                            str_tag_ctx = f"\\n({limpa_str(str_tags)})" if str_tags else ""
+                                            
+                                            if has_in_pin and lbl_in_limpo and str(lbl_in_limpo).strip() not in ["", "nan"]:
+                                                cabo_in = obter_cabo(inst_f, False)
+                                                dot += f'  "{node_name}_in" [label="{prefix}{lbl_in_limpo}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#2B7BC4"];\n'
+                                                dot += f'  "{node_name}_in" -> "Controlador" [label="{cabo_in}", fontsize=8, color="#2B7BC4"];\n'
+                                                has_inputs = True
                                                 
+                                            if not is_monitoramento and has_out_pin and lbl_out_limpo and str(lbl_out_limpo).strip() not in ["", "nan"]:
+                                                if "Resistência de aquecimento" in inst_f:
+                                                    dot += f'  "{node_name}_out_DO" [label="{prefix}Habilita RAQ{str_tag_ctx}\\nTAG: DO", color="#E14D2A"];\n'
+                                                    dot += f'  "Controlador" -> "{node_name}_out_DO" [label="2x1,00mm²", fontsize=8, color="#E14D2A"];\n'
+                                                    dot += f'  "{node_name}_out_AO" [label="{prefix}Modulação Resistência{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
+                                                    dot += f'  "Controlador" -> "{node_name}_out_AO" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
+                                                    has_outputs = True
+                                                elif "medição de vazão de ar" in inst_f:
+                                                    dot += f'  "{node_name}_out" [label="{prefix}Modula Inversor{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
+                                                    dot += f'  "Controlador" -> "{node_name}_out" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
+                                                    has_outputs = True
+                                                else:
+                                                    cabo_out = obter_cabo(inst_f, True)
+                                                    dot += f'  "{node_name}_out" [label="{prefix}{lbl_out_limpo}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#E14D2A"];\n'
+                                                    dot += f'  "Controlador" -> "{node_name}_out" [label="{cabo_out}", fontsize=8, color="#E14D2A"];\n'
+                                                    has_outputs = True
+                                        else:
+                                            # Desenha CAIXAS SEPARADAS
+                                            for idx_q in range(q_int):
+                                                node_name = f"N_{node_idx}_{idx_q}"
+                                                lbl_suf = f" {idx_q+1}" if q_int > 1 else ""
+                                                
+                                                tag_contexto = tags_inst[idx_q % len(tags_inst)] if tags_inst else ""
+                                                str_tag_ctx = f"\\n({limpa_str(tag_contexto)})" if tag_contexto else ""
+                                                
+                                                if has_in_pin and lbl_in_limpo and str(lbl_in_limpo).strip() not in ["", "nan"]:
+                                                    cabo_in = obter_cabo(inst_f, False)
+                                                    dot += f'  "{node_name}_in" [label="{lbl_in_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#2B7BC4"];\n'
+                                                    dot += f'  "{node_name}_in" -> "Controlador" [label="{cabo_in}", fontsize=8, color="#2B7BC4"];\n'
+                                                    has_inputs = True
+                                                    
+                                                if not is_monitoramento and has_out_pin and lbl_out_limpo and str(lbl_out_limpo).strip() not in ["", "nan"]:
+                                                    if "Resistência de aquecimento" in inst_f:
+                                                        dot += f'  "{node_name}_out_DO" [label="Habilita RAQ{lbl_suf}{str_tag_ctx}\\nTAG: DO", color="#E14D2A"];\n'
+                                                        dot += f'  "Controlador" -> "{node_name}_out_DO" [label="2x1,00mm²", fontsize=8, color="#E14D2A"];\n'
+                                                        dot += f'  "{node_name}_out_AO" [label="Modulação Resistência{lbl_suf}{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
+                                                        dot += f'  "Controlador" -> "{node_name}_out_AO" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
+                                                        has_outputs = True
+                                                    elif "medição de vazão de ar" in inst_f:
+                                                        dot += f'  "{node_name}_out" [label="Modula Inversor{lbl_suf}{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
+                                                        dot += f'  "Controlador" -> "{node_name}_out" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
+                                                        has_outputs = True
+                                                    else:
+                                                        cabo_out = obter_cabo(inst_f, True)
+                                                        dot += f'  "{node_name}_out" [label="{lbl_out_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#E14D2A"];\n'
+                                                        dot += f'  "Controlador" -> "{node_name}_out" [label="{cabo_out}", fontsize=8, color="#E14D2A"];\n'
+                                                        has_outputs = True
+                                                        
                                         node_idx += 1
                                         
                                 if not is_monitoramento:
@@ -944,7 +965,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 if not has_outputs: dot += '  "Controlador" -> "Atuadores" [style=dashed];\n'
                                 dot += '}'
                                 
-                                # MOSTRA O DIAGRAMA UMA ÚNICA VEZ
+                                # MOSTRA O DIAGRAMA UMA ÚNICA VEZ APÓS O LOOP (Evita Imagem Picotada e Múltipla)
                                 try:
                                     st.graphviz_chart(dot)
                                     
@@ -957,7 +978,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                     except ImportError:
                                         st.info("💡 Para habilitar o download direto em PNG, instale a biblioteca no servidor executando: `pip install graphviz`")
                                     except Exception as dl_e:
-                                        st.warning("Ocorreu um erro ao gerar o PNG. Você pode copiar a imagem diretamente da tela acima.")
+                                        st.warning("Ocorreu um erro ao gerar o PNG. Você pode copiar a imagem diretamente da tela acima clicando nela com o botão direito.")
                                 except Exception as e:
                                     st.error(f"Erro ao projetar fluxograma visual: {e}")
 
