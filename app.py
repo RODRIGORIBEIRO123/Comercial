@@ -341,7 +341,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Siemens - Serviço Custo DI/DO": 180.00
     }
 
-    # NOVIDADE: ATUALIZAÇÃO DA LINHA MERCATO (MFC, MFC Plus, MDX)
     banco_mercato = {
         "Mercato - Controlador MDX (Expansão Direta)": 1250.00,
         "Mercato - Controlador MFC": 1650.00,
@@ -359,7 +358,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "CFR21 Qualificável - Acima de 250 pts": 30.00,
         "CFR21 Qualificado - Até 30 pts": 400.00,
         "CFR21 Qualificado - 31 a 60 pts": 350.00,
-        "CFR21 Qualificado - Acima de 250 pts": 200.00
+        "CFR21 Qualificado - Acima de 250 pts": 200.00,
+        "Serviço de Calibração (Por Ponto Analógico)": 180.00
     }
 
     banco_ihm = { "IHM Padrão 7\"": 3400.00, "IHM Premium 10\"": 8500.00, "Sem Interface (Cego)": 0.00 }
@@ -433,6 +433,15 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 }
     }
 
+    # --- FUNÇÃO PARA TIPO DE CABO NO DIAGRAMA ---
+    def obter_cabo(inst_nome):
+        inst_upper = inst_nome.upper()
+        if "(TT/MT)" in inst_upper or "TIT/MIT" in inst_upper: return "5x0,75mm² + Shield"
+        if "(PDT)" in inst_upper or "(PDIT)" in inst_upper or "(TT)" in inst_upper or "(PIT)" in inst_upper or "(FIT)" in inst_upper or "(TIT)" in inst_upper or "(TCV)" in inst_upper: return "3x0,75mm² + Shield"
+        if "(PSH)" in inst_upper or "(TC)" in inst_upper or "(TSH)" in inst_upper: return "2x1,00mm²"
+        if "CHAVE" in inst_upper: return "5x1,00mm²"
+        return ""
+
     def calcular_painel_fisico(qtd_controladores):
         if qtd_controladores == 0: return "Sem Painel", 0.0
         elif qtd_controladores <= 4: return "Quadro 600x400mm", 4500.00
@@ -478,13 +487,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         return hw
         
     def dimensionar_mercato(ui, ao, do, is_compressor_sys=False):
-        # NOVIDADE: Inteligência para selecionar Linha MDX se for compressor
         if is_compressor_sys and ui <= 6 and ao <= 2 and do <= 5: 
             return "Mercato - Controlador MDX (Expansão Direta)"
-        # MFC Padrão
         elif ui <= 8 and ao <= 4 and do <= 5: 
             return "Mercato - Controlador MFC"
-        # MFC Plus
         elif ui <= 14 and ao <= 6 and do <= 8: 
             return "Mercato - Controlador MFC Plus"
         return None
@@ -494,7 +500,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     ])
 
     with aba_auto:
-        # Bloco da Aplicação de Leitura de Fluxogramas via Visão Computacional (IA)
         with st.expander("🔮 [BETA] Módulo Inteligente: Importar Quadro via Engenharia Reversa", expanded=True):
             st.markdown("Faça o upload dos fluxogramas descritivos. O sistema fará o mapeamento condicional estrito de IOs.")
             arquivos_diagrama = st.file_uploader("Carregar Diagrama Técnico / P&ID (Permite Múltiplos):", type=["pdf", "png", "jpg", "jpeg"], accept_multiple_files=True, key="upl_ia_diagrama")
@@ -531,7 +536,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 "Selecione a Modalidade do CFR-21 Part 11:",
                                 ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"]
                             )
-                            
+                
+                calibracao_ia = c_ia2.radio("Os instrumentos serão calibrados?", ["Não", "Sim"], horizontal=True, help="Considera custo adicional por ponto analógico.")
+
                 st.markdown("##### 🔀 Distribuição de Equipamentos por Quadro")
                 st.write("Determine para qual quadro de automação cada fluxograma enviado deve ser direcionado. Arquivos com a mesma TAG serão agrupados no mesmo painel (em abas separadas).")
                 
@@ -575,6 +582,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 "tipo_cfr": tipo_cfr_ia,
                                 "modo_config": "Usar Padrão Existente (Kits)",
                                 "ihm": ihm_ia,
+                                "calibracao": calibracao_ia,
                                 "sobra_20": "Não",
                                 "tags_nao_reconhecidas": ["PT-08 (Sala Químicos)", "FQI-01 (Duto Exaustão)"],
                                 "grupos_equipamentos": grupos_equip
@@ -622,9 +630,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"]
                             )
                 
-                tag_q = st.text_input("5. Insira a TAG / Identificação do Quadro (Ex: QTA-01, QD-CAG):")
+                calibracao_opt = st.radio("5. Os instrumentos serão calibrados?", ["Não", "Sim"], horizontal=True)
+                tag_q = st.text_input("6. Insira a TAG / Identificação do Quadro (Ex: QTA-01, QD-CAG):")
                 
-                config_opt = st.radio("6. Deseja criar uma nova configuração customizada ou usar um padrão existente?", 
+                config_opt = st.radio("7. Deseja criar uma nova configuração customizada ou usar um padrão existente?", 
                                       ["Usar Padrão Existente (Kits)", "Criar Nova Configuração Customizada (Em Branco)"], 
                                       horizontal=True, index=None)
                 
@@ -635,12 +644,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     else: opcoes_kits_filtrados = [k for k in KITS_PADRAO.keys() if "CAG" not in k]
                     kit_final_selecionado = st.selectbox("Selecione o Modelo Padrão SIARCON:", ["Selecione..."] + opcoes_kits_filtrados)
                 
-                sobra_opt = st.radio("7. Deseja considerar 20% de sobra nas I/O (Reserva Técnica)?", ["Não", "Sim"], horizontal=True)
+                sobra_opt = st.radio("8. Deseja considerar 20% de sobra nas I/O (Reserva Técnica)?", ["Não", "Sim"], horizontal=True)
                 
                 c_conf, c_canc = st.columns(2)
                 if c_conf.button("🚀 Confirmar e Montar Quadro", use_container_width=True):
                     if not tag_q: st.warning("⚠️ Insira uma TAG válida para identificar o quadro.")
-                    elif config_opt is None: st.warning("⚠️ Responda a pergunta 6: Selecione se deseja usar um padrão existente ou criar um novo.")
+                    elif config_opt is None: st.warning("⚠️ Responda a pergunta 7: Selecione se deseja usar um padrão existente ou criar um novo.")
                     elif config_opt == "Usar Padrão Existente (Kits)" and kit_final_selecionado == "Selecione...": st.warning("⚠️ Selecione um kit padrão.")
                     else:
                         novos_instrumentos = {k: 0 for k in REGRA_IO.keys()}
@@ -657,7 +666,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             "id": str(uuid.uuid4()),
                             "nome": tag_q, "tipo": tipo_q, "supervisorio": soft_sel, "arquitetura": arquitetura_opt,
                             "tipo_cfr": tipo_cfr_wizard,
-                            "modo_config": config_opt, "ihm": ihm_selecionada, "sobra_20": sobra_opt, "grupos_equipamentos": grupos_equip
+                            "modo_config": config_opt, "ihm": ihm_selecionada, "sobra_20": sobra_opt, "calibracao": calibracao_opt, "grupos_equipamentos": grupos_equip
                         }
                         
                         st.session_state.paineis_auto.insert(0, novo_quadro)
@@ -697,7 +706,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 p_data['nome'] = c_nome_painel.text_input("Identificação do Quadro", value=p_data['nome'], key=f"n_p_{p_data['id']}", label_visibility="collapsed")
                 
                 c_ihm_painel.markdown(f"<div style='padding-top:10px; color:#555;'><b>IHM:</b> {p_data.get('ihm', 'Sem Interface (Cego)')}</div>", unsafe_allow_html=True)
-                st.caption(f"**Arquitetura:** {p_data.get('arquitetura', 'SpaceLogic (Schneider)')} | **Supervisão:** {p_data.get('supervisorio', 'Sem Supervisório')} | **CFR-21:** {p_data.get('tipo_cfr', 'Não Aplicável')} | **Reserva 20%:** {p_data.get('sobra_20', 'Não')}")
+                st.caption(f"**Arquitetura:** {p_data.get('arquitetura', 'SpaceLogic (Schneider)')} | **Supervisão:** {p_data.get('supervisorio', 'Sem Supervisório')} | **CFR-21:** {p_data.get('tipo_cfr', 'Não Aplicável')} | **Calibração:** {p_data.get('calibracao', 'Não')} | **Reserva 20%:** {p_data.get('sobra_20', 'Não')}")
                 
                 with st.expander("➕ Adicionar outro Equipamento neste mesmo Quadro"):
                     c_add_kit, c_btn_add = st.columns([3, 1])
@@ -819,6 +828,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                         
                                         if not has_in_pin and not has_out_pin: continue
                                         
+                                        cabo_str = obter_cabo(inst_f)
+                                        
                                         for idx_q in range(int(q_f)):
                                             if int(q_f) > 4 and idx_q > 0: break
                                             
@@ -837,12 +848,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                             
                                             if has_in_pin and lbl_in_limpo and str(lbl_in_limpo).strip() not in ["", "nan"]:
                                                 dot += f'  "{node_name}_in" [label="{prefix}{lbl_in_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#2B7BC4"];\n'
-                                                dot += f'  "{node_name}_in" -> "Controlador" [color="#2B7BC4"];\n'
+                                                dot += f'  "{node_name}_in" -> "Controlador" [label="{cabo_str}", fontsize=8, color="#2B7BC4"];\n'
                                                 has_inputs = True
                                                 
                                             if has_out_pin and lbl_out_limpo and str(lbl_out_limpo).strip() not in ["", "nan"]:
                                                 dot += f'  "{node_name}_out" [label="{prefix}{lbl_out_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#E14D2A"];\n'
-                                                dot += f'  "Controlador" -> "{node_name}_out" [color="#E14D2A"];\n'
+                                                dot += f'  "Controlador" -> "{node_name}_out" [label="{cabo_str}", fontsize=8, color="#E14D2A"];\n'
                                                 has_outputs = True
                                                 
                                         node_idx += 1
@@ -857,11 +868,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 
                                 if lbl_in_c and str(lbl_in_c).strip() not in ["", "nan"]:
                                     dot += f'  "chave_in" [label="{lbl_in_c}\\nTAG: CH", color="#2B7BC4"];\n'
-                                    dot += f'  "chave_in" -> "Controlador" [color="#2B7BC4"];\n'
+                                    dot += f'  "chave_in" -> "Controlador" [label="5x1,00mm²", fontsize=8, color="#2B7BC4"];\n'
                                     has_inputs = True
                                 if lbl_out_c and str(lbl_out_c).strip() not in ["", "nan"]:
                                     dot += f'  "chave_out" [label="{lbl_out_c}\\nTAG: CH", color="#E14D2A"];\n'
-                                    dot += f'  "Controlador" -> "chave_out" [color="#E14D2A"];\n'
+                                    dot += f'  "Controlador" -> "chave_out" [label="5x1,00mm²", fontsize=8, color="#E14D2A"];\n'
                                     has_outputs = True
 
                                 if not has_inputs: dot += '  "Sinais de Campo" -> "Controlador" [style=dashed];\n'
@@ -1238,9 +1249,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             is_schneider = ('Schneider' in arquitetura_atual)
             tem_sobra_20 = (p.get('sobra_20', 'Não') == 'Sim')
             tipo_cfr_painel = p.get('tipo_cfr', 'Não Aplicável')
+            calibracao_ativa = (p.get('calibracao', 'Não') == 'Sim')
             
             raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
             qtd_equipamentos_painel = 0
+            total_pontos_calibracao = 0
             
             lista_equip_nomes = []
             tem_resistencia = False
@@ -1275,6 +1288,14 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         qtd_final = qtd * mult
                         item_nome_real = inst
                         
+                        # NOVIDADE: CÁLCULO DE CALIBRAÇÃO (Apenas Analógicos)
+                        if calibracao_ativa:
+                            inst_up = inst.upper()
+                            if "(TT/MT)" in inst_up or "(TIT/MIT)" in inst_up:
+                                total_pontos_calibracao += (2 * qtd_final)
+                            elif "(PDT)" in inst_up or "(PDIT)" in inst_up or "(TT)" in inst_up or "(PIT)" in inst_up or "(FIT)" in inst_up or "(TIT)" in inst_up:
+                                total_pontos_calibracao += (1 * qtd_final)
+
                         if is_mercato:
                             if "Transmissor de temperatura para duto (TT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC (Duto)"
                             elif "Transmissor de temperatura Ambiente (TT)" in inst: item_nome_real = "Mercato - Sensor de Temperatura NTC (Ambiente)"
@@ -1351,6 +1372,15 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         custo_base_mercato += (mult * p_hw)
                     else:
                         linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"⚠️ ALERTA: Capacidade MFC/MDX Excedida ({g['nome_grupo']} - {p['nome']})", "Preço Unit.": 0.0, "Qtd": mult, "Custo Total": 0.0})
+
+            # INCLUSÃO DO CUSTO DE CALIBRAÇÃO (Se Houver)
+            if total_pontos_calibracao > 0:
+                pr_calib = st.session_state.precos_banco.get("Serviço de Calibração (Por Ponto Analógico)", 180.0)
+                linhas_servicos.append({
+                    "Categoria": "Serviços de Lógica", 
+                    "Item": f"Calibração de Instrumentos Analógicos ({p['nome']})", 
+                    "Preço Unit.": pr_calib, "Qtd": total_pontos_calibracao, "Custo Total": total_pontos_calibracao * pr_calib
+                })
 
             reserva_ai_painel = math.ceil(raw_ai_painel * 0.2) if tem_sobra_20 else 0
             reserva_ao_painel = math.ceil(raw_ao_painel * 0.2) if tem_sobra_20 else 0
@@ -1474,6 +1504,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 f"• Condições gerais de funcionamento.\n\n"
                 f"A solução proporciona maior confiabilidade operacional, facilidade de manutenção e gestão eficiente dos ativos térmicos e de controle de ar."
             )
+            
+            # NOVIDADE: INJEÇÃO DO TEXTO DE CALIBRAÇÃO NA PROPOSTA
+            if calibracao_ativa:
+                texto_p += "\n\nDestaca-se que somente os instrumentos analógicos de medição passarão por processo de calibração aferida."
             
             if tipo_cfr_painel == 'CFR21 Part 11 - Qualificável':
                 texto_p += "\n\nO sistema será fornecido de forma Qualificável conforme normas CFR 21 Part 11, atendendo a todos os requisitos técnicos e de software para que o cliente realize a qualificação posterior."
