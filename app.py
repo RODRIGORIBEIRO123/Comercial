@@ -85,6 +85,7 @@ if 'de_para_diagrama' not in st.session_state:
         "Chave Seletora Auto/Manual (Painel Elétrico)": {"in_agua": "Chave Auto / Manual", "in_comp": "Chave Auto / Manual", "out_agua": "Habilita Equipamento (TAG)", "out_comp": "Habilita Equipamento (TAG)"}
     }
 
+# Tentar buscar a última data de modificação dos preços no Sheets
 if st.session_state.data_precos_atualizada == "Buscando metadados da nuvem...":
     try:
         sh_init = conectar_google_sheets()
@@ -428,7 +429,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             "Transmissor de temperatura e umidade para duto (TT/MT)": 1, 
             "Relé de Corrente - Status Compressor (TC)": 2,
             "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros M5 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1,
-            "Termostato de segurança (TSH)": 1, "Resistência de aquecimento (Equipamento) (RAQ)": 1, "Pressostato diferencial para ar (PSH)": 1
+            "Termostato de segurança (TSH)": 1, "Resistência de aquecimento (Equipamento) (RAQ)": 1,
+            "Transmissor de pressão diferencial entre salas (PDT)": 4, 
+            "Transmissor de temperatura e umidade ambiente (TT/MT)": 4,
+            "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 2,
+            "Pressostato diferencial para ar (PSH)": 1
         },
         "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1 },
         "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 }
@@ -765,7 +770,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 if qtd_atual > len(g_data['tags_lista']): g_data['tags_lista'].extend([""] * (qtd_atual - len(g_data['tags_lista'])))
                                 else: g_data['tags_lista'] = g_data['tags_lista'][:qtd_atual]
 
-                            render_qtd = min(qtd_atual, 6) # Adaptado para mostrar até 6 caixas de tags (ex: 6 exaustores)
+                            render_qtd = min(qtd_atual, 6) 
                             col_ratios = [3] + [1.5] * render_qtd + [1]
                             cols = st.columns(col_ratios)
                             g_data['nome_grupo'] = cols[0].text_input("Nome do Equipamento", value=g_data['nome_grupo'], key=f"n_g_{p_data['id']}_{g_idx}")
@@ -775,6 +780,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             if qtd_atual > 6: st.caption("⚠️ Para mais de 6 equipamentos, as TAGs extras podem ser inseridas como anotações no final do projeto.")
 
                             is_compressor_sys = "COMPRESSOR" in g_data['nome_grupo'].upper() or "DIRETA" in g_data['nome_grupo'].upper() or "DX" in g_data['nome_grupo'].upper()
+                            is_monitoramento = "SALA" in g_data['nome_grupo'].upper() or "MONITORAMENTO" in g_data['nome_grupo'].upper()
 
                             with st.container():
                                 for inst, q in g_data['instrumentos'].items():
@@ -784,7 +790,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                     total_di_g_single = q * io_vals["DI"]
                                     total_do_g_single = q * io_vals["DO"]
                                     
-                                total_di_g_single += 2
+                                if not is_monitoramento:
+                                    total_di_g_single += 2
                                     
                                 if is_mercato_quadro:
                                     ui_nec = total_ai_g_single + total_di_g_single
@@ -798,8 +805,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                     else:
                                         st.success(f"✅ OK! Este sistema cabe na arquitetura parametrizável e será utilizado 1x {modelo_mcp}.")
 
+                            # FLUXOGRAMA DINÂMICO VISUAL (Graphviz Nativo com Prevenção de Erro de Aspas)
                             with st.expander("👁️ Visualizar Diagrama P&ID (Lógica e TAGs)", expanded=True):
                                 
+                                # FUNÇÃO PARA BLINDAR STRINGS CONTRA ERROS DO GRAPHVIZ
                                 def limpa_str(texto):
                                     return str(texto).replace('"', "''").replace('\n', ' ')
                                 
@@ -821,7 +830,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 has_outputs = False
                                 node_idx = 0
                                 
-                                # CRÍTICO: RENDERIZA O GRÁFICO 1 VEZ POR MÁQUINA (DENTRO DO LOOP DE INSTRUMENTOS APENAS ADICIONA NÓS)
+                                # CRÍTICO: RENDERIZA O GRÁFICO 1 VEZ POR TIPO DE INSTRUMENTO (Agrupa Caixas)
                                 for inst_f, q_f in g_data['instrumentos'].items():
                                     if q_f > 0:
                                         io_v = REGRA_IO.get(inst_f, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
@@ -854,69 +863,88 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                         
                                         if not has_in_pin and not has_out_pin: continue
                                         
-                                        for idx_q in range(int(q_f)):
-                                            if int(q_f) > 4 and idx_q > 0: break
-                                            
-                                            node_name = f"N_{node_idx}_{idx_q}"
-                                            lbl_suf = f" {idx_q+1}" if int(q_f) > 1 and int(q_f) <= 4 else ""
-                                            prefix = f"{q_f}x " if int(q_f) > 4 else ""
-                                            
-                                            tag_contexto = g_data['tags_lista'][(node_idx + idx_q) % len(g_data['tags_lista'])] if g_data.get('tags_lista') and len(g_data['tags_lista']) > 0 else ""
-                                            str_tag_ctx = f"\\n({limpa_str(tag_contexto)})" if tag_contexto else ""
-                                            
-                                            lbl_in_limpo = limpa_str(lbl_in)
-                                            lbl_out_limpo = limpa_str(lbl_out)
-                                            
-                                            if len(lbl_in_limpo) > 35: lbl_in_limpo = lbl_in_limpo[:35] + "..."
-                                            if len(lbl_out_limpo) > 35: lbl_out_limpo = lbl_out_limpo[:35] + "..."
-                                            
-                                            if has_in_pin and lbl_in_limpo and str(lbl_in_limpo).strip() not in ["", "nan"]:
-                                                cabo_in = obter_cabo(inst_f, False)
-                                                dot += f'  "{node_name}_in" [label="{prefix}{lbl_in_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#2B7BC4"];\n'
-                                                dot += f'  "{node_name}_in" -> "Controlador" [label="{cabo_in}", fontsize=8, color="#2B7BC4"];\n'
-                                                has_inputs = True
-                                                
-                                            if has_out_pin and lbl_out_limpo and str(lbl_out_limpo).strip() not in ["", "nan"]:
-                                                if "Resistência de aquecimento" in inst_f:
-                                                    dot += f'  "{node_name}_out_DO" [label="{prefix}Habilita RAQ{lbl_suf}{str_tag_ctx}\\nTAG: DO", color="#E14D2A"];\n'
-                                                    dot += f'  "Controlador" -> "{node_name}_out_DO" [label="2x1,00mm²", fontsize=8, color="#E14D2A"];\n'
-                                                    dot += f'  "{node_name}_out_AO" [label="{prefix}Modulação Resistência{lbl_suf}{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
-                                                    dot += f'  "Controlador" -> "{node_name}_out_AO" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
-                                                    has_outputs = True
-                                                elif "medição de vazão de ar" in inst_f:
-                                                    dot += f'  "{node_name}_out" [label="{prefix}Modula Inversor{lbl_suf}{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
-                                                    dot += f'  "Controlador" -> "{node_name}_out" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
-                                                    has_outputs = True
+                                        node_name = f"N_{node_idx}"
+                                        prefix = f"{int(q_f)}x " if int(q_f) > 1 else ""
+                                        
+                                        # Agrupamento das TAGs do usuário
+                                        tags_validas = [t for t in g_data['tags_lista'] if t.strip()]
+                                        if not tags_validas:
+                                            str_tag_ctx = ""
+                                        else:
+                                            if len(tags_validas) == 1:
+                                                tag_simples = tags_validas[0]
+                                                # Isola a TAG primária (ex: UE-01) para a vazão se houver mais de um equipamento listado na mesma string
+                                                if "vazão de ar" in inst_f.lower() and "/" in tag_simples:
+                                                    tag_simples = tag_simples.split('/')[0].strip()
+                                                str_tag_ctx = f"\\n({limpa_str(tag_simples)})"
+                                            else:
+                                                # Limita visualização para 4 itens para não explodir a caixa
+                                                q_real = int(q_f)
+                                                tags_selecionadas = tags_validas[:q_real]
+                                                if len(tags_selecionadas) > 4:
+                                                    tags_formatadas = ", ".join(tags_selecionadas[:4]) + ", ..."
                                                 else:
-                                                    cabo_out = obter_cabo(inst_f, True)
-                                                    dot += f'  "{node_name}_out" [label="{prefix}{lbl_out_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#E14D2A"];\n'
-                                                    dot += f'  "Controlador" -> "{node_name}_out" [label="{cabo_out}", fontsize=8, color="#E14D2A"];\n'
-                                                    has_outputs = True
-                                                    
+                                                    tags_formatadas = ", ".join(tags_selecionadas)
+                                                str_tag_ctx = f"\\n({limpa_str(tags_formatadas)})"
+                                        
+                                        lbl_in_limpo = limpa_str(lbl_in)
+                                        lbl_out_limpo = limpa_str(lbl_out)
+                                        
+                                        if len(lbl_in_limpo) > 35: lbl_in_limpo = lbl_in_limpo[:35] + "..."
+                                        if len(lbl_out_limpo) > 35: lbl_out_limpo = lbl_out_limpo[:35] + "..."
+                                        
+                                        # Desenha entrada apenas se tiver nome na planilha
+                                        if has_in_pin and lbl_in_limpo and str(lbl_in_limpo).strip() not in ["", "nan"]:
+                                            cabo_in = obter_cabo(inst_f, False)
+                                            dot += f'  "{node_name}_in" [label="{prefix}{lbl_in_limpo}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#2B7BC4"];\n'
+                                            dot += f'  "{node_name}_in" -> "Controlador" [label="{cabo_in}", fontsize=8, color="#2B7BC4"];\n'
+                                            has_inputs = True
+                                            
+                                        # Desenha saída apenas se tiver nome na planilha
+                                        if has_out_pin and lbl_out_limpo and str(lbl_out_limpo).strip() not in ["", "nan"]:
+                                            if "Resistência de aquecimento" in inst_f:
+                                                dot += f'  "{node_name}_out_DO" [label="{prefix}Habilita RAQ{str_tag_ctx}\\nTAG: DO", color="#E14D2A"];\n'
+                                                dot += f'  "Controlador" -> "{node_name}_out_DO" [label="2x1,00mm²", fontsize=8, color="#E14D2A"];\n'
+                                                dot += f'  "{node_name}_out_AO" [label="{prefix}Modulação Resistência{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
+                                                dot += f'  "Controlador" -> "{node_name}_out_AO" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
+                                                has_outputs = True
+                                            elif "medição de vazão de ar" in inst_f:
+                                                dot += f'  "{node_name}_out" [label="{prefix}Modula Inversor{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
+                                                dot += f'  "Controlador" -> "{node_name}_out" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
+                                                has_outputs = True
+                                            else:
+                                                cabo_out = obter_cabo(inst_f, True)
+                                                dot += f'  "{node_name}_out" [label="{prefix}{lbl_out_limpo}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#E14D2A"];\n'
+                                                dot += f'  "Controlador" -> "{node_name}_out" [label="{cabo_out}", fontsize=8, color="#E14D2A"];\n'
+                                                has_outputs = True
+                                                
                                         node_idx += 1
                                         
-                                inst_chave = "Chave Seletora Auto/Manual (Painel Elétrico)"
-                                c_names = st.session_state.de_para_diagrama.get(inst_chave, {})
-                                lbl_in_c = str(c_names.get("in_comp", "")) if is_compressor_sys else str(c_names.get("in_agua", ""))
-                                lbl_out_c = str(c_names.get("out_comp", "")) if is_compressor_sys else str(c_names.get("out_agua", ""))
-                                
-                                lbl_in_c = limpa_str(lbl_in_c)
-                                lbl_out_c = limpa_str(lbl_out_c)
-                                
-                                if lbl_in_c and str(lbl_in_c).strip() not in ["", "nan"]:
-                                    dot += f'  "chave_in" [label="{lbl_in_c}\\nTAG: CH", color="#2B7BC4"];\n'
-                                    dot += f'  "chave_in" -> "Controlador" [label="5x1,00mm²", fontsize=8, color="#2B7BC4"];\n'
-                                    has_inputs = True
-                                if lbl_out_c and str(lbl_out_c).strip() not in ["", "nan"]:
-                                    dot += f'  "chave_out" [label="{lbl_out_c}\\nTAG: CH", color="#E14D2A"];\n'
-                                    dot += f'  "Controlador" -> "chave_out" [label="5x1,00mm²", fontsize=8, color="#E14D2A"];\n'
-                                    has_outputs = True
+                                if not is_monitoramento:
+                                    inst_chave = "Chave Seletora Auto/Manual (Painel Elétrico)"
+                                    c_names = st.session_state.de_para_diagrama.get(inst_chave, {})
+                                    lbl_in_c = str(c_names.get("in_comp", "")) if is_compressor_sys else str(c_names.get("in_agua", ""))
+                                    lbl_out_c = str(c_names.get("out_comp", "")) if is_compressor_sys else str(c_names.get("out_agua", ""))
+                                    
+                                    lbl_in_c = limpa_str(lbl_in_c)
+                                    lbl_out_c = limpa_str(lbl_out_c)
+                                    
+                                    prefix_c = f"{int(qtd_atual)}x " if int(qtd_atual) > 1 else ""
+                                    
+                                    if lbl_in_c and str(lbl_in_c).strip() not in ["", "nan"]:
+                                        dot += f'  "chave_in" [label="{prefix_c}{lbl_in_c}\\nTAG: CH", color="#2B7BC4"];\n'
+                                        dot += f'  "chave_in" -> "Controlador" [label="5x1,00mm²", fontsize=8, color="#2B7BC4"];\n'
+                                        has_inputs = True
+                                    if lbl_out_c and str(lbl_out_c).strip() not in ["", "nan"]:
+                                        dot += f'  "chave_out" [label="{prefix_c}{lbl_out_c}\\nTAG: CH", color="#E14D2A"];\n'
+                                        dot += f'  "Controlador" -> "chave_out" [label="5x1,00mm²", fontsize=8, color="#E14D2A"];\n'
+                                        has_outputs = True
 
                                 if not has_inputs: dot += '  "Sinais de Campo" -> "Controlador" [style=dashed];\n'
                                 if not has_outputs: dot += '  "Controlador" -> "Atuadores" [style=dashed];\n'
                                 dot += '}'
                                 
-                                # MOSTRA O DIAGRAMA UMA ÚNICA VEZ APÓS O LOOP (Evita Imagem Picotada e Múltipla)
+                                # MOSTRA O DIAGRAMA UMA ÚNICA VEZ
                                 try:
                                     st.graphviz_chart(dot)
                                     
@@ -949,6 +977,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
                 for g_data in p_data['grupos_equipamentos']:
                     qtd_atual_calc = g_data.get('multiplicador', 1)
+                    is_monitoramento = "SALA" in g_data['nome_grupo'].upper() or "MONITORAMENTO" in g_data['nome_grupo'].upper()
+                    
                     for inst, q in g_data['instrumentos'].items():
                         io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
                         raw_ai_painel += q * io_vals["AI"] * qtd_atual_calc
@@ -956,7 +986,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         raw_di_painel += q * io_vals["DI"] * qtd_atual_calc
                         raw_do_painel += q * io_vals["DO"] * qtd_atual_calc
 
-                    raw_di_painel += (2 * qtd_atual_calc)
+                    if not is_monitoramento:
+                        raw_di_painel += (2 * qtd_atual_calc)
 
                 reserva_ai = math.ceil(raw_ai_painel * 0.2) if tem_sobra_20 else 0
                 reserva_ao = math.ceil(raw_ao_painel * 0.2) if tem_sobra_20 else 0
@@ -1330,6 +1361,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 raw_ai_g_single = raw_ao_g_single = raw_di_g_single = raw_do_g_single = 0
                 
                 is_compressor_sys = "COMPRESSOR" in g['nome_grupo'].upper() or "DIRETA" in g['nome_grupo'].upper() or "DX" in g['nome_grupo'].upper()
+                is_monitoramento = "SALA" in g['nome_grupo'].upper() or "MONITORAMENTO" in g['nome_grupo'].upper()
                 
                 for inst, qtd in g['instrumentos'].items():
                     if qtd > 0:
@@ -1400,9 +1432,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         elif is_mercato: custo_base_mercato += custo_tot_inst
                         else: custo_base_schneider += custo_tot_inst
                 
-                raw_di_painel += (2 * mult)
-                raw_di_g_single += 2
-                linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": nome_equip, "Instrumento": "Chave Seletora Auto/Manual (Painel Elétrico)", "Quantidade Total": mult, "Entrada Digital (DI)": 2 * mult, "Saída Digital (DO)": 0, "Entrada Analógica (AI)": 0, "Saída Analógica (AO)": 0})
+                if not is_monitoramento:
+                    raw_di_painel += (2 * mult)
+                    raw_di_g_single += 2
+                    linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": nome_equip, "Instrumento": "Chave Seletora Auto/Manual (Painel Elétrico)", "Quantidade Total": mult, "Entrada Digital (DI)": 2 * mult, "Saída Digital (DO)": 0, "Entrada Analógica (AI)": 0, "Saída Analógica (AO)": 0})
 
                 if is_mercato:
                     reserva_g_ui = math.ceil((raw_ai_g_single + raw_di_g_single) * 0.2) if tem_sobra_20 else 0
