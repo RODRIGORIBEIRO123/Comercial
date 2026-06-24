@@ -65,7 +65,7 @@ if 'data_precos_atualizada' not in st.session_state: st.session_state.data_preco
 # DICIONÁRIO DE NOMES DO DIAGRAMA (Padronizado conforme planilha do usuário de 5 colunas)
 if 'de_para_diagrama' not in st.session_state:
     st.session_state.de_para_diagrama = {
-        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": {"in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "", "out_comp": ""},
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {"in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "Modula Inversor", "out_comp": "Modula Inversor"},
         "Transmissor de temperatura e umidade para duto (TT/MT)": {"in_agua": "Trans. Temp. e Umid. (TT/MT)", "in_comp": "Trans. Temp. e Umid. (TT/MT)", "out_agua": "", "out_comp": ""},
         "Transmissor de temperatura para duto (TT)": {"in_agua": "Trans. Temp. (TT)", "in_comp": "Trans. Temp. (TT)", "out_agua": "", "out_comp": ""},
         "Válvula de controle de água gelada proporcional (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Modula VAG", "out_comp": "Habilta Compressor"},
@@ -253,7 +253,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     st.markdown("---")
 
     REGRA_IO = {
-        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
         "Transmissor de temperatura e umidade para duto (TT/MT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de temperatura para duto (TT)": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
         "Válvula de controle proporcional com atuador (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
@@ -280,9 +280,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Pressostato para monitorar os filtros F9 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
         "Pressostato para monitorar os filtros H13/H14 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
         "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
-        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de pressão diferencial entre salas (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de pressão diferencial entre salas com display (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
         "Transmissor de temperatura Ambiente (TT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
@@ -295,7 +295,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     }
 
     banco_schneider_comum = {
-        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1490.00,
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1490.00,
         "Transmissor de temperatura e umidade para duto (TT/MT)": 2050.00,
         "Transmissor de temperatura para duto (TT)": 800.00,
         "Válvula de controle proporcional com atuador (TCV)": 0.00,
@@ -314,6 +314,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "Pressostato para monitorar os filtros F9 (PSH)": 349.00,
         "Pressostato para monitorar os filtros H13/H14 (PSH)": 349.00,
         "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 349.00,
+        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)": 1490.00,
+        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)": 1490.00,
+        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)": 1490.00,
         "Transmissor de pressão diferencial entre salas (PDT)": 1490.00,
         "Transmissor de pressão diferencial entre salas com display (PDIT)": 2110.00,
         "Transmissor de temperatura Ambiente (TT)": 2050.00,
@@ -383,7 +386,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
     GRUPOS_INSTRUMENTOS = {
         "🔹 Controle (HVAC e Máquinas)": [
-            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)",
+            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)",
             "Transmissor de temperatura e umidade para duto (TT/MT)", "Transmissor de temperatura para duto (TT)",
             "Válvula de controle proporcional com atuador (TCV)", "Válvula de controle de água gelada proporcional (TCV)",
             "Relé de Corrente - Status Compressor (TC)", "Termostato de segurança (TSH)",
@@ -391,7 +394,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         ],
         "🔸 Monitoramento (Filtros e Status)": [
             "Pressostato para monitorar os filtros G4 (PSH)", "Pressostato para monitorar os filtros F9 (PSH)", "Pressostato para monitorar os filtros H13/H14 (PSH)",
-            "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", "Transmissor de pressão diferencial (monitorar os filtros G4) (PDIT)"
+            "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)"
         ],
         "🟢 Monitoramento e Controle de Ambientes": [
             "Transmissor de pressão diferencial entre salas (PDT)",
@@ -403,23 +406,23 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     
     KITS_PADRAO = {
         "❄️ UTA Padrão - Água Gelada": {
-            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1,
+            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1,
             "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Válvula de controle de água gelada proporcional (TCV)": 1,
             "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1
         },
         "🌬️ UTA Padrão - Expansão Direta": {
-            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1,
+            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1,
             "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Relé de Corrente - Status Compressor (TC)": 2,
             "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1
         },
         "🔥 UTA Padrão - Água Gelada + Resistência": {
-            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1,
+            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1,
             "Transmissor de temperatura e umidade para duto (TT/MT)": 1, "Válvula de controle de água gelada proporcional (TCV)": 1,
             "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1,
             "Termostato de segurança (TSH)": 1, "Pressostato diferencial para ar (PSH)": 1, "Resistência de aquecimento (Equipamento) (RAQ)": 1
         },
         "🔥 UTA Expansão Direta (2 Compressores) + Resistência (Salas e Exaustão)": {
-            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1,
+            "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1,
             "Transmissor de temperatura e umidade para duto (TT/MT)": 1, 
             "Relé de Corrente - Status Compressor (TC)": 2,
             "Pressostato para monitorar os filtros G4 (PSH)": 1, "Pressostato para monitorar os filtros F9 (PSH)": 1,
@@ -429,17 +432,24 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 2,
             "Pressostato diferencial para ar (PSH)": 1
         },
-        "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDIT)": 1 },
+        "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1 },
         "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 }
     }
 
     # --- FUNÇÃO PARA TIPO DE CABO NO DIAGRAMA ---
-    def obter_cabo(inst_nome):
+    def obter_cabo(inst_nome, is_output=False):
         inst_upper = inst_nome.upper()
-        if "(TT/MT)" in inst_upper or "TIT/MIT" in inst_upper: return "5x0,75mm² + Shield"
-        if "(PDT)" in inst_upper or "(PDIT)" in inst_upper or "(TT)" in inst_upper or "(PIT)" in inst_upper or "(FIT)" in inst_upper or "(TIT)" in inst_upper or "(TCV)" in inst_upper: return "3x0,75mm² + Shield"
-        if "(PSH)" in inst_upper or "(TC)" in inst_upper or "(TSH)" in inst_upper: return "2x1,00mm²"
-        if "CHAVE" in inst_upper: return "5x1,00mm²"
+        if is_output:
+            if "RAQ" in inst_upper or "RESISTÊNCIA" in inst_upper: return "2x1,00mm²"
+            if "VÁLVULA" in inst_upper or "TCV" in inst_upper: return "3x0,75mm² + Shield"
+            if "INVERSOR" in inst_upper or "VAZÃO" in inst_upper: return "3x0,75mm² + Shield"
+            if "CHAVE" in inst_upper: return "5x1,00mm²"
+            return "2x1,00mm²"
+        else:
+            if "(TT/MT)" in inst_upper or "TIT/MIT" in inst_upper: return "5x0,75mm² + Shield"
+            if "(PDT)" in inst_upper or "(PDIT)" in inst_upper or "(TT)" in inst_upper or "(PIT)" in inst_upper or "(FIT)" in inst_upper or "(TIT)" in inst_upper or "(TCV)" in inst_upper: return "3x0,75mm² + Shield"
+            if "(PSH)" in inst_upper or "(TC)" in inst_upper or "(TSH)" in inst_upper: return "2x1,00mm²"
+            if "CHAVE" in inst_upper: return "5x1,00mm²"
         return ""
 
     def calcular_painel_fisico(qtd_controladores):
@@ -627,7 +637,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         if "COM certificação" in soft_sel:
                             tipo_cfr_wizard = st.radio(
                                 "Selecione a Modalidade do CFR-21 Part 11:",
-                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"]
+                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"],
+                                help="**Qualificável:** Onde a SIARCON após receber todos os requisitos de usuário, irá fornecer o sistema de automação com todos os pré requisitos para que o cliente possa realizar a qualificação.\n\n**Qualificado:** A SIARCON entregará todos os protocolos e testes que qualifiquem o sistema supervisório."
                             )
                 
                 calibracao_opt = st.radio("5. Os instrumentos serão calibrados?", ["Não", "Sim"], horizontal=True)
@@ -726,6 +737,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
                 raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
 
+                # --- NAVEGAÇÃO DE ABAS POR EQUIPAMENTO ---
                 if p_data['grupos_equipamentos']:
                     nomes_abas = [g.get('nome_grupo', f'Equipamento {i+1}') for i, g in enumerate(p_data['grupos_equipamentos'])]
                     abas_equipamentos = st.tabs(nomes_abas)
@@ -828,8 +840,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                         
                                         if not has_in_pin and not has_out_pin: continue
                                         
-                                        cabo_str = obter_cabo(inst_f)
-                                        
                                         for idx_q in range(int(q_f)):
                                             if int(q_f) > 4 and idx_q > 0: break
                                             
@@ -847,43 +857,55 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                             if len(lbl_out_limpo) > 35: lbl_out_limpo = lbl_out_limpo[:35] + "..."
                                             
                                             if has_in_pin and lbl_in_limpo and str(lbl_in_limpo).strip() not in ["", "nan"]:
+                                                cabo_in = obter_cabo(inst_f, False)
                                                 dot += f'  "{node_name}_in" [label="{prefix}{lbl_in_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#2B7BC4"];\n'
-                                                dot += f'  "{node_name}_in" -> "Controlador" [label="{cabo_str}", fontsize=8, color="#2B7BC4"];\n'
+                                                dot += f'  "{node_name}_in" -> "Controlador" [label="{cabo_in}", fontsize=8, color="#2B7BC4"];\n'
                                                 has_inputs = True
                                                 
                                             if has_out_pin and lbl_out_limpo and str(lbl_out_limpo).strip() not in ["", "nan"]:
-                                                dot += f'  "{node_name}_out" [label="{prefix}{lbl_out_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#E14D2A"];\n'
-                                                dot += f'  "Controlador" -> "{node_name}_out" [label="{cabo_str}", fontsize=8, color="#E14D2A"];\n'
-                                                has_outputs = True
-                                                
-                                        node_idx += 1
-                                        
-                                inst_chave = "Chave Seletora Auto/Manual (Painel Elétrico)"
-                                c_names = st.session_state.de_para_diagrama.get(inst_chave, {})
-                                lbl_in_c = str(c_names.get("in_comp", "")) if is_compressor_sys else str(c_names.get("in_agua", ""))
-                                lbl_out_c = str(c_names.get("out_comp", "")) if is_compressor_sys else str(c_names.get("out_agua", ""))
-                                
-                                lbl_in_c = limpa_str(lbl_in_c)
-                                lbl_out_c = limpa_str(lbl_out_c)
-                                
-                                if lbl_in_c and str(lbl_in_c).strip() not in ["", "nan"]:
-                                    dot += f'  "chave_in" [label="{lbl_in_c}\\nTAG: CH", color="#2B7BC4"];\n'
-                                    dot += f'  "chave_in" -> "Controlador" [label="5x1,00mm²", fontsize=8, color="#2B7BC4"];\n'
-                                    has_inputs = True
-                                if lbl_out_c and str(lbl_out_c).strip() not in ["", "nan"]:
-                                    dot += f'  "chave_out" [label="{lbl_out_c}\\nTAG: CH", color="#E14D2A"];\n'
-                                    dot += f'  "Controlador" -> "chave_out" [label="5x1,00mm²", fontsize=8, color="#E14D2A"];\n'
-                                    has_outputs = True
+                                                if "Resistência de aquecimento" in inst_f:
+                                                    dot += f'  "{node_name}_out_DO" [label="{prefix}Habilita RAQ{lbl_suf}{str_tag_ctx}\\nTAG: DO", color="#E14D2A"];\n'
+                                                    dot += f'  "Controlador" -> "{node_name}_out_DO" [label="2x1,00mm²", fontsize=8, color="#E14D2A"];\n'
+                                                    dot += f'  "{node_name}_out_AO" [label="{prefix}Modulação Resistência{lbl_suf}{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
+                                                    dot += f'  "Controlador" -> "{node_name}_out_AO" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
+                                                    has_outputs = True
+                                                elif "medição de vazão de ar" in inst_f:
+                                                    dot += f'  "{node_name}_out" [label="{prefix}Modula Inversor{lbl_suf}{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
+                                                    dot += f'  "Controlador" -> "{node_name}_out" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
+                                                    has_outputs = True
+                                                else:
+                                                    cabo_out = obter_cabo(inst_f, True)
+                                                    dot += f'  "{node_name}_out" [label="{prefix}{lbl_out_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#E14D2A"];\n'
+                                                    dot += f'  "Controlador" -> "{node_name}_out" [label="{cabo_out}", fontsize=8, color="#E14D2A"];\n'
+                                                    has_outputs = True
+                                                    
+                                            node_idx += 1
+                                            
+                                    inst_chave = "Chave Seletora Auto/Manual (Painel Elétrico)"
+                                    c_names = st.session_state.de_para_diagrama.get(inst_chave, {})
+                                    lbl_in_c = str(c_names.get("in_comp", "")) if is_compressor_sys else str(c_names.get("in_agua", ""))
+                                    lbl_out_c = str(c_names.get("out_comp", "")) if is_compressor_sys else str(c_names.get("out_agua", ""))
+                                    
+                                    lbl_in_c = limpa_str(lbl_in_c)
+                                    lbl_out_c = limpa_str(lbl_out_c)
+                                    
+                                    if lbl_in_c and str(lbl_in_c).strip() not in ["", "nan"]:
+                                        dot += f'  "chave_in" [label="{lbl_in_c}\\nTAG: CH", color="#2B7BC4"];\n'
+                                        dot += f'  "chave_in" -> "Controlador" [label="5x1,00mm²", fontsize=8, color="#2B7BC4"];\n'
+                                        has_inputs = True
+                                    if lbl_out_c and str(lbl_out_c).strip() not in ["", "nan"]:
+                                        dot += f'  "chave_out" [label="{lbl_out_c}\\nTAG: CH", color="#E14D2A"];\n'
+                                        dot += f'  "Controlador" -> "chave_out" [label="5x1,00mm²", fontsize=8, color="#E14D2A"];\n'
+                                        has_outputs = True
 
-                                if not has_inputs: dot += '  "Sinais de Campo" -> "Controlador" [style=dashed];\n'
-                                if not has_outputs: dot += '  "Controlador" -> "Atuadores" [style=dashed];\n'
-                                dot += '}'
-                                
-                                try:
-                                    st.graphviz_chart(dot)
-                                except Exception as e:
-                                    st.error(f"Erro ao projetar fluxograma visual: {e}")
-                                    st.code(dot, language="dot")
+                                    if not has_inputs: dot += '  "Sinais de Campo" -> "Controlador" [style=dashed];\n'
+                                    if not has_outputs: dot += '  "Controlador" -> "Atuadores" [style=dashed];\n'
+                                    dot += '}'
+                                    
+                                    try:
+                                        st.graphviz_chart(dot)
+                                    except Exception as e:
+                                        st.error(f"Erro ao projetar fluxograma visual: {e}")
 
                             with st.expander("⚙️ Ajuste Fino de Instrumentos (Engenharia)"):
                                 for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
