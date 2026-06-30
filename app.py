@@ -144,7 +144,7 @@ if st.session_state.usuario_logado is None:
                 usuarios_validos = {
                     "giovanna.ribeiro": "1234", "aline.ferraz": "1234", "janaina.dias": "1234",
                     "victor.hugo": "1234", "rodrigo.ribeiro": "1234", "rodrigo": "1234", "engenharia": "1234",
-                    "suprimentos": "1234", "obras": "1234"
+                    "suprimentos": "1234", "obras": "1234", "ricardo.pires": "1234"
                 }
                 user_limpo = c_user.lower().strip()
                 if user_limpo in usuarios_validos and c_pass == usuarios_validos[user_limpo]:
