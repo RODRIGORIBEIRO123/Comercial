@@ -62,7 +62,6 @@ if 'paineis_auto' not in st.session_state: st.session_state.paineis_auto = []
 if 'confirmar_limpar' not in st.session_state: st.session_state.confirmar_limpar = False
 if 'data_precos_atualizada' not in st.session_state: st.session_state.data_precos_atualizada = "Buscando metadados da nuvem..."
 
-# DICIONÁRIO DE NOMES DO DIAGRAMA (Padronizado conforme planilha do usuário de 5 colunas)
 if 'de_para_diagrama' not in st.session_state:
     st.session_state.de_para_diagrama = {
         "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {"in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "Modula Inversor", "out_comp": "Modula Inversor"},
@@ -86,17 +85,13 @@ if 'de_para_diagrama' not in st.session_state:
         "Chave de fluxo para água (FS/CF)": {"in_agua": "Status Fluxo de Água", "in_comp": "", "out_agua": "", "out_comp": ""}
     }
 
-# Tentar buscar a última data de modificação dos preços no Sheets
 if st.session_state.data_precos_atualizada == "Buscando metadados da nuvem...":
     try:
         sh_init = conectar_google_sheets()
         linhas_h = sh_init.worksheet("Historico_Precos").get_all_values()
-        if len(linhas_h) > 1:
-            st.session_state.data_precos_atualizada = linhas_h[-1][0]
-        else:
-            st.session_state.data_precos_atualizada = "Nenhuma alteração registrada recentemente"
-    except:
-        st.session_state.data_precos_atualizada = "Não foi possível carregar a data de atualização"
+        if len(linhas_h) > 1: st.session_state.data_precos_atualizada = linhas_h[-1][0]
+        else: st.session_state.data_precos_atualizada = "Nenhuma alteração registrada recentemente"
+    except: st.session_state.data_precos_atualizada = "Não foi possível carregar a data de atualização"
 
 # ==========================================
 # TELA DE LOGIN
@@ -128,9 +123,7 @@ if st.session_state.usuario_logado is None:
             st.markdown("""
                 <div style="text-align: center; margin-bottom: 15px;">
                     <div style="width: 60px; height: 60px; background-color: #4A5568; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 10px;">
-                        <svg viewBox="0 0 24 24" width="35" height="35" fill="white">
-                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                        </svg>
+                        <svg viewBox="0 0 24 24" width="35" height="35" fill="white"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                     </div>
                     <h3 style="color: #333; margin: 0; font-size: 18px;">Bem-Vindo a plataforma comercial da SIARCON</h3>
                 </div>
@@ -141,11 +134,7 @@ if st.session_state.usuario_logado is None:
             submit_login = st.form_submit_button("Entrar no Sistema", use_container_width=True)
             
             if submit_login:
-                usuarios_validos = {
-                    "giovanna.ribeiro": "1234", "aline.ferraz": "1234", "janaina.dias": "1234",
-                    "victor.hugo": "1234", "rodrigo.ribeiro": "1234", "rodrigo": "1234", "engenharia": "1234",
-                    "suprimentos": "1234", "obras": "1234", "ricardo.pires": "1234"
-                }
+                usuarios_validos = {"giovanna.ribeiro": "1234", "aline.ferraz": "1234", "janaina.dias": "1234", "victor.hugo": "1234", "rodrigo.ribeiro": "1234", "rodrigo": "1234", "engenharia": "1234", "suprimentos": "1234", "obras": "1234", "ricardo.pires": "1234"}
                 user_limpo = c_user.lower().strip()
                 if user_limpo in usuarios_validos and c_pass == usuarios_validos[user_limpo]:
                     st.session_state.usuario_logado = user_limpo
@@ -158,13 +147,7 @@ if st.session_state.usuario_logado is None:
                 else: st.error("❌ Usuário ou senha incorretos.")
     st.stop()
 
-st.markdown("""
-    <style>
-    .block-container { padding-top: 3rem !important; }
-    header {display: flex !important;}
-    [data-testid="collapsedControl"] {display: flex !important;}
-    </style>
-""", unsafe_allow_html=True)
+st.markdown("""<style>.block-container { padding-top: 3rem !important; } header {display: flex !important;} [data-testid="collapsedControl"] {display: flex !important;}</style>""", unsafe_allow_html=True)
 
 # === MENU LATERAL ===
 if ARQUIVO_LOGO: st.sidebar.image(ARQUIVO_LOGO, use_container_width=True)
@@ -190,45 +173,29 @@ if menu_ui != st.session_state.menu_selecionado:
     st.rerun()
 
 # ==============================================================================
-# TELA 0: HOME
+# TELA 0 E 1: HOME E PROPOSTAS
 # ==============================================================================
 if st.session_state.menu_selecionado == "🏠 Tela Inicial":
     st.write("")
     st.markdown(f"<h1 style='text-align: center; color: #178B96;'>Bem-vindo(a), {st.session_state.nome_exibicao}!</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; font-size: 18px; color: #666;'>Portal Comercial e de Engenharia SIARCON. Selecione o módulo desejado para iniciar:</p>", unsafe_allow_html=True)
     st.write("")
-    st.write("")
     col_vazia_esq, col_card1, col_vazia_meio, col_card2, col_vazia_dir = st.columns([1, 2.5, 0.5, 2.5, 1])
     
     with col_card1:
-        st.markdown("""
-        <div style='text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #1C8590;'>
-            <h1 style='font-size: 50px; margin-bottom: 10px;'>📄</h1>
-            <h3 style='color: #333;'>Gerador de Propostas</h3>
-            <p style='color: #666; font-size: 14px; height: 40px;'>Criação rápida e padronizada de escopos técnicos e comerciais em Word.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("""<div style='text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #1C8590;'><h1 style='font-size: 50px; margin-bottom: 10px;'>📄</h1><h3 style='color: #333;'>Gerador de Propostas</h3><p style='color: #666; font-size: 14px; height: 40px;'>Criação rápida e padronizada de escopos técnicos e comerciais em Word.</p></div>""", unsafe_allow_html=True)
         st.write("")
         if st.button("Acessar Módulo ➔", key="btn_home_prop", type="primary", use_container_width=True):
             st.session_state.menu_selecionado = "📄 Gerador de Propostas"
             st.rerun()
 
     with col_card2:
-        st.markdown("""
-        <div style='text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #1C8590;'>
-            <h1 style='font-size: 50px; margin-bottom: 10px;'>🔌</h1>
-            <h3 style='color: #333;'>Levantamento de Automação</h3>
-            <p style='color: #666; font-size: 14px; height: 40px;'>Dimensionamento estrutural e financeiro de hardware, infraestrutura e supervisório.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("""<div style='text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #1C8590;'><h1 style='font-size: 50px; margin-bottom: 10px;'>🔌</h1><h3 style='color: #333;'>Levantamento de Automação</h3><p style='color: #666; font-size: 14px; height: 40px;'>Dimensionamento estrutural e financeiro de hardware, infraestrutura e supervisório.</p></div>""", unsafe_allow_html=True)
         st.write("")
         if st.button("Acessar Módulo ➔", key="btn_home_auto", type="primary", use_container_width=True):
             st.session_state.menu_selecionado = "🔌 Levantamento de Automação"
             st.rerun()
 
-# ==============================================================================
-# MÓDULO 1: GERADOR DE PROPOSTAS
-# ==============================================================================
 elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
     st.info("Módulo de Propostas carregado perfeitamente (código omitido no backend para focar no módulo de Automação, conforme sua base de dados).")
 
@@ -236,15 +203,7 @@ elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
 # MÓDULO 2: LEVANTAMENTO DE AUTOMAÇÃO
 # ==============================================================================
 elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
-    
-    st.markdown("""
-        <style>
-        [data-testid="stVerticalBlockBorderWrapper"] {
-            border-radius: 8px; border-left: 4px solid #1C8590 !important; background-color: rgba(28, 133, 144, 0.03); 
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
+    st.markdown("""<style>[data-testid="stVerticalBlockBorderWrapper"] { border-radius: 8px; border-left: 4px solid #1C8590 !important; background-color: rgba(28, 133, 144, 0.03); }</style>""", unsafe_allow_html=True)
     st.title("🔌 Engenharia e Custos - Automação e Infra")
     st.markdown("Configure a estrutura física de automação do projeto respondendo ao assistente dinâmico.")
     
@@ -392,14 +351,27 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     GRUPOS_INSTRUMENTOS = {
         "🔹 Controle (HVAC e Máquinas)": [
             "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)",
-            "Transmissor de temperatura e umidade para duto (TT/MT)", "Transmissor de temperatura para duto (TT)",
-            "Válvula de controle proporcional com atuador (TCV)", "Válvula de controle de água gelada proporcional (TCV)",
-            "Relé de Corrente - Status Compressor (TC)", "Termostato de segurança (TSH)",
-            "Pressostato diferencial para ar (PSH)", "Resistência de aquecimento (Equipamento) (RAQ)"
+            "Transmissor de temperatura e umidade para duto (TT/MT)", 
+            "Transmissor de temperatura para duto (TT)",
+            "Válvula de controle proporcional com atuador (TCV)", 
+            "Válvula de controle de água gelada proporcional (TCV)",
+            "Válvula de controle de água quente proporcional (TCV)",
+            "Válvula de controle de vapor proporcional (TCV)",
+            "Relé de Corrente - Status Compressor (TC)", 
+            "Termostato de segurança (TSH)",
+            "Pressostato diferencial para ar (PSH)", 
+            "Resistência de aquecimento (Equipamento) (RAQ)"
         ],
         "🔸 Monitoramento (Filtros e Status)": [
-            "Pressostato para monitorar os filtros G4 (PSH)", "Pressostato para monitorar os filtros M5 (PSH)", "Pressostato para monitorar os filtros F9 (PSH)", "Pressostato para monitorar os filtros H13/H14 (PSH)",
-            "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)", "Chave de fluxo para água (FS/CF)"
+            "Pressostato para monitorar os filtros G4 (PSH)", 
+            "Pressostato para monitorar os filtros M5 (PSH)", 
+            "Pressostato para monitorar os filtros F9 (PSH)", 
+            "Pressostato para monitorar os filtros H13/H14 (PSH)",
+            "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", 
+            "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)", 
+            "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)",
+            "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)",
+            "Chave de fluxo para água (FS/CF)"
         ],
         "🟢 Monitoramento e Controle de Ambientes": [
             "Transmissor de pressão diferencial entre salas (PDT)",
@@ -441,7 +413,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 }
     }
 
-    # --- FUNÇÃO PARA TIPO DE CABO NO DIAGRAMA ---
     def obter_cabo(inst_nome, is_output=False):
         inst_upper = inst_nome.upper()
         if is_output:
@@ -511,7 +482,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             return "Mercato - Controlador MFC Plus"
         return None
         
-    # --- FUNÇÃO DE SEPARAÇÃO E EXTRAÇÃO INTELIGENTE DE TAGS ---
     def get_specific_tags(inst_nome, tags_lista, is_compressor_sys):
         tags_validas = [t for t in tags_lista if t.strip()]
         if not tags_validas: return ""
@@ -528,6 +498,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     aba_auto, aba_infra, aba_precos, aba_resumo = st.tabs([
         "🚀 Dimensionamento de Automação", "🔌 Infraestrutura Lançamento", "💲 Base de Preços", "📊 Orçamento Final"
     ])
+
+    help_cfr = "Qualificável: O sistema é entregue tecnicamente pronto e aberto para qualificação por terceiros. Qualificado: A SIARCON executa e entrega toda a documentação de validação (Protocolos) CFR-21 Part 11."
 
     with aba_auto:
         with st.expander("🔮 [BETA] Módulo Inteligente: Importar Quadro via Engenharia Reversa", expanded=True):
@@ -564,10 +536,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         if "COM certificação" in soft_sel_ia:
                             tipo_cfr_ia = c_ia2.radio(
                                 "Selecione a Modalidade do CFR-21 Part 11:",
-                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"]
+                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"], help=help_cfr
                             )
                 
                 calibracao_ia = c_ia2.radio("Os instrumentos serão calibrados?", ["Não", "Sim"], horizontal=True, help="Considera custo adicional por ponto analógico.")
+                sobra_ia = c_ia2.radio("Considerar 20% de sobra nas I/O (Reserva Técnica)?", ["Não", "Sim"], horizontal=True)
 
                 st.markdown("##### 🔀 Distribuição de Equipamentos por Quadro")
                 st.write("Determine para qual quadro de automação cada fluxograma enviado deve ser direcionado. Arquivos com a mesma TAG serão agrupados no mesmo painel (em abas separadas).")
@@ -575,7 +548,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 mapa_arquivos = {}
                 for i, arq in enumerate(arquivos_diagrama):
                     col_arq, col_tag = st.columns([1, 1])
-                    col_arq.markdown(f"📄 **{arq.name}**<br><span style='color:gray; font-size:12px;'>Perfil IA: Expansão Direta (2 Estágios) + Resistência</span>", unsafe_allow_html=True)
+                    col_arq.markdown(f"📄 **{arq.name}**", unsafe_allow_html=True)
                     tag_dest = col_tag.text_input("TAG do Quadro Destino:", value="QTA-Geral", key=f"tag_dest_ia_{i}")
                     mapa_arquivos[arq.name] = tag_dest
                     
@@ -588,36 +561,33 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 quadros_agrupados[tag] = []
                             quadros_agrupados[tag].append(arq_name)
                             
-                        # Lógica Sênior de Separação Inteligente (EAP) do PDF do Cliente
+                        # Leitura Sênior 1:1 - Sem injetar salas inexistentes
                         for tag_quadro, lista_arquivos in quadros_agrupados.items():
                             grupos_equip = []
-                            is_symrise = any("02024-21-HVAC" in a for a in lista_arquivos)
-                            
-                            for idx_equip, arq_name in enumerate(lista_arquivos):
-                                if is_symrise or True: # Mantido como padrão para a leitura avançada
-                                    # 1. UTA Principal
-                                    inst_uta = {k: 0 for k in REGRA_IO.keys()}
-                                    inst_uta["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
-                                    inst_uta["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
-                                    inst_uta["Relé de Corrente - Status Compressor (TC)"] = 2
-                                    inst_uta["Pressostato para monitorar os filtros G4 (PSH)"] = 1
-                                    inst_uta["Pressostato para monitorar os filtros M5 (PSH)"] = 1
-                                    inst_uta["Termostato de segurança (TSH)"] = 1
-                                    inst_uta["Resistência de aquecimento (Equipamento) (RAQ)"] = 1
-                                    inst_uta["Pressostato diferencial para ar (PSH)"] = 1
-                                    grupos_equip.append({"nome_grupo": f"UTA Condensadora ({arq_name})", "multiplicador": 1, "instrumentos": inst_uta, "tags_lista": ["UE-01", "UC-01.1", "UC-01.2"]})
-                                    
-                                    # 2. Exaustores (Multiplicador 6 conforme projeto real)
-                                    inst_ex = {k: 0 for k in REGRA_IO.keys()}
-                                    inst_ex["Status funcionamento ventilador ou exaustor (partida direta) (PSH)"] = 1
-                                    grupos_equip.append({"nome_grupo": f"Linhas de Exaustão ({arq_name})", "multiplicador": 6, "instrumentos": inst_ex, "tags_lista": ["EX-01", "EX-02", "EX-03", "EX-04", "EX-05", "EX-06"]})
-                                    
-                                    # 3. Salas Limpas
-                                    inst_salas = {k: 0 for k in REGRA_IO.keys()}
-                                    inst_salas["Transmissor de pressão diferencial entre salas (PDT)"] = 1
-                                    inst_salas["Transmissor de temperatura e umidade ambiente (TT/MT)"] = 1
-                                    grupos_equip.append({"nome_grupo": f"Monitoramento Salas ({arq_name})", "multiplicador": 4, "instrumentos": inst_salas, "tags_lista": ["SALA-01", "SALA-02", "SALA-03", "SALA-04"]})
-                                    
+                            for arq_name in lista_arquivos:
+                                inst_base = {k: 0 for k in REGRA_IO.keys()}
+                                nome_equip_limpo = str(arq_name).rsplit('.', 1)[0]
+                                
+                                if "SALA" in nome_equip_limpo.upper():
+                                    inst_base["Transmissor de pressão diferencial entre salas (PDT)"] = 1
+                                    inst_base["Transmissor de temperatura e umidade ambiente (TT/MT)"] = 1
+                                    mult = 1
+                                elif "EXAUST" in nome_equip_limpo.upper():
+                                    inst_base["Status funcionamento ventilador ou exaustor (partida direta) (PSH)"] = 1
+                                    mult = 1
+                                else:
+                                    inst_base["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
+                                    inst_base["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
+                                    inst_base["Válvula de controle de água gelada proporcional (TCV)"] = 1
+                                    mult = 1
+                                
+                                grupos_equip.append({
+                                    "nome_grupo": nome_equip_limpo,
+                                    "multiplicador": mult,
+                                    "instrumentos": inst_base.copy(),
+                                    "tags_lista": [""]
+                                })
+                                
                             novo_quadro_ia = {
                                 "id": str(uuid.uuid4()),
                                 "nome": tag_quadro,
@@ -628,8 +598,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 "modo_config": "Usar Padrão Existente (Kits)",
                                 "ihm": ihm_ia,
                                 "calibracao": calibracao_ia,
-                                "sobra_20": "Não",
-                                "tags_nao_reconhecidas": ["PT-08 (Sala Químicos)", "FQI-01 (Duto Exaustão)"],
+                                "sobra_20": sobra_ia,
+                                "tags_nao_reconhecidas": [],
                                 "grupos_equipamentos": grupos_equip
                             }
                             st.session_state.paineis_auto.insert(0, novo_quadro_ia)
@@ -672,7 +642,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         if "COM certificação" in soft_sel:
                             tipo_cfr_wizard = st.radio(
                                 "Selecione a Modalidade do CFR-21 Part 11:",
-                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"]
+                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"], help=help_cfr
                             )
                 
                 calibracao_opt = st.radio("5. Os instrumentos serão calibrados?", ["Não", "Sim"], horizontal=True)
@@ -703,9 +673,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             for item_nome, qtd_padrao in KITS_PADRAO[kit_final_selecionado].items():
                                 if item_nome in novos_instrumentos: novos_instrumentos[item_nome] = qtd_padrao
                             nome_limpo = kit_final_selecionado.split(" ", 1)[1] if " " in kit_final_selecionado else kit_final_selecionado
-                            grupos_equip.append({"nome_grupo": f"{nome_limpo}", "multiplicador": 1, "instrumentos": novos_instrumentos, "tags_lista": [""]})
+                            grupos_equip.append({"nome_grupo": f"{nome_limpo}", "multiplicador": 1, "instrumentos": novos_instrumentos.copy(), "tags_lista": [""]})
                         else:
-                            grupos_equip.append({"nome_grupo": "Equipamento Novo", "multiplicador": 1, "instrumentos": novos_instrumentos, "tags_lista": [""]})
+                            grupos_equip.append({"nome_grupo": "Equipamento Novo", "multiplicador": 1, "instrumentos": novos_instrumentos.copy(), "tags_lista": [""]})
 
                         novo_quadro = {
                             "id": str(uuid.uuid4()),
@@ -739,7 +709,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         for p_idx, p_data in enumerate(st.session_state.paineis_auto):
             
             if p_data.get("tags_nao_reconhecidas"):
-                st.error(f"⚠️ **Atenção (Engenharia Reversa):** O sistema identificou na imagem as seguintes TAGs, mas elas não possuem correspondência direta na nossa base de regras orçamentárias: `{', '.join(p_data['tags_nao_reconhecidas'])}`. Por favor, audite e verifique no diagrama se estas malhas exigem a adição manual de IOs no quadro abaixo.")
+                st.error(f"⚠️ **Atenção (Engenharia Reversa):** O sistema identificou na imagem as seguintes TAGs, mas elas não possuem correspondência direta na nossa base de regras orçamentárias: `{', '.join(p_data['tags_nao_reconhecidas'])}`.")
             
             is_mercato_quadro = ('Mercato' in p_data.get('arquitetura', ''))
             is_schneider_quadro = ('Schneider' in p_data.get('arquitetura', ''))
@@ -761,12 +731,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             novos_inst = {k: 0 for k in REGRA_IO.keys()}
                             
                             if sub_kit == "Equipamento Novo (Em Branco)":
-                                p_data['grupos_equipamentos'].insert(0, {"nome_grupo": "Equipamento Novo", "multiplicador": 1, "instrumentos": novos_inst, "tags_lista": [""]})
+                                p_data['grupos_equipamentos'].insert(0, {"nome_grupo": "Equipamento Novo", "multiplicador": 1, "instrumentos": novos_inst.copy(), "tags_lista": [""]})
                             else:
                                 for item_nome, qtd_padrao in KITS_PADRAO[sub_kit].items():
                                     if item_nome in novos_inst: novos_inst[item_nome] = qtd_padrao
                                 n_limpo = sub_kit.split(" ", 1)[1] if " " in sub_kit else sub_kit
-                                p_data['grupos_equipamentos'].insert(0, {"nome_grupo": f"{n_limpo}", "multiplicador": 1, "instrumentos": novos_inst, "tags_lista": [""]})
+                                p_data['grupos_equipamentos'].insert(0, {"nome_grupo": f"{n_limpo}", "multiplicador": 1, "instrumentos": novos_inst.copy(), "tags_lista": [""]})
                             st.rerun()
 
                 raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
@@ -795,8 +765,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             
                             if qtd_atual > 6: st.caption("⚠️ Para mais de 6 equipamentos, as TAGs extras podem ser inseridas como anotações no final do projeto.")
 
+                            # Identificação Senior de Monitoramento
+                            auto_is_monitoramento = "SALA" in g_data['nome_grupo'].upper() or "MONITORAMENTO" in g_data['nome_grupo'].upper()
+                            is_monitoramento = st.checkbox("📍 Este equipamento é exclusivamente Monitoramento de Ambiente (Salas) - Não requer intertravamento de hardware", value=auto_is_monitoramento, key=f"chk_mon_{p_data['id']}_{g_idx}")
                             is_compressor_sys = "COMPRESSOR" in g_data['nome_grupo'].upper() or "DIRETA" in g_data['nome_grupo'].upper() or "DX" in g_data['nome_grupo'].upper()
-                            is_monitoramento = "SALA" in g_data['nome_grupo'].upper() or "MONITORAMENTO" in g_data['nome_grupo'].upper()
 
                             with st.container():
                                 for inst, q in g_data['instrumentos'].items():
@@ -817,60 +789,37 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                     
                                     modelo_mcp = dimensionar_mercato(ui_check, ao_check, do_check, is_compressor_sys)
                                     if not modelo_mcp:
-                                        st.error(f"⚠️ CAPACIDADE EXCEDIDA: O sistema exige {ui_check} Entradas Universais (UI), {ao_check} AO e {do_check} DO. Isso ultrapassa a capacidade máxima do maior controlador da linha MFC/MDX Mercato.\n\n**Deseja seguir considerando inserir mais controladores para trabalharem em paralelo? (Não recomendável)**")
+                                        st.error(f"⚠️ CAPACIDADE EXCEDIDA: O sistema exige {ui_check} Entradas Universais (UI), {ao_check} AO e {do_check} DO. Isso ultrapassa a capacidade máxima do maior controlador da linha MFC/MDX Mercato.")
                                     else:
                                         st.success(f"✅ OK! Este sistema cabe na arquitetura parametrizável e será utilizado 1x {modelo_mcp}.")
 
-                            # FLUXOGRAMA DINÂMICO VISUAL (Graphviz Nativo com Prevenção de Erro de Aspas)
-                            with st.expander("👁️ Visualizar Diagrama P&ID (Lógica e TAGs)", expanded=True):
+                            with st.expander("👁️ Visualizar Diagrama P&ID (Lógica e TAGs)", expanded=False):
+                                def limpa_str(texto): return str(texto).replace('"', "''").replace('\n', ' ')
                                 
-                                # FUNÇÃO PARA BLINDAR STRINGS CONTRA ERROS DO GRAPHVIZ
-                                def limpa_str(texto):
-                                    return str(texto).replace('"', "''").replace('\n', ' ')
-                                
-                                dot = f'digraph G {{\n'
-                                dot += f'  rankdir=LR;\n'
-                                dot += f'  node [fontname="Arial", fontsize=10, shape=box, style=rounded];\n'
-                                
+                                dot = f'digraph G {{\n  rankdir=LR;\n  node [fontname="Arial", fontsize=10, shape=box, style=rounded];\n'
                                 if p_data.get('ihm') and "Cego" not in p_data['ihm']:
                                     ihm_nome = p_data["ihm"].replace('Mercato - ', '').replace('IHM Padrão ', '').replace('IHM Premium ', '')
-                                    ihm_nome = limpa_str(ihm_nome)
-                                    dot += f'  "IHM" [label="{ihm_nome}\\n(Painel)", fillcolor="#D5F5E3", style=filled];\n'
-                                    dot += '  "IHM" -> "Controlador" [dir=both, style=dashed];\n'
+                                    dot += f'  "IHM" [label="{limpa_str(ihm_nome)}\\n(Painel)", fillcolor="#D5F5E3", style=filled];\n  "IHM" -> "Controlador" [dir=both, style=dashed];\n'
                                     
-                                arq_nome = limpa_str(p_data.get("arquitetura", "Controlador"))
-                                grupo_nome = limpa_str(g_data["nome_grupo"])
-                                dot += f'  "Controlador" [label="{arq_nome}\\n({grupo_nome})", fillcolor="#1C8590", style=filled, fontcolor=white, shape=ellipse];\n'
-                                
-                                has_inputs = False
-                                has_outputs = False
+                                dot += f'  "Controlador" [label="{limpa_str(p_data.get("arquitetura", "Controlador"))}\\n({limpa_str(g_data["nome_grupo"])})", fillcolor="#1C8590", style=filled, fontcolor=white, shape=ellipse];\n'
+                                has_inputs = has_outputs = False
                                 node_idx = 0
+                                group_boxes = is_monitoramento or ("EXAUST" in g_data["nome_grupo"].upper())
                                 
-                                # AGRUPAR CAIXAS SE FOR MONITORAMENTO OU EXAUSTÃO
-                                group_boxes = is_monitoramento or ("EXAUST" in grupo_nome.upper())
-                                
-                                # CRÍTICO: RENDERIZA O GRÁFICO 1 VEZ POR TIPO DE INSTRUMENTO
                                 for inst_f, q_f in g_data['instrumentos'].items():
                                     if q_f > 0:
                                         q_int = int(q_f)
                                         io_v = REGRA_IO.get(inst_f, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
-                                        tag_hardware = inst_f.split('(')[-1].replace(')', '').strip() if '(' in inst_f else 'IO'
-                                        tag_hardware = limpa_str(tag_hardware)
-                                        
+                                        tag_hw = limpa_str(inst_f.split('(')[-1].replace(')', '').strip() if '(' in inst_f else 'IO')
                                         c_names = st.session_state.de_para_diagrama.get(inst_f, {})
-                                        if isinstance(c_names, str):
-                                            lbl_in = lbl_out = c_names
+                                        if isinstance(c_names, str): lbl_in = lbl_out = c_names
                                         else:
                                             if is_compressor_sys:
-                                                lbl_in = c_names.get("in_comp", "")
-                                                lbl_out = c_names.get("out_comp", "")
-                                                if not lbl_in: lbl_in = c_names.get("in_agua", "")
-                                                if not lbl_out: lbl_out = c_names.get("out_agua", "")
+                                                lbl_in = c_names.get("in_comp", c_names.get("in_agua", ""))
+                                                lbl_out = c_names.get("out_comp", c_names.get("out_agua", ""))
                                             else:
-                                                lbl_in = c_names.get("in_agua", "")
-                                                lbl_out = c_names.get("out_agua", "")
-                                                if not lbl_in: lbl_in = c_names.get("in_comp", "")
-                                                if not lbl_out: lbl_out = c_names.get("out_comp", "")
+                                                lbl_in = c_names.get("in_agua", c_names.get("in_comp", ""))
+                                                lbl_out = c_names.get("out_agua", c_names.get("out_comp", ""))
                                         
                                         if not lbl_in: lbl_in = inst_f.split('(')[0].strip()
                                         if not lbl_out: lbl_out = inst_f.split('(')[0].strip()
@@ -883,143 +832,99 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                         
                                         if not has_in_pin and not has_out_pin: continue
                                         
-                                        # Agrupamento das TAGs do usuário
-                                        tags_validas = [t for t in g_data['tags_lista'] if t.strip()]
-                                        tags_inst = tags_validas
-                                        
-                                        # Isolar UE e UC se for sistema de Expansão Direta integrado
-                                        if is_compressor_sys and ("UTA" in grupo_nome.upper() or "SISTEMA" in grupo_nome.upper()):
+                                        tags_inst = [t for t in g_data['tags_lista'] if t.strip()]
+                                        if is_compressor_sys and ("UTA" in g_data["nome_grupo"].upper() or "SISTEMA" in g_data["nome_grupo"].upper()):
                                             if "COMPRESSOR" in inst_f.upper() or "TC" in inst_f.upper() or "CONDENSADOR" in inst_f.upper():
-                                                tags_inst = [t for t in tags_validas if "UC" in t.upper() or "COND" in t.upper() or "COMP" in t.upper()]
+                                                tags_inst = [t for t in tags_inst if "UC" in t.upper() or "COND" in t.upper() or "COMP" in t.upper()]
                                             else:
-                                                tags_inst = [t for t in tags_validas if "UE" in t.upper() or "EVAP" in t.upper() or "UTA" in t.upper()]
-                                            if not tags_inst: tags_inst = tags_validas
+                                                tags_inst = [t for t in tags_inst if "UE" in t.upper() or "EVAP" in t.upper() or "UTA" in t.upper()]
+                                            if not tags_inst: tags_inst = [t for t in g_data['tags_lista'] if t.strip()]
                                         
-                                        lbl_in_limpo = limpa_str(lbl_in)
-                                        lbl_out_limpo = limpa_str(lbl_out)
+                                        lbl_in_limpo, lbl_out_limpo = limpa_str(lbl_in), limpa_str(lbl_out)
                                         if len(lbl_in_limpo) > 35: lbl_in_limpo = lbl_in_limpo[:35] + "..."
                                         if len(lbl_out_limpo) > 35: lbl_out_limpo = lbl_out_limpo[:35] + "..."
                                         
                                         if group_boxes:
-                                            # Desenha APENAS 1 CAIXA com prefixo quantitativo e as TAGs juntas
                                             node_name = f"N_{node_idx}_grp"
                                             prefix = f"{q_int}x "
-                                            
                                             str_tags = ", ".join(tags_inst)
                                             str_tag_ctx = f"\\n({limpa_str(str_tags)})" if str_tags else ""
-                                            
-                                            if has_in_pin and lbl_in_limpo and str(lbl_in_limpo).strip() not in ["", "nan"]:
-                                                cabo_in = obter_cabo(inst_f, False)
-                                                dot += f'  "{node_name}_in" [label="{prefix}{lbl_in_limpo}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#2B7BC4"];\n'
-                                                dot += f'  "{node_name}_in" -> "Controlador" [label="{cabo_in}", fontsize=8, color="#2B7BC4"];\n'
+                                            if has_in_pin and lbl_in_limpo.strip() not in ["", "nan"]:
+                                                dot += f'  "{node_name}_in" [label="{prefix}{lbl_in_limpo}{str_tag_ctx}\\nTAG: {tag_hw}", color="#2B7BC4"];\n  "{node_name}_in" -> "Controlador" [label="{obter_cabo(inst_f, False)}", fontsize=8, color="#2B7BC4"];\n'
                                                 has_inputs = True
-                                                
-                                            if not is_monitoramento and has_out_pin and lbl_out_limpo and str(lbl_out_limpo).strip() not in ["", "nan"]:
+                                            if not is_monitoramento and has_out_pin and lbl_out_limpo.strip() not in ["", "nan"]:
                                                 if "Resistência de aquecimento" in inst_f:
-                                                    dot += f'  "{node_name}_out_DO" [label="{prefix}Habilita RAQ{str_tag_ctx}\\nTAG: DO", color="#E14D2A"];\n'
-                                                    dot += f'  "Controlador" -> "{node_name}_out_DO" [label="2x1,00mm²", fontsize=8, color="#E14D2A"];\n'
-                                                    dot += f'  "{node_name}_out_AO" [label="{prefix}Modulação Resistência{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
-                                                    dot += f'  "Controlador" -> "{node_name}_out_AO" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
+                                                    dot += f'  "{node_name}_out_DO" [label="{prefix}Habilita RAQ{str_tag_ctx}\\nTAG: DO", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out_DO" [label="2x1,00mm²", fontsize=8, color="#E14D2A"];\n  "{node_name}_out_AO" [label="{prefix}Modulação Resistência{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out_AO" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
                                                     has_outputs = True
                                                 elif "medição de vazão de ar" in inst_f:
-                                                    dot += f'  "{node_name}_out" [label="{prefix}Modula Inversor{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
-                                                    dot += f'  "Controlador" -> "{node_name}_out" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
+                                                    dot += f'  "{node_name}_out" [label="{prefix}Modula Inversor{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
                                                     has_outputs = True
                                                 else:
-                                                    cabo_out = obter_cabo(inst_f, True)
-                                                    dot += f'  "{node_name}_out" [label="{prefix}{lbl_out_limpo}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#E14D2A"];\n'
-                                                    dot += f'  "Controlador" -> "{node_name}_out" [label="{cabo_out}", fontsize=8, color="#E14D2A"];\n'
+                                                    dot += f'  "{node_name}_out" [label="{prefix}{lbl_out_limpo}{str_tag_ctx}\\nTAG: {tag_hw}", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out" [label="{obter_cabo(inst_f, True)}", fontsize=8, color="#E14D2A"];\n'
                                                     has_outputs = True
                                         else:
-                                            # Desenha CAIXAS SEPARADAS
                                             for idx_q in range(q_int):
                                                 node_name = f"N_{node_idx}_{idx_q}"
                                                 lbl_suf = f" {idx_q+1}" if q_int > 1 else ""
-                                                
                                                 tag_contexto = tags_inst[idx_q % len(tags_inst)] if tags_inst else ""
-                                                # Correção para PDIT/Vazão herdar só a primeira TAG principal (UE-01) ao invés da string combinada
-                                                if "vazão de ar" in inst_f.lower() and "/" in tag_contexto:
-                                                    tag_contexto = tag_contexto.split('/')[0].strip()
-                                                    
+                                                if "vazão de ar" in inst_f.lower() and "/" in tag_contexto: tag_contexto = tag_contexto.split('/')[0].strip()
                                                 str_tag_ctx = f"\\n({limpa_str(tag_contexto)})" if tag_contexto else ""
                                                 
-                                                if has_in_pin and lbl_in_limpo and str(lbl_in_limpo).strip() not in ["", "nan"]:
-                                                    cabo_in = obter_cabo(inst_f, False)
-                                                    dot += f'  "{node_name}_in" [label="{lbl_in_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#2B7BC4"];\n'
-                                                    dot += f'  "{node_name}_in" -> "Controlador" [label="{cabo_in}", fontsize=8, color="#2B7BC4"];\n'
+                                                if has_in_pin and lbl_in_limpo.strip() not in ["", "nan"]:
+                                                    dot += f'  "{node_name}_in" [label="{lbl_in_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hw}", color="#2B7BC4"];\n  "{node_name}_in" -> "Controlador" [label="{obter_cabo(inst_f, False)}", fontsize=8, color="#2B7BC4"];\n'
                                                     has_inputs = True
-                                                    
-                                                if not is_monitoramento and has_out_pin and lbl_out_limpo and str(lbl_out_limpo).strip() not in ["", "nan"]:
+                                                if not is_monitoramento and has_out_pin and lbl_out_limpo.strip() not in ["", "nan"]:
                                                     if "Resistência de aquecimento" in inst_f:
-                                                        dot += f'  "{node_name}_out_DO" [label="Habilita RAQ{lbl_suf}{str_tag_ctx}\\nTAG: DO", color="#E14D2A"];\n'
-                                                        dot += f'  "Controlador" -> "{node_name}_out_DO" [label="2x1,00mm²", fontsize=8, color="#E14D2A"];\n'
-                                                        dot += f'  "{node_name}_out_AO" [label="Modulação Resistência{lbl_suf}{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
-                                                        dot += f'  "Controlador" -> "{node_name}_out_AO" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
+                                                        dot += f'  "{node_name}_out_DO" [label="Habilita RAQ{lbl_suf}{str_tag_ctx}\\nTAG: DO", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out_DO" [label="2x1,00mm²", fontsize=8, color="#E14D2A"];\n  "{node_name}_out_AO" [label="Modulação Resistência{lbl_suf}{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out_AO" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
                                                         has_outputs = True
                                                     elif "medição de vazão de ar" in inst_f:
-                                                        dot += f'  "{node_name}_out" [label="Modula Inversor{lbl_suf}{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n'
-                                                        dot += f'  "Controlador" -> "{node_name}_out" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
+                                                        dot += f'  "{node_name}_out" [label="Modula Inversor{lbl_suf}{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
                                                         has_outputs = True
                                                     else:
-                                                        cabo_out = obter_cabo(inst_f, True)
-                                                        dot += f'  "{node_name}_out" [label="{lbl_out_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hardware}", color="#E14D2A"];\n'
-                                                        dot += f'  "Controlador" -> "{node_name}_out" [label="{cabo_out}", fontsize=8, color="#E14D2A"];\n'
+                                                        dot += f'  "{node_name}_out" [label="{lbl_out_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hw}", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out" [label="{obter_cabo(inst_f, True)}", fontsize=8, color="#E14D2A"];\n'
                                                         has_outputs = True
-                                                        
                                         node_idx += 1
                                         
                                 if not is_monitoramento:
                                     inst_chave = "Chave Seletora Auto/Manual (Painel Elétrico)"
                                     c_names = st.session_state.de_para_diagrama.get(inst_chave, {})
-                                    lbl_in_c = str(c_names.get("in_comp", "")) if is_compressor_sys else str(c_names.get("in_agua", ""))
-                                    lbl_out_c = str(c_names.get("out_comp", "")) if is_compressor_sys else str(c_names.get("out_agua", ""))
-                                    
-                                    lbl_in_c = limpa_str(lbl_in_c)
-                                    lbl_out_c = limpa_str(lbl_out_c)
-                                    
+                                    lbl_in_c = limpa_str(str(c_names.get("in_comp", "")) if is_compressor_sys else str(c_names.get("in_agua", "")))
+                                    lbl_out_c = limpa_str(str(c_names.get("out_comp", "")) if is_compressor_sys else str(c_names.get("out_agua", "")))
                                     prefix_c = f"{int(qtd_atual)}x " if int(qtd_atual) > 1 and group_boxes else ""
                                     
-                                    if lbl_in_c and str(lbl_in_c).strip() not in ["", "nan"]:
-                                        dot += f'  "chave_in" [label="{prefix_c}{lbl_in_c}\\nTAG: CH", color="#2B7BC4"];\n'
-                                        dot += f'  "chave_in" -> "Controlador" [label="5x1,00mm²", fontsize=8, color="#2B7BC4"];\n'
+                                    if lbl_in_c.strip() not in ["", "nan"]:
+                                        dot += f'  "chave_in" [label="{prefix_c}{lbl_in_c}\\nTAG: CH", color="#2B7BC4"];\n  "chave_in" -> "Controlador" [label="5x1,00mm²", fontsize=8, color="#2B7BC4"];\n'
                                         has_inputs = True
-                                    if lbl_out_c and str(lbl_out_c).strip() not in ["", "nan"]:
-                                        dot += f'  "chave_out" [label="{prefix_c}{lbl_out_c}\\nTAG: CH", color="#E14D2A"];\n'
-                                        dot += f'  "Controlador" -> "chave_out" [label="5x1,00mm²", fontsize=8, color="#E14D2A"];\n'
+                                    if lbl_out_c.strip() not in ["", "nan"]:
+                                        dot += f'  "chave_out" [label="{prefix_c}{lbl_out_c}\\nTAG: CH", color="#E14D2A"];\n  "Controlador" -> "chave_out" [label="5x1,00mm²", fontsize=8, color="#E14D2A"];\n'
                                         has_outputs = True
 
                                 if not has_inputs: dot += '  "Sinais de Campo" -> "Controlador" [style=dashed];\n'
                                 if not has_outputs and not is_monitoramento: dot += '  "Controlador" -> "Atuadores" [style=dashed];\n'
                                 dot += '}'
                                 
-                                # MOSTRA O DIAGRAMA UMA ÚNICA VEZ APÓS O LOOP (Evita Imagem Picotada e Múltipla)
                                 try:
                                     st.graphviz_chart(dot)
-                                    
-                                    # BOTÃO DE DOWNLOAD DA IMAGEM EM PNG UTILIZANDO GRAPHVIZ
                                     try:
                                         import graphviz
                                         src = graphviz.Source(dot)
                                         png_bytes = src.pipe(format='png')
                                         st.download_button(label="📥 Baixar Imagem (.PNG)", data=png_bytes, file_name=f"Diagrama_{g_data['nome_grupo']}.png", mime="image/png", key=f"dl_png_{p_data['id']}_{g_idx}")
-                                    except ImportError:
-                                        st.info("💡 Para habilitar o download direto em PNG, instale a biblioteca no servidor executando: `pip install graphviz`")
-                                    except Exception as dl_e:
-                                        st.warning("Ocorreu um erro ao gerar o PNG. Você pode copiar a imagem diretamente da tela acima clicando nela com o botão direito.")
-                                except Exception as e:
-                                    st.error(f"Erro ao projetar fluxograma visual: {e}")
+                                    except: pass
+                                except: pass
 
                             with st.expander("⚙️ Ajuste Fino de Instrumentos (Engenharia)"):
                                 for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
-                                    open_p_eng = False
-                                    with st.expander(grupo_nome, expanded=open_p_eng):
+                                    with st.expander(grupo_nome, expanded=False):
                                         cols_inst = st.columns(2)
                                         for i, inst in enumerate(lista_itens):
                                             if inst not in g_data['instrumentos']: g_data['instrumentos'][inst] = 0
                                             with cols_inst[i % 2]:
                                                 chave_unica = f"inst_{p_data['id']}_{g_idx}_{grupo_nome}_{inst}"
                                                 g_data['instrumentos'][inst] = st.number_input(inst, min_value=0, step=1, value=g_data['instrumentos'][inst], key=chave_unica)
-                            if st.button("🗑️ Remover Máquina", key=f"del_{p_data['id']}_{g_idx}"):
+                                                
+                            st.write("")
+                            if st.button("🗑️ Remover Equipamento", key=f"del_{p_data['id']}_{g_idx}"):
                                 p_data['grupos_equipamentos'].pop(g_idx)
                                 st.rerun()
 
@@ -1064,7 +969,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         
         if st.session_state.paineis_auto:
             st.markdown("---")
-            
             c_bot_salvar, c_bot_sair = st.columns(2)
             
             if c_bot_salvar.button("💾 Salvar Rascunho e Sair (Retomar depois)", type="primary", use_container_width=True):
@@ -1158,7 +1062,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         st.write("Baixe a planilha estruturada sem preços para enviar aos fornecedores. Após receber a cotação preenchida, faça o upload aqui para atualizar todos os valores do sistema automaticamente.")
         
         c_cot1, c_cot2 = st.columns(2)
-        
         with c_cot1:
             def gerar_planilha_cotacao(com_precos_atuais):
                 buffer_cotacao = io.BytesIO()
@@ -1252,7 +1155,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         st.markdown("### 🏷️ Padronização de Nomes para o Diagrama P&ID")
         st.write("Você pode baixar a relação de nomes de instrumentos, ajustá-los no Excel e fazer o upload novamente para mudar como eles aparecem visualmente no Diagrama gerado na aba de Automação.")
         
-        # DOWNLOAD DA PLANILHA DE DICIONÁRIO
         buffer_nomes = io.BytesIO()
         df_nomes = pd.DataFrame([
             {"Nome Original (Base de Preços)": k, 
@@ -1266,7 +1168,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         buffer_nomes.seek(0)
         st.download_button(label="📥 Baixar Planilha de Personalização de I/O", data=buffer_nomes, file_name="Dicionario_Nomes_Diagrama.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         
-        # UPLOAD DA PLANILHA EDITADA
         upload_nomes = st.file_uploader("📂 Faça o upload da planilha editada para atualizar os nomes no sistema", type=["xlsx", "csv"])
         if upload_nomes is not None:
             try:
@@ -1312,7 +1213,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         df_cfr = pd.DataFrame([{"Item / Equipamento": k, "Valor Atual (R$)": st.session_state.precos_banco.get(k, 0.0)} for k in lista_cfr if k in st.session_state.precos_banco])
         edited_cfr = st.data_editor(df_cfr, use_container_width=True, hide_index=True, key="ed_cfr")
         
-        # --- A CORREÇÃO SOLICITADA ESTÁ NESTE BOTÃO ABAIXO ---
         if st.button("💾 Salvar Novos Preços no Banco de Dados", type="primary"):
             alterou_algo = False
             novos_historicos = []
@@ -1356,7 +1256,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             else:
                 st.info("Nenhuma alteração detectada para salvar.")
 
-    # FUNÇÃO INTELIGENTE DE EAP (Extrai as tags separadas para exportação)
     def get_specific_tags(inst_nome, tags_lista, is_compressor_sys):
         tags_validas = [t for t in tags_lista if t.strip()]
         if not tags_validas: return ""
@@ -1440,7 +1339,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         qtd_final = qtd * mult
                         item_nome_real = inst
                         
-                        # CÁLCULO DE CALIBRAÇÃO (Apenas Analógicos)
                         if calibracao_ativa:
                             inst_up = inst.upper()
                             if "(TT/MT)" in inst_up or "(TIT/MIT)" in inst_up:
@@ -1482,7 +1380,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         elif "co2" in inst.lower(): func_inst = "Medição da Qualidade do Ar (CO2)"
                         elif "fluxo" in inst.lower() or "fs" in inst.lower() or "cf" in inst.lower(): func_inst = "Confirmação de Fluxo de Água"
                         
-                        # TAG ESPECÍFICA PARA A PLANILHA
                         tag_especifica = get_specific_tags(inst, g.get('tags_lista', []), is_compressor_sys)
                         str_tag_ctx = f" [TAGs: {tag_especifica}]" if tag_especifica else ""
                         nome_equip_inst = f"{nome_equip}{str_tag_ctx}"
@@ -1532,7 +1429,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     else:
                         linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"⚠️ ALERTA: Capacidade MFC/MDX Excedida ({g['nome_grupo']} - {p['nome']})", "Preço Unit.": 0.0, "Qtd": mult, "Custo Total": 0.0})
 
-            # INCLUSÃO DO CUSTO DE CALIBRAÇÃO (Se Houver)
             if total_pontos_calibracao > 0:
                 pr_calib = st.session_state.precos_banco.get("Serviço de Calibração (Por Ponto Analógico)", 180.0)
                 linhas_servicos.append({
