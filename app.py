@@ -1312,11 +1312,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         df_cfr = pd.DataFrame([{"Item / Equipamento": k, "Valor Atual (R$)": st.session_state.precos_banco.get(k, 0.0)} for k in lista_cfr if k in st.session_state.precos_banco])
         edited_cfr = st.data_editor(df_cfr, use_container_width=True, hide_index=True, key="ed_cfr")
         
-        if st.button("💾 Salvar Novos Preços no Banco de Dados", type="primary"):
+       if st.button("💾 Salvar Novos Preços no Banco de Dados", type="primary"):
             alterou_algo = False
             novos_historicos = []
             edited_total = pd.concat([edited_geral, edited_siemens, edited_mercato, edited_cfr], ignore_index=True)
             data_hora_agora = datetime.now(fuso_br).strftime("%d/%m/%Y %H:%M:%S")
+            
             for idx, row in edited_total.iterrows():
                 item = row['Item / Equipamento']
                 novo_valor = row['Valor Atual (R$)']
@@ -1327,6 +1328,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     novos_historicos.append(novo_hist)
                     st.session_state.precos_banco[item] = novo_valor
                     alterou_algo = True
+                    
             if alterou_algo:
                 try:
                     sh = conectar_google_sheets()
@@ -1336,14 +1338,22 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         ws_precos.append_row(["Item", "Valor"])
                     ws_precos.clear()
                     ws_precos.append_rows([["Item", "Valor"]] + [[k, v] for k, v in st.session_state.precos_banco.items()])
+                    
                     try: ws_hist = sh.worksheet("Historico_Precos")
                     except:
                         ws_hist = sh.add_worksheet(title="Historico_Precos", rows="1000", cols="4")
                         ws_hist.append_row(["Data/Hora", "Item Alterado", "Valor Antigo", "Novo Valor"])
+                    
                     if novos_historicos: ws_hist.append_rows([[h["Data/Hora"], h["Item Alterado"], h["Valor Antigo"], h["Novo Valor"]] for h in novos_historicos])
+                    
                     st.session_state.data_precos_atualizada = data_hora_agora
                     st.cache_data.clear()
-                    st.success("Base atualizada!")
+                    
+                    # --- CORREÇÃO APLICADA AQUI ABAIXO ---
+                    st.toast("✅ Base de preços atualizada com sucesso!", icon="💾")
+                    st.rerun() 
+                    # -------------------------------------
+                    
                 except Exception as e: st.error(f"Erro ao salvar: {e}")
 
     # FUNÇÃO INTELIGENTE DE EAP (Extrai as tags separadas para exportação)
