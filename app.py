@@ -547,7 +547,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         with st.expander("🔮 [BETA] Módulo Inteligente: Importar Quadro via IA Sênior (Gemini Vision)", expanded=True):
             st.markdown("Integração direta com **Google Gemini 1.5 Pro Vision** configurada via nuvem.")
             
-            arquivos_diagrama = st.file_uploader("Carregar P&ID / Imagem do Diagrama (Permite Múltiplos):", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+            # --- CORREÇÃO AQUI: ADICIONADO PDF ---
+            arquivos_diagrama = st.file_uploader("Carregar P&ID / Imagem do Diagrama (Permite Múltiplos):", type=["pdf", "png", "jpg", "jpeg"], accept_multiple_files=True)
+            
             if arquivos_diagrama:
                 st.info(f"💡 {len(arquivos_diagrama)} arquivo(s) carregado(s).")
                 c_ia1, c_ia2 = st.columns(2)
@@ -589,7 +591,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         with st.spinner("IA processando diagramas P&ID..."):
                             for arq in arquivos_diagrama:
                                 try:
-                                    img = Image.open(arq)
+                                    # --- CORREÇÃO AQUI: TRATAMENTO DE PDF X IMAGEM ---
+                                    if arq.name.lower().endswith('.pdf'):
+                                        doc_input = {"mime_type": "application/pdf", "data": arq.getvalue()}
+                                    else:
+                                        doc_input = Image.open(arq)
+
                                     prompt = """Atue como Engenheiro de Automação Sênior. Analise este diagrama P&ID de HVAC.
                                     Extraia as quantidades exatas dos equipamentos de forma técnica. Responda APENAS com um JSON estrito, usando esta estrutura:
                                     {
@@ -599,7 +606,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                         "filtros": [], // Opções exatas permitidas na lista: "G4 (PSH)", "M5 (PSH)", "F9 (PDT)", "H13/H14 (PDT)"
                                         "resistencia": false
                                     }"""
-                                    response = model.generate_content([prompt, img])
+                                    response = model.generate_content([prompt, doc_input])
                                     json_str = response.text.replace('```json', '').replace('```', '').strip()
                                     st.session_state.resultado_ia[arq.name] = json.loads(json_str)
                                 except Exception as e:
@@ -648,9 +655,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 if "F9 (PDT)" in config["filtros"]: i_u["Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)"] = 1
                                 if "H13/H14 (PDT)" in config["filtros"]: i_u["Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)"] = 1
                                 if config["resistencia"]:
-                                    i_u["Resistência de aquecimento (Equipamento) (RAQ)"] = 1
-                                    i_u["Termostato de segurança (TSH)"] = 1
-                                    i_u["Pressostato diferencial para ar (PSH)"] = 1
+                                    i_u["Resistência de aquecimento (Equipamento) (RAQ)"] = 1; i_u["Termostato de segurança (TSH)"] = 1; i_u["Pressostato diferencial para ar (PSH)"] = 1
                                 grupos_equip.append({"nome_grupo": f"UTA ({a_name})", "multiplicador": config["utas"], "instrumentos": i_u, "tags_lista": [f"UTA-{i+1:02d}" for i in range(config["utas"])]})
                             
                             if config["exaustores"] > 0:
@@ -827,121 +832,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                         modelo_mcp = dimensionar_mercato(ui_chk, ao_chk, do_chk, is_comp_sys)
                                         if not modelo_mcp: st.error(f"⚠️ CAPACIDADE EXCEDIDA para a linha Mercato.")
 
-                            with st.expander("👁️ Visualizar Diagrama P&ID (Lógica e TAGs)", expanded=False):
-                                def limpa_str(texto): return str(texto).replace('"', "''").replace('\n', ' ')
-                                dot = f'digraph G {{\n  rankdir=LR;\n  node [fontname="Arial", fontsize=10, shape=box, style=rounded];\n'
-                                if p_data.get('ihm') and "Cego" not in p_data['ihm']:
-                                    ihm_nome = p_data["ihm"].replace('Mercato - ', '').replace('IHM Padrão ', '').replace('IHM Premium ', '')
-                                    dot += f'  "IHM" [label="{limpa_str(ihm_nome)}\\n(Painel)", fillcolor="#D5F5E3", style=filled];\n  "IHM" -> "Controlador" [dir=both, style=dashed];\n'
-                                dot += f'  "Controlador" [label="{limpa_str(p_data.get("arquitetura", "Controlador"))}\\n({limpa_str(g_data["nome_grupo"])})", fillcolor="#1C8590", style=filled, fontcolor=white, shape=ellipse];\n'
-                                has_inputs = has_outputs = False
-                                node_idx = 0
-                                group_boxes = is_mon or ("EXAUST" in g_data["nome_grupo"].upper())
-                                
-                                for inst_f, q_f in g_data['instrumentos'].items():
-                                    if q_f > 0:
-                                        q_int = int(q_f)
-                                        io_v = REGRA_IO.get(inst_f, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
-                                        tag_hw = limpa_str(inst_f.split('(')[-1].replace(')', '').strip() if '(' in inst_f else 'IO')
-                                        c_names = st.session_state.de_para_diagrama.get(inst_f, {})
-                                        if isinstance(c_names, str): lbl_in = lbl_out = c_names
-                                        else:
-                                            if is_comp_sys:
-                                                lbl_in = c_names.get("in_comp", c_names.get("in_agua", ""))
-                                                lbl_out = c_names.get("out_comp", c_names.get("out_agua", ""))
-                                            else:
-                                                lbl_in = c_names.get("in_agua", c_names.get("in_comp", ""))
-                                                lbl_out = c_names.get("out_agua", c_names.get("out_comp", ""))
-                                        
-                                        if not lbl_in: lbl_in = inst_f.split('(')[0].strip()
-                                        if not lbl_out: lbl_out = inst_f.split('(')[0].strip()
-                                        
-                                        force_out = isinstance(c_names, dict) and (str(c_names.get("out_agua", "")).strip() not in ["", "nan"] or str(c_names.get("out_comp", "")).strip() not in ["", "nan"])
-                                        force_in = isinstance(c_names, dict) and (str(c_names.get("in_agua", "")).strip() not in ["", "nan"] or str(c_names.get("in_comp", "")).strip() not in ["", "nan"])
-
-                                        has_in_pin = io_v["AI"] > 0 or io_v["DI"] > 0 or force_in
-                                        has_out_pin = io_v["AO"] > 0 or io_v["DO"] > 0 or force_out
-                                        if not has_in_pin and not has_out_pin: continue
-                                        
-                                        tags_inst = [t for t in g_data['tags_lista'] if t.strip()]
-                                        if is_comp_sys and ("UTA" in g_data["nome_grupo"].upper() or "SISTEMA" in g_data["nome_grupo"].upper()):
-                                            if "COMPRESSOR" in inst_f.upper() or "TC" in inst_f.upper() or "CONDENSADOR" in inst_f.upper():
-                                                tags_inst = [t for t in tags_inst if "UC" in t.upper() or "COND" in t.upper() or "COMP" in t.upper()]
-                                            else:
-                                                tags_inst = [t for t in tags_inst if "UE" in t.upper() or "EVAP" in t.upper() or "UTA" in t.upper()]
-                                            if not tags_inst: tags_inst = [t for t in g_data['tags_lista'] if t.strip()]
-                                        
-                                        lbl_in_limpo, lbl_out_limpo = limpa_str(lbl_in), limpa_str(lbl_out)
-                                        if len(lbl_in_limpo) > 35: lbl_in_limpo = lbl_in_limpo[:35] + "..."
-                                        if len(lbl_out_limpo) > 35: lbl_out_limpo = lbl_out_limpo[:35] + "..."
-                                        
-                                        if group_boxes:
-                                            node_name = f"N_{node_idx}_grp"
-                                            prefix = f"{q_int}x "
-                                            str_tags = ", ".join(tags_inst)
-                                            str_tag_ctx = f"\\n({limpa_str(str_tags)})" if str_tags else ""
-                                            if has_in_pin and lbl_in_limpo.strip() not in ["", "nan"]:
-                                                dot += f'  "{node_name}_in" [label="{prefix}{lbl_in_limpo}{str_tag_ctx}\\nTAG: {tag_hw}", color="#2B7BC4"];\n  "{node_name}_in" -> "Controlador" [label="{obter_cabo(inst_f, False)}", fontsize=8, color="#2B7BC4"];\n'
-                                                has_inputs = True
-                                            if not is_mon and has_out_pin and lbl_out_limpo.strip() not in ["", "nan"]:
-                                                if "Resistência de aquecimento" in inst_f:
-                                                    dot += f'  "{node_name}_out_DO" [label="{prefix}Habilita RAQ{str_tag_ctx}\\nTAG: DO", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out_DO" [label="2x1,00mm²", fontsize=8, color="#E14D2A"];\n  "{node_name}_out_AO" [label="{prefix}Modulação Resistência{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out_AO" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
-                                                    has_outputs = True
-                                                elif "medição de vazão de ar" in inst_f:
-                                                    dot += f'  "{node_name}_out" [label="{prefix}Modula Inversor{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
-                                                    has_outputs = True
-                                                else:
-                                                    dot += f'  "{node_name}_out" [label="{prefix}{lbl_out_limpo}{str_tag_ctx}\\nTAG: {tag_hw}", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out" [label="{obter_cabo(inst_f, True)}", fontsize=8, color="#E14D2A"];\n'
-                                                    has_outputs = True
-                                        else:
-                                            for idx_q in range(q_int):
-                                                node_name = f"N_{node_idx}_{idx_q}"
-                                                lbl_suf = f" {idx_q+1}" if q_int > 1 else ""
-                                                tag_contexto = tags_inst[idx_q % len(tags_inst)] if tags_inst else ""
-                                                if "vazão de ar" in inst_f.lower() and "/" in tag_contexto: tag_contexto = tag_contexto.split('/')[0].strip()
-                                                str_tag_ctx = f"\\n({limpa_str(tag_contexto)})" if tag_contexto else ""
-                                                
-                                                if has_in_pin and lbl_in_limpo.strip() not in ["", "nan"]:
-                                                    dot += f'  "{node_name}_in" [label="{lbl_in_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hw}", color="#2B7BC4"];\n  "{node_name}_in" -> "Controlador" [label="{obter_cabo(inst_f, False)}", fontsize=8, color="#2B7BC4"];\n'
-                                                    has_inputs = True
-                                                if not is_mon and has_out_pin and lbl_out_limpo.strip() not in ["", "nan"]:
-                                                    if "Resistência de aquecimento" in inst_f:
-                                                        dot += f'  "{node_name}_out_DO" [label="Habilita RAQ{lbl_suf}{str_tag_ctx}\\nTAG: DO", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out_DO" [label="2x1,00mm²", fontsize=8, color="#E14D2A"];\n  "{node_name}_out_AO" [label="Modulação Resistência{lbl_suf}{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out_AO" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
-                                                        has_outputs = True
-                                                    elif "medição de vazão de ar" in inst_f:
-                                                        dot += f'  "{node_name}_out" [label="Modula Inversor{lbl_suf}{str_tag_ctx}\\nTAG: AO", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out" [label="3x0,75mm² + Shield", fontsize=8, color="#E14D2A"];\n'
-                                                        has_outputs = True
-                                                    else:
-                                                        dot += f'  "{node_name}_out" [label="{lbl_out_limpo}{lbl_suf}{str_tag_ctx}\\nTAG: {tag_hw}", color="#E14D2A"];\n  "Controlador" -> "{node_name}_out" [label="{obter_cabo(inst_f, True)}", fontsize=8, color="#E14D2A"];\n'
-                                                        has_outputs = True
-                                        node_idx += 1
-                                        
-                                if not is_mon:
-                                    inst_chave = "Chave Seletora Auto/Manual (Painel Elétrico)"
-                                    c_names = st.session_state.de_para_diagrama.get(inst_chave, {})
-                                    lbl_in_c = limpa_str(str(c_names.get("in_comp", "")) if is_comp_sys else str(c_names.get("in_agua", "")))
-                                    lbl_out_c = limpa_str(str(c_names.get("out_comp", "")) if is_comp_sys else str(c_names.get("out_agua", "")))
-                                    prefix_c = f"{int(qtd_atual)}x " if int(qtd_atual) > 1 and group_boxes else ""
-                                    
-                                    if lbl_in_c.strip() not in ["", "nan"]:
-                                        dot += f'  "chave_in" [label="{prefix_c}{lbl_in_c}\\nTAG: CH", color="#2B7BC4"];\n  "chave_in" -> "Controlador" [label="5x1,00mm²", fontsize=8, color="#2B7BC4"];\n'
-                                        has_inputs = True
-                                    if lbl_out_c.strip() not in ["", "nan"]:
-                                        dot += f'  "chave_out" [label="{prefix_c}{lbl_out_c}\\nTAG: CH", color="#E14D2A"];\n  "Controlador" -> "chave_out" [label="5x1,00mm²", fontsize=8, color="#E14D2A"];\n'
-                                        has_outputs = True
-
-                                if not has_inputs: dot += '  "Sinais de Campo" -> "Controlador" [style=dashed];\n'
-                                if not has_outputs and not is_mon: dot += '  "Controlador" -> "Atuadores" [style=dashed];\n'
-                                dot += '}'
-                                try:
-                                    st.graphviz_chart(dot)
-                                    try:
-                                        import graphviz
-                                        src = graphviz.Source(dot)
-                                        st.download_button("📥 Baixar Imagem (.PNG)", src.pipe(format='png'), f"Diagrama_{g_data['nome_grupo']}.png", "image/png", key=f"dl_png_{p_data['id']}_{g_idx}")
-                                    except: pass
-                                except: pass
-
                             with st.expander("⚙️ Ajuste Fino de Instrumentos (Engenharia)"):
                                 for grupo_nome, lista_itens in GRUPOS_INSTRUMENTOS.items():
                                     with st.expander(grupo_nome, expanded=False):
@@ -987,7 +877,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     try:
                         sh = conectar_google_sheets()
                         try: ws_hist_orc = sh.worksheet("Historico_Orcamentos")
-                        except: ws_hist_orc = sh.add_worksheet("Historico_Orcamentos", 1000, 8); ws_hist_orc.append_row(["Data/Hora", "Nome do Projeto", "Revisão", "Subtotal Hardware", "Serviços de Lógica", "Custo Total Estimado", "Configuracao_JSON", "Usuário"])
+                        except:
+                            ws_hist_orc = sh.add_worksheet(title="Historico_Orcamentos", rows="1000", cols="8")
+                            ws_hist_orc.append_row(["Data/Hora", "Nome do Projeto", "Revisão", "Subtotal Hardware", "Serviços de Lógica", "Custo Total Estimado", "Configuracao_JSON", "Usuário"])
                         todas_linhas = ws_hist_orc.get_all_values()
                         c_rev = sum(1 for r in todas_linhas[1:] if r[1].strip().upper() == st.session_state.nome_projeto_orcamento.strip().upper())
                         ws_hist_orc.append_row([datetime.now(fuso_br).strftime("%d/%m/%Y %H:%M:%S"), st.session_state.nome_projeto_orcamento, f"R-{c_rev:02d}", "R$ 0,00", "R$ 0,00", "R$ 0,00 (Rascunho)", json.dumps(st.session_state.paineis_auto), st.session_state.usuario_logado])
