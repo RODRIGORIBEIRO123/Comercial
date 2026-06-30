@@ -1,8 +1,9 @@
 streamlit
 pandas
-openpyxl
 docxtpl
 gspread
 oauth2client
+openpyxl
 google-generativeai
-pillow
+Pillow
+graphviz
