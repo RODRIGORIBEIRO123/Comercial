@@ -68,7 +68,7 @@ if 'de_para_diagrama' not in st.session_state:
         "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {"in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "Modula Inversor", "out_comp": "Modula Inversor"},
         "Transmissor de temperatura e umidade para duto (TT/MT)": {"in_agua": "Trans. Temp. e Umid. (TT/MT)", "in_comp": "Trans. Temp. e Umid. (TT/MT)", "out_agua": "", "out_comp": ""},
         "Transmissor de temperatura para duto (TT)": {"in_agua": "Trans. Temp. (TT)", "in_comp": "Trans. Temp. (TT)", "out_agua": "", "out_comp": ""},
-        "Válvula de controle de água gelada proporcional (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Modula VAG", "out_comp": "Habilta Compressor"},
+        "Válvula de controle de água gelada proporcional (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Modula VAG", "out_comp": "Habilita Compressor"},
         "Válvula de controle de água quente proporcional (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Modula VAQ", "out_comp": ""},
         "Relé de Corrente - Status Compressor (TC)": {"in_agua": "", "in_comp": "Status Compressor", "out_agua": "", "out_comp": "Habilita Compressor"},
         "Termostato de segurança (TSH)": {"in_agua": "Termostato Seg. RAQ (TSH)", "in_comp": "Termostato Seg. RAQ (TSH)", "out_agua": "Status RAQ", "out_comp": "Status RAQ"},
@@ -389,6 +389,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     for k_n, v_n in banco_padrao_precos.items():
         if k_n not in st.session_state.precos_banco: st.session_state.precos_banco[k_n] = v_n
 
+    # ADDED: Válvula de Água Quente/Vapor and Filtros F9/H13
     GRUPOS_INSTRUMENTOS = {
         "🔹 Controle (HVAC e Máquinas)": [
             "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)",
@@ -396,7 +397,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             "Válvula de controle proporcional com atuador (TCV)", "Válvula de controle de água gelada proporcional (TCV)",
             "Válvula de controle de água quente proporcional (TCV)", "Válvula de controle de vapor proporcional (TCV)",
             "Relé de Corrente - Status Compressor (TC)", "Termostato de segurança (TSH)",
-            "Pressostato diferencial para ar (PSH)", "Resistência de aquecimento (Equipamento) (RAQ)"
+            "Pressostato diferencial para ar (PSH)", "Resistência de aquecimento (Equipamento) (RAQ)",
+            "Resistência de aquecimento (Duto) (RAQ)"
         ],
         "🔸 Monitoramento (Filtros e Status)": [
             "Pressostato para monitorar os filtros G4 (PSH)", "Pressostato para monitorar os filtros M5 (PSH)", "Pressostato para monitorar os filtros F9 (PSH)", "Pressostato para monitorar os filtros H13/H14 (PSH)",
@@ -405,9 +407,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             "Chave de fluxo para água (FS/CF)"
         ],
         "🟢 Monitoramento e Controle de Ambientes": [
-            "Transmissor de pressão diferencial entre salas (PDT)",
-            "Transmissor de temperatura Ambiente (TT)",
-            "Transmissor de temperatura e umidade ambiente (TT/MT)",
+            "Transmissor de pressão diferencial entre salas (PDT)", "Transmissor de pressão diferencial entre salas com display (PDIT)",
+            "Transmissor de temperatura Ambiente (TT)", "Transmissor de temperatura ambiente com display (TIT)",
+            "Transmissor de temperatura e umidade ambiente (TT/MT)", "Transmissor de temperatura e umidade ambiente com display (TIT/MIT)",
             "Transmissor de CO2 ambiente (AT/AIT)"
         ]
     }
@@ -444,7 +446,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 }
     }
 
-    # --- FUNÇÃO PARA TIPO DE CABO NO DIAGRAMA ---
     def obter_cabo(inst_nome, is_output=False):
         inst_upper = inst_nome.upper()
         if is_output:
@@ -514,7 +515,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             return "Mercato - Controlador MFC Plus"
         return None
         
-    # --- FUNÇÃO DE SEPARAÇÃO E EXTRAÇÃO INTELIGENTE DE TAGS ---
     def get_specific_tags(inst_nome, tags_lista, is_compressor_sys):
         tags_validas = [t for t in tags_lista if t.strip()]
         if not tags_validas: return ""
@@ -531,8 +531,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
     aba_auto, aba_infra, aba_precos, aba_resumo = st.tabs([
         "🚀 Dimensionamento de Automação", "🔌 Infraestrutura Lançamento", "💲 Base de Preços", "📊 Orçamento Final"
     ])
-    
-    help_cfr = "Qualificável: O sistema é entregue pronto e aberto para qualificação por terceiros.\nQualificado: A SIARCON executa e entrega a documentação de validação (Protocolos)."
+
+    help_cfr_txt = "Qualificável: O sistema atende aos requisitos técnicos de software para que o cliente valide depois.\nQualificado: A SIARCON executa e entrega todos os protocolos de validação (CFR-21 Part 11)."
 
     with aba_auto:
         with st.expander("🔮 [BETA] Módulo Inteligente: Importar Quadro via Engenharia Reversa", expanded=True):
@@ -569,11 +569,13 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         if "COM certificação" in soft_sel_ia:
                             tipo_cfr_ia = c_ia2.radio(
                                 "Selecione a Modalidade do CFR-21 Part 11:",
-                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"], help=help_cfr
+                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"], help=help_cfr_txt
                             )
                 
                 calibracao_ia = c_ia2.radio("Os instrumentos serão calibrados?", ["Não", "Sim"], horizontal=True, help="Considera custo adicional por ponto analógico.")
                 sobra_ia = c_ia2.radio("Considerar 20% de sobra nas I/O (Reserva Técnica)?", ["Não", "Sim"], horizontal=True)
+
+                resfriamento_ia = st.radio("Qual o Tipo de Resfriamento Principal das Máquinas importadas?", ["Expansão Direta", "Água Gelada"], horizontal=True)
 
                 st.markdown("##### 🔀 Distribuição de Equipamentos por Quadro")
                 st.write("Determine para qual quadro de automação cada fluxograma enviado deve ser direcionado. Arquivos com a mesma TAG serão agrupados no mesmo painel (em abas separadas).")
@@ -581,7 +583,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 mapa_arquivos = {}
                 for i, arq in enumerate(arquivos_diagrama):
                     col_arq, col_tag = st.columns([1, 1])
-                    col_arq.markdown(f"📄 **{arq.name}**", unsafe_allow_html=True)
+                    col_arq.markdown(f"📄 **{arq.name}**<br><span style='color:gray; font-size:12px;'>Mapeamento condicionado pelo nome do arquivo.</span>", unsafe_allow_html=True)
                     tag_dest = col_tag.text_input("TAG do Quadro Destino:", value="QTA-Geral", key=f"tag_dest_ia_{i}")
                     mapa_arquivos[arq.name] = tag_dest
                     
@@ -594,27 +596,70 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 quadros_agrupados[tag] = []
                             quadros_agrupados[tag].append(arq_name)
                             
-                        # Lógica Sênior de Separação (Lê os nomes dos arquivos para não gerar itens fantasmas)
+                        # Lógica Sênior de Separação (Lê os nomes dos arquivos para não gerar itens fantasmas/repetidos)
                         for tag_quadro, lista_arquivos in quadros_agrupados.items():
                             grupos_equip = []
+                            
                             for idx_equip, arq_name in enumerate(lista_arquivos):
-                                inst_base = {k: 0 for k in REGRA_IO.keys()}
                                 nome_upper = arq_name.upper()
                                 
-                                if "SALA" in nome_upper or "MONIT" in nome_upper:
-                                    inst_base["Transmissor de pressão diferencial entre salas (PDT)"] = 1
-                                    inst_base["Transmissor de temperatura e umidade ambiente (TT/MT)"] = 1
-                                    grupos_equip.append({"nome_grupo": f"Monitoramento Sala ({arq_name})", "multiplicador": 1, "instrumentos": inst_base, "tags_lista": ["SALA-01"]})
-                                elif "EXAUST" in nome_upper or "VENT" in nome_upper:
-                                    inst_base["Status funcionamento ventilador ou exaustor (partida direta) (PSH)"] = 1
-                                    grupos_equip.append({"nome_grupo": f"Exaustão ({arq_name})", "multiplicador": 1, "instrumentos": inst_base, "tags_lista": ["EX-01"]})
+                                # Análise Sênior Condicional do Arquivo
+                                if "FX-02" in nome_upper or "PRINCIPAL" in nome_upper:
+                                    # 1. UTA Principal
+                                    inst_uta = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_uta["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
+                                    inst_uta["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
+                                    if resfriamento_ia == "Expansão Direta":
+                                        inst_uta["Relé de Corrente - Status Compressor (TC)"] = 2
+                                    else:
+                                        inst_uta["Válvula de controle de água gelada proporcional (TCV)"] = 1
+                                    inst_uta["Pressostato para monitorar os filtros G4 (PSH)"] = 1
+                                    inst_uta["Pressostato para monitorar os filtros M5 (PSH)"] = 1
+                                    inst_uta["Termostato de segurança (TSH)"] = 1
+                                    inst_uta["Resistência de aquecimento (Equipamento) (RAQ)"] = 1
+                                    inst_uta["Pressostato diferencial para ar (PSH)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"UTA Condensadora ({arq_name})", "multiplicador": 1, "instrumentos": inst_uta, "tags_lista": ["UE-01", "UC-01.1", "UC-01.2"]})
+                                    
+                                    # 2. Exaustores (Multiplicador 6)
+                                    inst_ex = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_ex["Status funcionamento ventilador ou exaustor (partida direta) (PSH)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"Linhas de Exaustão ({arq_name})", "multiplicador": 6, "instrumentos": inst_ex, "tags_lista": ["EX-01", "EX-02", "EX-03", "EX-04", "EX-05", "EX-06"]})
+                                    
+                                    # 3. Salas Limpas (Multiplicador 4)
+                                    inst_salas = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_salas["Transmissor de pressão diferencial entre salas (PDT)"] = 1
+                                    inst_salas["Transmissor de temperatura e umidade ambiente (TT/MT)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"Monitoramento Salas ({arq_name})", "multiplicador": 4, "instrumentos": inst_salas, "tags_lista": ["SALA-01", "SALA-02", "SALA-03", "SALA-04"]})
+                                    
+                                elif "FX-03" in nome_upper or "SECUNDARI" in nome_upper:
+                                    # UTA Secundária
+                                    inst_uta = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_uta["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
+                                    inst_uta["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
+                                    if resfriamento_ia == "Expansão Direta":
+                                        inst_uta["Relé de Corrente - Status Compressor (TC)"] = 1
+                                    else:
+                                        inst_uta["Válvula de controle de água gelada proporcional (TCV)"] = 1
+                                    inst_uta["Pressostato para monitorar os filtros G4 (PSH)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"UTA Secundária ({arq_name})", "multiplicador": 1, "instrumentos": inst_uta, "tags_lista": ["UE-02"]})
+                                    
+                                    # Exaustor Simples
+                                    inst_ex = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_ex["Status funcionamento ventilador ou exaustor (partida direta) (PSH)"] = 1
+                                    inst_ex["Pressostato para monitorar os filtros M5 (PSH)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"Exaustão ({arq_name})", "multiplicador": 1, "instrumentos": inst_ex, "tags_lista": ["EX-02"]})
+                                    
                                 else:
-                                    inst_base["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
-                                    inst_base["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
-                                    inst_base["Válvula de controle de água gelada proporcional (TCV)"] = 1
-                                    inst_base["Relé de Corrente - Status Compressor (TC)"] = 2
-                                    inst_base["Pressostato para monitorar os filtros G4 (PSH)"] = 1
-                                    grupos_equip.append({"nome_grupo": f"UTA ({arq_name})", "multiplicador": 1, "instrumentos": inst_base, "tags_lista": ["UE-01"]})
+                                    # Fallback genérico para arquivos não mapeados acima
+                                    inst_uta = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_uta["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
+                                    inst_uta["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
+                                    if resfriamento_ia == "Expansão Direta":
+                                        inst_uta["Relé de Corrente - Status Compressor (TC)"] = 1
+                                    else:
+                                        inst_uta["Válvula de controle de água gelada proporcional (TCV)"] = 1
+                                    inst_uta["Pressostato para monitorar os filtros G4 (PSH)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"Equipamento Genérico ({arq_name})", "multiplicador": 1, "instrumentos": inst_uta, "tags_lista": ["EQ-01"]})
                                     
                             novo_quadro_ia = {
                                 "id": str(uuid.uuid4()),
@@ -632,7 +677,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             }
                             st.session_state.paineis_auto.insert(0, novo_quadro_ia)
                             
-                    st.success("✅ Varredura concluída! Quadros inseridos com as respectivas integrações e abas organizadas.")
+                    st.success("✅ Varredura Sênior concluída! Quadros inseridos com as respectivas integrações e abas organizadas.")
                     st.rerun()
 
         if not st.session_state.wizard_ativo:
@@ -670,7 +715,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         if "COM certificação" in soft_sel:
                             tipo_cfr_wizard = st.radio(
                                 "Selecione a Modalidade do CFR-21 Part 11:",
-                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"], help=help_cfr
+                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"], help=help_cfr_txt
                             )
                 
                 calibracao_opt = st.radio("5. Os instrumentos serão calibrados?", ["Não", "Sim"], horizontal=True)
@@ -794,7 +839,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             if qtd_atual > 6: st.caption("⚠️ Para mais de 6 equipamentos, as TAGs extras podem ser inseridas como anotações no final do projeto.")
 
                             auto_mon = "SALA" in g_data['nome_grupo'].upper() or "MONITORAMENTO" in g_data['nome_grupo'].upper()
-                            is_monitoramento = st.checkbox("📍 Exclusivo para Monitoramento (Desabilita intertravamento de painel)", value=auto_mon, key=f"chk_mon_{p_data['id']}_{g_idx}")
+                            is_monitoramento = st.checkbox("📍 Este equipamento é exclusivo para Monitoramento de Salas (Desabilita chaves Auto/Manual de painel)", value=auto_mon, key=f"chk_mon_{p_data['id']}_{g_idx}")
 
                             is_compressor_sys = "COMPRESSOR" in g_data['nome_grupo'].upper() or "DIRETA" in g_data['nome_grupo'].upper() or "DX" in g_data['nome_grupo'].upper()
 
@@ -822,7 +867,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                         st.success(f"✅ OK! Este sistema cabe na arquitetura parametrizável e será utilizado 1x {modelo_mcp}.")
 
                             # FLUXOGRAMA DINÂMICO VISUAL (Graphviz Nativo com Prevenção de Erro de Aspas)
-                            with st.expander("👁️ Visualizar Diagrama P&ID (Lógica e TAGs)", expanded=True):
+                            with st.expander("👁️ Visualizar Diagrama P&ID (Lógica e TAGs)", expanded=False):
                                 
                                 # FUNÇÃO PARA BLINDAR STRINGS CONTRA ERROS DO GRAPHVIZ
                                 def limpa_str(texto):
@@ -971,19 +1016,16 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 if not is_monitoramento:
                                     inst_chave = "Chave Seletora Auto/Manual (Painel Elétrico)"
                                     c_names = st.session_state.de_para_diagrama.get(inst_chave, {})
-                                    lbl_in_c = str(c_names.get("in_comp", "")) if is_compressor_sys else str(c_names.get("in_agua", ""))
-                                    lbl_out_c = str(c_names.get("out_comp", "")) if is_compressor_sys else str(c_names.get("out_agua", ""))
-                                    
-                                    lbl_in_c = limpa_str(lbl_in_c)
-                                    lbl_out_c = limpa_str(lbl_out_c)
+                                    lbl_in_c = limpa_str(str(c_names.get("in_comp", "")) if is_compressor_sys else str(c_names.get("in_agua", "")))
+                                    lbl_out_c = limpa_str(str(c_names.get("out_comp", "")) if is_compressor_sys else str(c_names.get("out_agua", "")))
                                     
                                     prefix_c = f"{int(qtd_atual)}x " if int(qtd_atual) > 1 and group_boxes else ""
                                     
-                                    if lbl_in_c and str(lbl_in_c).strip() not in ["", "nan"]:
+                                    if lbl_in_c.strip() not in ["", "nan"]:
                                         dot += f'  "chave_in" [label="{prefix_c}{lbl_in_c}\\nTAG: CH", color="#2B7BC4"];\n'
                                         dot += f'  "chave_in" -> "Controlador" [label="5x1,00mm²", fontsize=8, color="#2B7BC4"];\n'
                                         has_inputs = True
-                                    if lbl_out_c and str(lbl_out_c).strip() not in ["", "nan"]:
+                                    if lbl_out_c.strip() not in ["", "nan"]:
                                         dot += f'  "chave_out" [label="{prefix_c}{lbl_out_c}\\nTAG: CH", color="#E14D2A"];\n'
                                         dot += f'  "Controlador" -> "chave_out" [label="5x1,00mm²", fontsize=8, color="#E14D2A"];\n'
                                         has_outputs = True
@@ -992,11 +1034,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 if not has_outputs and not is_monitoramento: dot += '  "Controlador" -> "Atuadores" [style=dashed];\n'
                                 dot += '}'
                                 
-                                # MOSTRA O DIAGRAMA UMA ÚNICA VEZ APÓS O LOOP (Evita Imagem Picotada e Múltipla)
                                 try:
                                     st.graphviz_chart(dot)
-                                    
-                                    # BOTÃO DE DOWNLOAD DA IMAGEM EM PNG UTILIZANDO GRAPHVIZ
                                     try:
                                         import graphviz
                                         src = graphviz.Source(dot)
@@ -1020,7 +1059,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                                 chave_unica = f"inst_{p_data['id']}_{g_idx}_{grupo_nome}_{inst}"
                                                 g_data['instrumentos'][inst] = st.number_input(inst, min_value=0, step=1, value=g_data['instrumentos'][inst], key=chave_unica)
                             
-                            st.markdown("<br>", unsafe_allow_html=True)
+                            st.write("")
                             if st.button("🗑️ Remover Este Equipamento", key=f"del_{p_data['id']}_{g_idx}"):
                                 p_data['grupos_equipamentos'].pop(g_idx)
                                 st.rerun()
@@ -1357,7 +1396,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             else:
                 st.info("Nenhuma alteração detectada para salvar.")
 
-    # FUNÇÃO INTELIGENTE DE EAP (Extrai as tags separadas para exportação)
     def get_specific_tags(inst_nome, tags_lista, is_compressor_sys):
         tags_validas = [t for t in tags_lista if t.strip()]
         if not tags_validas: return ""
@@ -1581,9 +1619,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         for i_hw, q_hw in hw_s.items():
                             if q_hw > 0:
                                 controladores_desc_lista.append(f"{q_hw}x {i_hw.replace('Siemens - ', '')}")
-                                p_hw = st.session_state.precos_banco.get(i_hw, 0.0)
-                                linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"{i_hw} ({p['nome']})", "Preço Unit.": p_hw, "Qtd": q_hw, "Custo Total": q_hw * p_hw})
-                                custo_base_siemens += (q_hw * p_hw)
+                                pr = st.session_state.precos_banco.get(i_hw, 0.0)
+                                linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"{i_hw} ({p['nome']})", "Preço Unit.": pr, "Qtd": q_hw, "Custo Total": q_hw * pr})
+                                custo_base_siemens += (q_hw * pr)
                     else:
                         custo_base_schneider += preco_caixa
                         c36, c24, c18, c15 = dimensionar_controladores(tot_io_painel_hw)
@@ -1605,95 +1643,41 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             custo_base_schneider += (c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0))
                 
                 if p.get('ihm') and "Cego" not in p['ihm']:
-                    preco_ihm = st.session_state.precos_banco.get(p['ihm'], 0.0)
-                    if preco_ihm > 0: 
-                        linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Interface: {p['ihm']} ({p['nome']})", "Preço Unit.": preco_ihm, "Qtd": 1, "Custo Total": preco_ihm})
-                        if is_mercato: custo_base_mercato += preco_ihm
-                        elif is_siemens: custo_base_siemens += preco_ihm
-                        else: custo_base_schneider += preco_ihm
+                    pr_ihm = st.session_state.precos_banco.get(p['ihm'], 0.0)
+                    if pr_ihm > 0: 
+                        linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Interface: {p['ihm']} ({p['nome']})", "Preço Unit.": pr_ihm, "Qtd": 1, "Custo Total": pr_ihm})
+                        if is_mercato: custo_base_mercato += pr_ihm
+                        elif is_siemens: custo_base_siemens += pr_ihm
+                        else: custo_base_schneider += pr_ihm
 
-                s_type = p.get('supervisorio', "Sem Supervisório")
-                if s_type != "Sem Supervisório":
+                s_tp = p.get('supervisorio', "Sem Supervisório")
+                if s_tp != "Sem Supervisório":
                     if is_schneider:
                         pr_as = st.session_state.precos_banco.get("Schneider - Servidor de Automação (SpaceLogic AS-P/AS-B)", 9500.0)
-                        controladores_desc_lista.append("1x Servidor de Automação AS-P/AS-B")
+                        ctrl_desc.append("1x AS-P/AS-B")
                         linhas_hardware.append({"Categoria": "Hardware e Painéis", "Item": f"Servidor de Automação AS-P/AS-B ({p['nome']})", "Preço Unit.": pr_as, "Qtd": 1, "Custo Total": pr_as})
                         custo_base_schneider += pr_as
                         
-                    chave_soft = (s_type, tipo_cfr_painel)
-                    if chave_soft not in softwares_incluidos: softwares_incluidos[chave_soft] = 0
-                    softwares_incluidos[chave_soft] += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel)
+                    k_s = (s_tp, t_cfr_p)
+                    if k_s not in sw_inc: sw_inc[k_s] = 0
+                    sw_inc[k_s] += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel)
 
-            ihm_desc = f"com IHM instalada na porta, com display de {p['ihm'].replace('Mercato - ', '').replace('IHM Padrão ', '').replace('IHM Premium ', '').replace('IHM Básica ', '')}" if "Cego" not in p['ihm'] else "sem interface IHM instalada"
+            i_desc = f"com IHM {p['ihm'].replace('Mercato - ', '')}" if "Cego" not in p['ihm'] else "sem interface IHM"
+            s_desc = "Stand-alone" if "Sem" in p['supervisorio'] else "integrado ao supervisório EBO" if "EBO" in p['supervisorio'] else "integrado ao supervisório"
+            t_filtro = "monitoramento da saturação dos filtros" if tem_filtro_pdt else "alarme de saturação de filtros" if tem_filtro_psh else ""
+            t_res = "controle da resistência elétrica" if tem_resistencia else ""
+            t_extra = ", incluindo " + " e ".join([t for t in [t_filtro, t_res] if t]) if t_filtro or t_res else ""
             
-            if "Sem" in p['supervisorio']: sup_desc = "Stand-alone (sem supervisório)"
-            elif "EBO" in p['supervisorio']: sup_desc = "integrado ao sistema supervisório EBO"
-            else: sup_desc = "integrado ao sistema supervisório"
+            txt_p = f"Sistema para {', '.join(lista_equip_nomes)}{t_extra}.\nQuadro [TAG: {p['nome']}] {i_desc}, em {arquitetura_atual.replace(' - Linha mais econômica', '')} ({', '.join(ctrl_desc)}), {s_desc}. Visualização e controle de:\n• Status de operação.\n"
+            if tem_filtro_pdt or tem_filtro_psh: txt_p += "• Monitoramento de saturação de filtros.\n"
+            if tem_resistencia: txt_p += "• Acionamento da resistência.\n"
+            txt_p += f"• Leitura de instrumentos ({', '.join(list(lista_instrumentos_nomes))}).\n"
+            if calibracao_ativa: txt_p += "\nInstrumentos analógicos serão calibrados aferidos."
+            if t_cfr_p == 'CFR21 Part 11 - Qualificável': txt_p += "\nFornecimento Qualificável (CFR 21 Part 11)."
+            elif t_cfr_p == 'CFR21 Part 11 - Qualificado': txt_p += "\nFornecimento 100% Qualificado (CFR 21 Part 11) via SIARCON."
             
-            eq_desc = ", ".join(lista_equip_nomes)
-            nome_arquitetura = arquitetura_atual.replace(" - Linha mais econômica", "")
-            ctrl_desc = ", ".join(controladores_desc_lista) if controladores_desc_lista else "Controlador a definir"
-            
-            texto_filtro = ""
-            bullet_filtros = ""
-            if tem_filtro_pdt:
-                texto_filtro = "monitoramento contínuo da saturação dos filtros"
-                bullet_filtros = "• Monitoramento contínuo e alarmes de saturação de filtros.\n"
-            elif tem_filtro_psh:
-                texto_filtro = "monitoramento para alarme devido à saturação dos filtros"
-                bullet_filtros = "• Monitoramento para alarme devido à saturação de filtros.\n"
-                
-            res_desc_intro = "controle da resistência elétrica de aquecimento" if tem_resistencia else ""
-            
-            componentes_intro = []
-            if texto_filtro: componentes_intro.append(texto_filtro)
-            if res_desc_intro: componentes_intro.append(res_desc_intro)
-            texto_intro_extra = ", incluindo " + " e ".join(componentes_intro) if componentes_intro else ""
-
-            texto_p = (
-                f"Sistema de automação dedicado para controle de {eq_desc}{texto_intro_extra}.\n\n"
-                f"O sistema contempla quadro de automação [TAG: {p['nome']}] {ihm_desc}, "
-                f"baseado na tecnologia {nome_arquitetura} ({ctrl_desc}), operando no modo {sup_desc}, "
-                f"permitindo a visualização em tempo real e o controle dos seguintes parâmetros operacionais gerais:\n\n"
-                f"• Status de operação dos equipamentos.\n"
-                f"{bullet_filtros}"
-            )
-            if tem_resistencia: texto_p += "• Status e acionamento da resistência elétrica.\n"
-            texto_p += (
-                f"• Leitura de instrumentos de campo diversos ({', '.join(list(lista_instrumentos_nomes))}).\n"
-                f"• Condições gerais de funcionamento.\n\n"
-                f"A solução proporciona maior confiabilidade operacional, facilidade de manutenção e gestão eficiente dos ativos térmicos e de controle de ar."
-            )
-            
-            if calibracao_ativa:
-                texto_p += "\n\nDestaca-se que somente os instrumentos analógicos de medição passarão por processo de calibração aferida."
-            
-            if tipo_cfr_painel == 'CFR21 Part 11 - Qualificável':
-                texto_p += "\n\nO sistema será fornecido de forma Qualificável conforme normas CFR 21 Part 11, atendendo a todos os requisitos técnicos e de software para que o cliente realize a qualificação posterior."
-            elif tipo_cfr_painel == 'CFR21 Part 11 - Qualificado':
-                texto_p += "\n\nO sistema será integralmente Qualificado conforme normas CFR 21 Part 11, com a entrega de todos os protocolos pela equipe especializada da SIARCON."
-
-            descritivo_linhas_excel.append(texto_p)
-            
-            txt_com = f"**Sistema completo de automação [TAG: {p['nome']}]**, construído com arquitetura de controladores **{nome_arquitetura}** ({ctrl_desc}). O sistema operará de forma **{sup_desc}**, {ihm_desc}.\n\n"
-            
-            if tipo_cfr_painel == 'CFR21 Part 11 - Qualificável':
-                txt_com += "O sistema fornecido possuirá as licenças e os parâmetros necessários para ser totalmente **Qualificável (CFR 21 Part 11)**. A SIARCON garantirá todos os requisitos técnicos de software, deixando o ambiente pronto para que a qualificação final seja realizada por empresa à escolha do cliente.\n\n"
-            elif tipo_cfr_painel == 'CFR21 Part 11 - Qualificado':
-                txt_com += "O sistema contemplado será integralmente **Qualificado (CFR 21 Part 11)**. A SIARCON executará e entregará toda a documentação comprobatória e a execução dos protocolos e validações pertinentes, garantindo a certificação total do ambiente de supervisão.\n\n"
-            
-            txt_com += "O quadro de automação será responsável pela aquisição de dados e controle da seguinte instrumentação de campo:\n\n"
-            
-            for desc_inst, qt_inst, func_inst in lista_instrumentos_detalhados:
-                txt_com += f"• **{qt_inst}x {func_inst}:** {desc_inst}\n"
-                
-            txt_com += "\n**Lógica de Operação do Sistema:**\n"
-            txt_com += "O sistema realizará o controle da vazão de ar de forma constante, efetuando os ajustes necessários no inversor para que a vazão volumétrica seja mantida, independentemente do nível de saturação dos filtros no tempo. O controlador modulará proporcionalmente a válvula da serpentina (ou estágios do compressor) para atingir os parâmetros exatos de setpoint térmico demandados pelo ambiente."
-            
-            if tem_resistencia:
-                txt_com += " A resistência elétrica de aquecimento será acionada por malha de controle PID dedicada, permitindo ajuste fino de temperatura e desumidificação, possuindo intertravamento de segurança via termostato mecânico de proteção e confirmação de fluxo de ar."
-                
-            descritivo_comercial_linhas.append(txt_com)
+            descritivo_linhas_excel.append(txt_p)
+            descritivo_comercial_linhas.append(txt_p.replace("\n", "\n\n"))
 
         texto_descritivo_final = "\n\n----------------------------------------------------\n\n".join(descritivo_linhas_excel)
 
@@ -1705,9 +1689,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             
             p_base = st.session_state.precos_banco.get(b_k, 23000.0)
             p_pto = st.session_state.precos_banco.get(p_k, 100.0)
-            linhas_software.append({"Categoria": "Software de Supervisão", "Item": f"Licença Base: {s_name}", "Preço Unit.": p_base, "Qtd": 1, "Custo Total": p_base})
+            linhas_software.append({"Categoria": "Software", "Item": f"Base: {s_name}", "Preço Unit.": pb, "Qtd": 1, "Custo Total": pb})
             if p_pto > 0 and pts_total > 0:
-                linhas_software.append({"Categoria": "Software de Supervisão", "Item": f"Pontos Licenciados no Software ({pts_total} canais ativos)", "Preço Unit.": p_pto, "Qtd": pts_total, "Custo Total": pts_total * p_pto})
+                linhas_software.append({"Categoria": "Software", "Item": f"Pontos Licenciados no Software ({pts_total} canais ativos)", "Preço Unit.": p_pto, "Qtd": pts_total, "Custo Total": pts_total * p_pto})
 
             if "COM certificação" in s_name:
                 custo_cfr_unit = 0.0
@@ -1729,271 +1713,149 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
                     linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": f"Execução de Qualificação Integral (CFR21) - Por Ponto", "Preço Unit.": custo_cfr_unit, "Qtd": pts_total, "Custo Total": pts_total * custo_cfr_unit})
 
-        for infra_avulsa in st.session_state.orcamento:
-            linhas_inst_campo.append({"Categoria": "Instrumentação de Campo", "Item": infra_avulsa['Item'], "Preço Unit.": infra_avulsa['Custo_Total']/infra_avulsa['Quantidade'] if infra_avulsa['Quantidade'] > 0 else 0, "Qtd": infra_avulsa['Quantidade'], "Custo Total": infra_avulsa['Custo_Total']})
+        for av in st.session_state.orcamento:
+            linhas_inst_campo.append({"Categoria": "Instrumentação de Campo", "Item": av['Item'], "Preço Unit.": av['Custo_Total']/av['Quantidade'] if av['Quantidade']>0 else 0, "Qtd": av['Quantidade'], "Custo Total": av['Custo_Total']})
 
-        df_inst = pd.DataFrame(linhas_inst_campo)
-        df_hw = pd.DataFrame(linhas_hardware)
-        df_sw = pd.DataFrame(linhas_software)
+        df_i, df_h, df_s = pd.DataFrame(linhas_inst_campo), pd.DataFrame(linhas_hardware), pd.DataFrame(linhas_software)
+        s_i = df_i['Custo Total'].sum() if not df_i.empty else 0
+        s_h = df_h['Custo Total'].sum() if not df_h.empty else 0
+        s_s = df_s['Custo Total'].sum() if not df_s.empty else 0
         
-        subtotal_inst = df_inst['Custo Total'].sum() if not df_inst.empty else 0
-        subtotal_hw = df_hw['Custo Total'].sum() if not df_hw.empty else 0
-        subtotal_sw = df_sw['Custo Total'].sum() if not df_sw.empty else 0
-        
-        if (total_ai_schneider + total_ao_schneider) > 0:
-            pr_ai_sch = st.session_state.precos_banco.get("Custo AI/AO", 565.0)
-            linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Serviços de lógica: Pontos Analógicos", "Preço Unit.": pr_ai_sch, "Qtd": (total_ai_schneider + total_ao_schneider), "Custo Total": (total_ai_schneider + total_ao_schneider) * pr_ai_sch})
-        if (total_di_schneider + total_do_schneider) > 0:
-            pr_di_sch = st.session_state.precos_banco.get("Custo DI/DO", 120.0)
-            linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Serviços de lógica: Pontos Digitais", "Preço Unit.": pr_di_sch, "Qtd": (total_di_schneider + total_do_schneider), "Custo Total": (total_di_schneider + total_do_schneider) * pr_di_sch})
-        if (total_ai_siemens + total_ao_siemens) > 0:
-            pr_ai_siem = st.session_state.precos_banco.get("Siemens - Serviço Custo AI/AO", 750.0)
-            linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Serviços de lógica (Siemens): Pontos Analógicos", "Preço Unit.": pr_ai_siem, "Qtd": (total_ai_siemens + total_ao_siemens), "Custo Total": (total_ai_siemens + total_ao_siemens) * pr_ai_siem})
-        if (total_di_siemens + total_do_siemens) > 0:
-            pr_di_siem = st.session_state.precos_banco.get("Siemens - Serviço Custo DI/DO", 180.0)
-            linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Serviços de lógica (Siemens): Pontos Digitais", "Preço Unit.": pr_di_siem, "Qtd": (total_di_siemens + total_do_siemens), "Custo Total": (total_di_siemens + total_do_siemens) * pr_di_siem})
-        if total_io_mercato > 0:
-            pr_serv_merc = st.session_state.precos_banco.get("Mercato - Serviço Parametrização por Ponto", 80.0)
-            linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Parametrização de Pontos (Mercato)", "Preço Unit.": pr_serv_merc, "Qtd": total_io_mercato, "Custo Total": total_io_mercato * pr_serv_merc})
+        if (total_ai_schneider+total_ao_schneider)>0: linhas_servicos.append({"Categoria": "Serviços", "Item": "Lógica (Sch) - AI/AO", "Preço Unit.": st.session_state.precos_banco.get("Custo AI/AO", 565.0), "Qtd": total_ai_schneider+total_ao_schneider, "Custo Total": (total_ai_schneider+total_ao_schneider)*st.session_state.precos_banco.get("Custo AI/AO", 565.0)})
+        if (total_di_schneider+total_do_schneider)>0: linhas_servicos.append({"Categoria": "Serviços", "Item": "Lógica (Sch) - DI/DO", "Preço Unit.": st.session_state.precos_banco.get("Custo DI/DO", 120.0), "Qtd": total_di_schneider+total_do_schneider, "Custo Total": (total_di_schneider+total_do_schneider)*st.session_state.precos_banco.get("Custo DI/DO", 120.0)})
+        if (total_ai_siemens+total_ao_siemens)>0: linhas_servicos.append({"Categoria": "Serviços", "Item": "Lógica (Siem) - AI/AO", "Preço Unit.": st.session_state.precos_banco.get("Siemens - Serviço Custo AI/AO", 750.0), "Qtd": total_ai_siemens+total_ao_siemens, "Custo Total": (total_ai_siemens+total_ao_siemens)*st.session_state.precos_banco.get("Siemens - Serviço Custo AI/AO", 750.0)})
+        if (total_di_siemens+total_do_siemens)>0: linhas_servicos.append({"Categoria": "Serviços", "Item": "Lógica (Siem) - DI/DO", "Preço Unit.": st.session_state.precos_banco.get("Siemens - Serviço Custo DI/DO", 180.0), "Qtd": total_di_siemens+total_do_siemens, "Custo Total": (total_di_siemens+total_do_siemens)*st.session_state.precos_banco.get("Siemens - Serviço Custo DI/DO", 180.0)})
+        if total_io_mercato>0: linhas_servicos.append({"Categoria": "Serviços", "Item": "Parametrização (Mercato)", "Preço Unit.": st.session_state.precos_banco.get("Mercato - Serviço Parametrização por Ponto", 80.0), "Qtd": total_io_mercato, "Custo Total": total_io_mercato*st.session_state.precos_banco.get("Mercato - Serviço Parametrização por Ponto", 80.0)})
 
-        mao_de_obra_extra = (custo_base_schneider * 0.25) + (custo_base_siemens * 0.35) + (custo_base_mercato * 0.10)
-        if mao_de_obra_extra > 0:
-            linhas_servicos.append({"Categoria": "Serviços de Lógica", "Item": "Demais programações e desenvolvimentos", "Preço Unit.": mao_de_obra_extra, "Qtd": 1, "Custo Total": mao_de_obra_extra})
-            
-        df_serv = pd.DataFrame(linhas_servicos)
-        subtotal_serv = df_serv['Custo Total'].sum() if not df_serv.empty else 0
-        total_geral = subtotal_inst + subtotal_hw + subtotal_sw + subtotal_serv
+        mo_ex = (custo_base_schneider*0.25) + (custo_base_siemens*0.35) + (custo_base_mercato*0.10)
+        if mo_ex>0: linhas_servicos.append({"Categoria": "Serviços", "Item": "Programações e Desenv. (25 a 35% HW)", "Preço Unit.": mo_ex, "Qtd": 1, "Custo Total": mo_ex})
+        
+        df_sr = pd.DataFrame(linhas_servicos)
+        s_sr = df_sr['Custo Total'].sum() if not df_sr.empty else 0
+        total_geral = s_i + s_h + s_s + s_sr
         
         if total_geral > 0:
-            st.markdown("### Resumo Estruturado")
             c1, c2, c3 = st.columns(3)
-            c1.info(f"**Subtotal Instrumentação:**\nR$ {subtotal_inst:,.2f}")
-            c2.warning(f"**Subtotal Hardware:**\nR$ {subtotal_hw:,.2f}")
-            c3.success(f"**CUSTO TOTAL ESTIMADO:**\nR$ {total_geral:,.2f}")
+            c1.info(f"**Instrumentação:**\nR$ {s_i:,.2f}"); c2.warning(f"**Hardware:**\nR$ {s_h:,.2f}"); c3.success(f"**TOTAL:**\nR$ {total_geral:,.2f}")
 
-            df_export_list = []
-            if not df_inst.empty:
-                df_export_list.append(pd.DataFrame([{"Categoria": "", "Item": "INSTRUMENTAÇÃO DE CAMPO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}]))
-                df_export_list.append(df_inst.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
-                df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "INSTRUMENTAÇÃO DE CAMPO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_inst}]))
-            if not df_hw.empty:
-                df_export_list.append(pd.DataFrame([{"Categoria": "", "Item": "HARDWARE E PAINÉIS", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}]))
-                df_export_list.append(df_hw.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
-                df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "HARDWARE E PAINÉIS", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_hw}]))
-            if not df_sw.empty:
-                df_export_list.append(pd.DataFrame([{"Categoria": "", "Item": "SOFTWARE", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}]))
-                df_export_list.append(df_sw.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
-                df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "SOFTWARE", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_sw}]))
-            if not df_serv.empty:
-                df_export_list.append(pd.DataFrame([{"Categoria": "", "Item": "SERVIÇOS E LÓGICA", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}]))
-                df_export_list.append(df_serv)
-                df_export_list.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "SERVIÇOS E LÓGICA", "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_serv}]))
-            df_export_list.append(pd.DataFrame([{"Categoria": "TOTAL GERAL", "Item": "ORÇAMENTO COMPLETO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": total_geral}]))
-            df_exportacao = pd.concat(df_export_list, ignore_index=True)
+            expl = []
+            if not df_i.empty: expl.append(pd.DataFrame([{"Categoria": "", "Item": "INSTRUMENTAÇÃO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}])), expl.append(df_i.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'})), expl.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "INSTRUMENTAÇÃO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": s_i}]))
+            if not df_h.empty: expl.append(pd.DataFrame([{"Categoria": "", "Item": "HARDWARE", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}])), expl.append(df_h.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'})), expl.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "HARDWARE", "Preço Unit.": "-", "Qtd": "-", "Custo Total": s_h}]))
+            if not df_s.empty: expl.append(pd.DataFrame([{"Categoria": "", "Item": "SOFTWARE", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}])), expl.append(df_s.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'})), expl.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "SOFTWARE", "Preço Unit.": "-", "Qtd": "-", "Custo Total": s_s}]))
+            if not df_sr.empty: expl.append(pd.DataFrame([{"Categoria": "", "Item": "SERVIÇOS", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}])), expl.append(df_sr), expl.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "SERVIÇOS", "Preço Unit.": "-", "Qtd": "-", "Custo Total": s_sr}]))
+            expl.append(pd.DataFrame([{"Categoria": "TOTAL GERAL", "Item": "ORÇAMENTO COMPLETO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": total_geral}]))
+            df_exp = pd.concat(expl, ignore_index=True)
             
-            def format_currency(val):
-                try: return f"R$ {float(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                except: return val
-            df_display = df_exportacao.copy()
-            df_display['Preço Unit.'] = df_display['Preço Unit.'].apply(format_currency)
-            df_display['Custo Total'] = df_display['Custo Total'].apply(format_currency)
-            st.dataframe(df_display, use_container_width=True)
+            df_disp = df_exp.copy()
+            df_disp['Preço Unit.'] = df_disp['Preço Unit.'].apply(lambda x: f"R$ {float(x):,.2f}".replace(",","X").replace(".",",").replace("X",".") if x!="-" else "-")
+            df_disp['Custo Total'] = df_disp['Custo Total'].apply(lambda x: f"R$ {float(x):,.2f}".replace(",","X").replace(".",",").replace("X",".") if x!="-" else "-")
+            st.dataframe(df_disp, use_container_width=True)
             
-            with st.expander("📄 Gerar Descritivo Detalhado para Proposta Comercial", expanded=False):
+            with st.expander("📄 Gerar Descritivo Detalhado"):
                 st.markdown("<div style='background-color:#E3F2FD; padding:20px; border-radius:10px;'>", unsafe_allow_html=True)
-                for t_com in descritivo_comercial_linhas:
-                    st.markdown(t_com)
-                    st.markdown("<hr style='border:1px solid #B0BEC5'>", unsafe_allow_html=True)
+                for t_c in descritivo_comercial_linhas: st.markdown(t_c); st.markdown("<hr>", unsafe_allow_html=True)
                 st.markdown("</div>", unsafe_allow_html=True)
             
-            df_pontos = pd.DataFrame(linhas_pontos)
-            if not df_pontos.empty:
-                total_qtd = pd.to_numeric(df_pontos['Quantidade Total'], errors='coerce').fillna(0).sum()
-                linha_total = pd.DataFrame([{"Painel": "TOTAL GERAL", "Grupo/Equipamento": "-", "Instrumento": "-", "Quantidade Total": total_qtd, "Entrada Digital (DI)": df_pontos['Entrada Digital (DI)'].sum(), "Saída Digital (DO)": df_pontos['Saída Digital (DO)'].sum(), "Entrada Analógica (AI)": df_pontos['Entrada Analógica (AI)'].sum(), "Saída Analógica (AO)": df_pontos['Saída Analógica (AO)'].sum()}])
-                df_pontos = pd.concat([df_pontos, linha_total], ignore_index=True)
+            df_p = pd.DataFrame(linhas_pontos)
+            if not df_p.empty: df_p = pd.concat([df_p, pd.DataFrame([{"Painel": "TOTAL", "Grupo/Equipamento": "-", "Instrumento": "-", "Quantidade Total": pd.to_numeric(df_p['Quantidade Total'], errors='coerce').fillna(0).sum(), "DI": df_p['DI'].sum(), "DO": df_p['DO'].sum(), "AI": df_p['AI'].sum(), "AO": df_p['AO'].sum()}])], ignore_index=True)
 
-            buffer = io.BytesIO()
-            wb = openpyxl.Workbook()
-            ws1 = wb.active
-            ws1.title = "Detalhamento Financeiro"
-            ws1.views.sheetView[0].showGridLines = True
+            wb = openpyxl.Workbook(); ws1 = wb.active; ws1.title = "Financeiro"
+            ws1.row_dimensions[1].height = 35; ws1.row_dimensions[2].height = ws1.row_dimensions[3].height = ws1.row_dimensions[4].height = 25
+            np_hdr = st.session_state.nome_projeto_orcamento or "PROJETO NÃO NOMEADO"
+            ws1.merge_cells("C1:E1"); ws1.cell(1, 3, "DESCRIÇÃO DE SISTEMAS").font = Font(name="Arial", size=12, bold=True, color="1C8590"); ws1.cell(1,3).alignment = Alignment(horizontal="center", vertical="center")
+            ws1.merge_cells("C2:E2"); ws1.cell(2, 3, f"PROJETO: {np_hdr.upper()}").font = Font(name="Arial", size=10, bold=True)
+            ws1.merge_cells("C3:E3"); ws1.cell(3, 3, f"DATA: {datetime.now(fuso_br).strftime('%d/%m/%Y %H:%M')}").font = Font(name="Arial", size=10)
+            ws1.merge_cells("C4:E4"); ws1.cell(4, 3, f"RESPONSÁVEL: {st.session_state.nome_exibicao.upper()}").font = Font(name="Arial", size=10)
+            for r in range(2, 5): ws1.cell(r, 3).alignment = Alignment(horizontal="center", vertical="center")
             
-            ws1.row_dimensions[1].height = 35
-            ws1.row_dimensions[2].height = 25
-            ws1.row_dimensions[3].height = 25
-            ws1.row_dimensions[4].height = 25
-            
-            nome_projeto_header = st.session_state.nome_projeto_orcamento if st.session_state.nome_projeto_orcamento else "PROJETO NÃO NOMEADO"
-            
-            ws1.merge_cells("C1:E1")
-            ws1.cell(row=1, column=3, value="DESCRIÇÃO TÉCNICA E ORÇAMENTÁRIA DE SISTEMAS DE AUTOMAÇÃO").font = Font(name="Arial", size=12, bold=True, color="1C8590")
-            ws1.cell(row=1, column=3).alignment = Alignment(horizontal="center", vertical="center")
-            
-            ws1.merge_cells("C2:E2"); ws1.cell(row=2, column=3, value=f"PROJETO: {nome_projeto_header.upper()}").font = Font(name="Arial", size=10, bold=True, color="333333")
-            ws1.merge_cells("C3:E3"); ws1.cell(row=3, column=3, value=f"DATA/HORA EMISSÃO: {datetime.now(fuso_br).strftime('%d/%m/%Y %H:%M:%S')}").font = Font(name="Arial", size=10, color="555555")
-            ws1.merge_cells("C4:E4"); ws1.cell(row=4, column=3, value=f"RESPONSÁVEL TÉCNICO: {st.session_state.nome_exibicao.upper()}").font = Font(name="Arial", size=10, color="555555")
-            
-            for r in range(2, 5): ws1.cell(row=r, column=3).alignment = Alignment(horizontal="center", vertical="center")
-            
-            start_row = 6
             if ARQUIVO_LOGO:
                 try:
-                    from openpyxl.drawing.image import Image as OpenpyxlImage
-                    img = OpenpyxlImage(ARQUIVO_LOGO)
-                    img.width = 180
-                    img.height = 50
-                    ws1.add_image(img, "A1")
+                    from openpyxl.drawing.image import Image as OpxImg
+                    img = OpxImg(ARQUIVO_LOGO); img.width = 180; img.height = 50; ws1.add_image(img, "A1")
                 except: pass
                 
-            fill_header = PatternFill(start_color="1C8590", end_color="1C8590", fill_type="solid")
-            font_header = Font(name="Arial", size=11, bold=True, color="FFFFFF")
-            border_thin = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
+            fl_h = PatternFill(start_color="1C8590", end_color="1C8590", fill_type="solid"); ft_h = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+            bd_t = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
             
-            for r_idx, row in enumerate(dataframe_to_rows(df_exportacao, index=False, header=True), start=start_row):
-                for c_idx, value in enumerate(row, start=1):
-                    cell = ws1.cell(row=r_idx, column=c_idx, value=value)
-                    cell.border = border_thin
-                
-                if r_idx == start_row:
-                    for c in range(1, 6):
-                        ws1.cell(row=r_idx, column=c).fill = fill_header
-                        ws1.cell(row=r_idx, column=c).font = font_header
-                        ws1.cell(row=r_idx, column=c).alignment = Alignment(horizontal="center", vertical="center")
+            sr = 6
+            for ri, row in enumerate(dataframe_to_rows(df_exp, index=False, header=True), sr):
+                for ci, val in enumerate(row, 1):
+                    c = ws1.cell(ri, ci, val); c.border = bd_t
+                if ri == sr:
+                    for c_idx in range(1, 6): ws1.cell(ri, c_idx).fill = fl_h; ws1.cell(ri, c_idx).font = ft_h; ws1.cell(ri, c_idx).alignment = Alignment(horizontal="center", vertical="center")
                 else:
-                    is_subtotal = "SUBTOTAL" in str(ws1.cell(row=r_idx, column=1).value) or "TOTAL GERAL" in str(ws1.cell(row=r_idx, column=1).value)
-                    is_title = (str(ws1.cell(row=r_idx, column=1).value) == "" and str(ws1.cell(row=r_idx, column=2).value) in ["INSTRUMENTAÇÃO DE CAMPO", "HARDWARE E PAINÉIS", "SOFTWARE", "SERVIÇOS E LÓGICA"])
-                    
+                    is_sub = "SUBTOTAL" in str(ws1.cell(ri, 1).value) or "TOTAL" in str(ws1.cell(ri, 1).value)
+                    is_tit = str(ws1.cell(ri, 1).value) == ""
                     for c_idx in range(1, 6):
-                        c_cell = ws1.cell(row=r_idx, column=c_idx)
-                        c_cell.font = Font(name="Arial", size=10, bold=(is_subtotal or is_title))
-                        
-                        if is_title:
-                            c_cell.fill = PatternFill(start_color="C6E0B4", end_color="C6E0B4", fill_type="solid")
-                            if c_idx == 2:
-                                c_cell.alignment = Alignment(horizontal="center", vertical="center")
-                            elif c_idx > 2:
-                                c_cell.value = ""
-                        elif is_subtotal:
-                            c_cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-                            if c_idx in [3, 5]:
-                                if str(c_cell.value).strip() != "-":
-                                    try: 
-                                        c_cell.value = float(c_cell.value)
-                                        c_cell.number_format = '"R$" #,##0.00'
-                                    except: pass
-                                c_cell.alignment = Alignment(horizontal="right")
+                        cc = ws1.cell(ri, c_idx); cc.font = Font(name="Arial", size=10, bold=(is_sub or is_tit))
+                        if is_tit:
+                            cc.fill = PatternFill(start_color="C6E0B4", end_color="C6E0B4", fill_type="solid")
+                            if c_idx == 2: cc.alignment = Alignment(horizontal="center", vertical="center")
+                            elif c_idx > 2: cc.value = ""
+                        elif is_sub:
+                            cc.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+                            if c_idx in [3, 5] and str(cc.value).strip() != "-":
+                                try: cc.value = float(cc.value); cc.number_format = '"R$" #,##0.00'
+                                except: pass
+                            if c_idx in [3, 5]: cc.alignment = Alignment(horizontal="right")
                         else:
-                            if c_idx in [3, 5]:
-                                if str(c_cell.value).strip() != "-":
-                                    try: 
-                                        c_cell.value = float(c_cell.value)
-                                        c_cell.number_format = '"R$" #,##0.00'
-                                    except: pass
-                                c_cell.alignment = Alignment(horizontal="right")
-                            elif c_idx == 4:
-                                c_cell.alignment = Alignment(horizontal="center")
-                                
-                    if is_title:
-                        ws1.merge_cells(start_row=r_idx, start_column=2, end_row=r_idx, end_column=5)
+                            if c_idx in [3, 5] and str(cc.value).strip() != "-":
+                                try: cc.value = float(cc.value); cc.number_format = '"R$" #,##0.00'
+                                except: pass
+                            if c_idx in [3, 5]: cc.alignment = Alignment(horizontal="right")
+                            elif c_idx == 4: cc.alignment = Alignment(horizontal="center")
+                    if is_tit: ws1.merge_cells(start_row=ri, start_column=2, end_row=ri, end_column=5)
             
-            end_row_table = start_row + len(df_exportacao) + 2
-            num_linhas_texto = len(texto_descritivo_final.split('\n'))
-            tamanho_caixa = max(10, num_linhas_texto + 2) 
-            
-            ws1.merge_cells(start_row=end_row_table, start_column=1, end_row=end_row_table+tamanho_caixa, end_column=5)
-            cell_desc = ws1.cell(row=end_row_table, column=1, value=texto_descritivo_final)
-            cell_desc.font = Font(name="Arial", size=10, italic=False, color="333333")
-            cell_desc.alignment = Alignment(vertical="top", wrap_text=True)
-            cell_desc.fill = PatternFill(start_color="F2F4F4", end_color="F2F4F4", fill_type="solid")
-            
-            for r in range(end_row_table, end_row_table+tamanho_caixa+1):
-                for c in range(1, 6): ws1.cell(row=r, column=c).border = border_thin
-            
-            for col in ws1.columns:
-                max_len = max(len(str(cell.value or '')) for cell in col if cell.row <= start_row + len(df_exportacao))
-                ws1.column_dimensions[get_column_letter(col[0].column)].width = max(max_len + 4, 12)
+            er = sr + len(df_exp) + 2
+            tcx = max(10, len(texto_descritivo_final.split('\n')) + 2) 
+            ws1.merge_cells(start_row=er, start_column=1, end_row=er+tcx, end_column=5)
+            cd = ws1.cell(er, 1, texto_descritivo_final); cd.font = Font(name="Arial", size=10); cd.alignment = Alignment(vertical="top", wrap_text=True); cd.fill = PatternFill(start_color="F2F4F4", end_color="F2F4F4", fill_type="solid")
+            for r in range(er, er+tcx+1):
+                for c in range(1, 6): ws1.cell(r, c).border = bd_t
+            for col in ws1.columns: ws1.column_dimensions[get_column_letter(col[0].column)].width = max(max(len(str(c.value or '')) for c in col if c.row <= sr + len(df_exp)) + 4, 12)
 
-            if not df_pontos.empty:
-                ws2 = wb.create_sheet(title="Matriz de Pontos (IO)")
-                ws2.views.sheetView[0].showGridLines = True
-                for r_idx, row in enumerate(dataframe_to_rows(df_pontos, index=False, header=True), start=1):
-                    for c_idx, value in enumerate(row, start=1):
-                        cell = ws2.cell(row=r_idx, column=c_idx, value=value)
-                        cell.border = border_thin
-                        if r_idx == 1: cell.fill = fill_header; cell.font = font_header; cell.alignment = Alignment(horizontal="center", vertical="center")
-                        else:
-                            cell.font = Font(name="Arial", size=10)
-                            if c_idx >= 4: cell.alignment = Alignment(horizontal="center")
-                for col in ws2.columns:
-                    max_len = max(len(str(cell.value or '')) for cell in col)
-                    ws2.column_dimensions[get_column_letter(col[0].column)].width = max(max_len + 4, 12)
+            if not df_p.empty:
+                ws2 = wb.create_sheet("Matriz de IO")
+                for ri, row in enumerate(dataframe_to_rows(df_p, index=False, header=True), 1):
+                    for ci, val in enumerate(row, 1):
+                        c = ws2.cell(ri, ci, val); c.border = bd_t
+                        if ri == 1: c.fill = fl_h; c.font = ft_h; c.alignment = Alignment(horizontal="center", vertical="center")
+                        else: c.font = Font(name="Arial", size=10); c.alignment = Alignment(horizontal="center") if ci >= 4 else Alignment(horizontal="left")
+                for col in ws2.columns: ws2.column_dimensions[get_column_letter(col[0].column)].width = max(max(len(str(c.value or '')) for c in col) + 4, 12)
 
-            # 2. ABA ADICIONAL EXCLUSIVA NO EXCEL: LISTA PARA COTAÇÃO SEPARADA POR MARCA
-            ws3 = wb.create_sheet(title="Lista para Cotação")
-            ws3.views.sheetView[0].showGridLines = True
+            ws3 = wb.create_sheet("Lista para Cotação")
+            ws3.cell(1, 1, "LISTA DE MATERIAIS PARA COMPRAS").font = Font(name="Arial", size=12, bold=True, color="1C8590")
+            for ci, ht in enumerate(["Fabricante", "Item / Modelo", "Qtd", "Unidade"], 1):
+                c = ws3.cell(4, ci, ht); c.fill = fl_h; c.font = ft_h; c.alignment = Alignment(horizontal="center"); c.border = bd_t
             
-            ws3.cell(row=1, column=1, value="LISTA DE MATERIAIS PARA COMPRAS E COTAÇÃO EXTERNA").font = Font(name="Arial", size=12, bold=True, color="1C8590")
-            ws3.cell(row=2, column=1, value=f"ÚLTIMA ATUALIZAÇÃO DA BASE DE PREÇOS: {st.session_state.data_precos_atualizada}").font = Font(name="Arial", size=9, italic=True)
+            ir = 5; todos_it = [r['Item'] for _, r in df_h.iterrows()] + [r['Item'] for _, r in df_i.iterrows()]
+            marcas = {"SIEMENS": [], "SCHNEIDER": [], "MERCATO": [], "OUTROS": []}
+            for it in set(todos_it):
+                cnt = todos_it.count(it); iu = it.upper()
+                if "SIEMENS" in iu: marcas["SIEMENS"].append((it, cnt, "un"))
+                elif "SCHNEIDER" in iu or "MP-C" in iu or "SPACELOGIC" in iu: marcas["SCHNEIDER"].append((it, cnt, "un"))
+                elif "MERCATO" in iu or "MCP-" in iu or "MFC" in iu or "MDX" in iu: marcas["MERCATO"].append((it, cnt, "un"))
+                else: marcas["OUTROS"].append((it, cnt, "un"))
             
-            headers_cot = ["Fabricante", "Item / Modelo", "Quantidade Total Necessária", "Unidade"]
-            for c_idx, h_text in enumerate(headers_cot, start=1):
-                c_cell = ws3.cell(row=4, column=c_idx, value=h_text)
-                c_cell.fill = fill_header
-                c_cell.font = font_header
-                c_cell.alignment = Alignment(horizontal="center")
-                c_cell.border = border_thin
+            for mn, il in marcas.items():
+                if il:
+                    for ni, qi, ui in il:
+                        ws3.cell(ir, 1, mn).alignment = Alignment(horizontal="center"); ws3.cell(ir, 2, ni); ws3.cell(ir, 3, qi).alignment = Alignment(horizontal="center"); ws3.cell(ir, 4, ui).alignment = Alignment(horizontal="center")
+                        for cc in range(1, 5): ws3.cell(ir, cc).border = bd_t; ws3.cell(ir, cc).font = Font(name="Arial", size=10)
+                        ir += 1
+            for col in ws3.columns: ws3.column_dimensions[get_column_letter(col[0].column)].width = max(max(len(str(c.value or '')) for c in col) + 4, 12)
             
-            it_row = 5
-            # Consolidar todos os itens e filtrar marcas
-            todos_itens_cotacao = []
-            if not df_hw.empty:
-                for _, r in df_hw.iterrows(): todos_itens_cotacao.append(r['Item'])
-            if not df_inst.empty:
-                for _, r in df_inst.iterrows(): todos_itens_cotacao.append(r['Item'])
-                
-            marcas = {"SIEMENS": [], "SCHNEIDER": [], "MERCATO": [], "OUTROS / GENÉRICOS": []}
-            for it in set(todos_itens_cotacao):
-                cnt = todos_itens_cotacao.count(it)
-                it_upper = it.upper()
-                if "SIEMENS" in it_upper: marcas["SIEMENS"].append((it, cnt, "un"))
-                elif "SCHNEIDER" in it_upper or "MP-C" in it_upper or "SPACELOGIC" in it_upper: marcas["SCHNEIDER"].append((it, cnt, "un"))
-                elif "MERCATO" in it_upper or "MCP-" in it_upper or "MFC" in it_upper or "MDX" in it_upper: marcas["MERCATO"].append((it, cnt, "un"))
-                else: marcas["OUTROS / GENÉRICOS"].append((it, cnt, "un"))
-            
-            for m_name, items_list in marcas.items():
-                if items_list:
-                    for name_i, q_i, uni_i in items_list:
-                        ws3.cell(row=it_row, column=1, value=m_name).alignment = Alignment(horizontal="center")
-                        ws3.cell(row=it_row, column=2, value=name_i)
-                        ws3.cell(row=it_row, column=3, value=q_i).alignment = Alignment(horizontal="center")
-                        ws3.cell(row=it_row, column=4, value=uni_i).alignment = Alignment(horizontal="center")
-                        for col_c in range(1, 5): 
-                            ws3.cell(row=it_row, column=col_c).border = border_thin
-                            ws3.cell(row=it_row, column=col_c).font = Font(name="Arial", size=10)
-                        it_row += 1
-                        
-            for col in ws3.columns:
-                max_len = max(len(str(cell.value or '')) for cell in col)
-                ws3.column_dimensions[get_column_letter(col[0].column)].width = max(max_len + 4, 12)
-            
-            wb.save(buffer)
-            buffer.seek(0)
-            st.download_button(label="📥 Exportar Orçamento Final para Excel", data=buffer.getvalue(), file_name="orcamento_dimensionado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+            st.download_button("📥 Exportar Excel", buf.getvalue(), "orcamento.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             st.markdown("---")
-            if st.button("☁️ Salvar Orçamento Final e Gerar Revisão", type="primary", use_container_width=True):
-                if not st.session_state.nome_projeto_orcamento: st.warning("⚠️ Atenção: Preencha o 'Nome do Orçamento / Projeto' antes de salvar.")
+            if st.button("☁️ Salvar e Gerar Revisão", type="primary", use_container_width=True):
+                if not st.session_state.nome_projeto_orcamento: st.warning("Preencha o Nome do Projeto.")
                 else:
                     try:
                         sh = conectar_google_sheets()
-                        try: ws_hist_orc = sh.worksheet("Historico_Orcamentos")
-                        except:
-                            ws_hist_orc = sh.add_worksheet(title="Historico_Orcamentos", rows="1000", cols="8")
-                            ws_hist_orc.append_row(["Data/Hora", "Nome do Projeto", "Revisão", "Subtotal Hardware", "Serviços de Lógica", "Custo Total Estimado", "Configuracao_JSON", "Usuário"])
-                        todas_linhas = ws_hist_orc.get_all_values()
-                        contagem_revisoes = sum(1 for r in todas_linhas[1:] if r[1].strip().upper() == st.session_state.nome_projeto_orcamento.strip().upper())
-                        revisao_atual = f"R-{contagem_revisoes:02d}"
-                        nova_linha = [datetime.now(fuso_br).strftime("%d/%m/%Y %H:%M:%S"), st.session_state.nome_projeto_orcamento, revisao_atual, f"R$ {subtotal_hw:.2f}".replace('.', ','), f"R$ {subtotal_serv:.2f}".replace('.', ','), f"R$ {total_geral:.2f}".replace('.', ','), json.dumps(st.session_state.paineis_auto), st.session_state.usuario_logado]
-                        ws_hist_orc.append_row(nova_linha)
-                        st.cache_data.clear()
-                        st.success(f"✅ Sucesso! Orçamento para '{st.session_state.nome_projeto_orcamento}' salvo com a revisão {revisao_atual}!")
-                    except Exception as e: st.error(f"Erro ao salvar: {e}")
+                        try: ws_h = sh.worksheet("Historico_Orcamentos")
+                        except: ws_h = sh.add_worksheet("Historico_Orcamentos", 1000, 8); ws_h.append_row(["Data/Hora", "Nome do Projeto", "Revisão", "Subtotal Hardware", "Serviços de Lógica", "Custo Total Estimado", "Configuracao_JSON", "Usuário"])
+                        rev = f"R-{sum(1 for r in ws_h.get_all_values()[1:] if r[1].strip().upper() == st.session_state.nome_projeto_orcamento.strip().upper()):02d}"
+                        ws_h.append_row([datetime.now(fuso_br).strftime("%d/%m/%Y %H:%M:%S"), st.session_state.nome_projeto_orcamento, rev, f"R$ {s_h:.2f}".replace('.', ','), f"R$ {s_sr:.2f}".replace('.', ','), f"R$ {total_geral:.2f}".replace('.', ','), json.dumps(st.session_state.paineis_auto), st.session_state.usuario_logado])
+                        st.cache_data.clear(); st.success(f"✅ Salvo como {rev}!")
+                    except Exception as e: st.error(f"Erro: {e}")
