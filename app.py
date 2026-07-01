@@ -30,7 +30,7 @@ def buscar_logo():
 ARQUIVO_LOGO = buscar_logo()
 
 # ==========================================
-# 🟢 CONEXÃO COM O GOOGLE SHEETS E IA
+# 🟢 CONEXÃO COM O GOOGLE SHEETS
 # ==========================================
 PLANILHA_URL = "https://docs.google.com/spreadsheets/d/1DgBxNqwUepO2RW6GdRwnFHxg7dLlWiRGZjdglkQ8Ls0/edit?gid=1169331401#gid=1169331401"
 
@@ -43,14 +43,14 @@ def conectar_google_sheets():
         client = gspread.authorize(creds)
         return client.open_by_url(PLANILHA_URL)
     except Exception as e:
-        st.error(f"Erro na conexão com Google Sheets: {e}. Verifique o link.")
+        st.error(f"Erro na conexão com Google Sheets: {e}. Verifique o link da planilha.")
         st.stop()
 
-# Configuração da IA Gemini
+# Configuração da Inteligência Artificial (Google Gemini)
 try:
     if "GEMINI_API_KEY" in st.secrets:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model_ia = genai.GenerativeModel('gemini-1.5-pro')
+        model_ia = genai.GenerativeModel('gemini-1.5-flash')
         ia_disponivel = True
     else:
         ia_disponivel = False
@@ -76,9 +76,7 @@ if 'confirmar_limpar' not in st.session_state: st.session_state.confirmar_limpar
 if 'data_precos_atualizada' not in st.session_state: st.session_state.data_precos_atualizada = "Buscando metadados da nuvem..."
 if 'resultado_ia' not in st.session_state: st.session_state.resultado_ia = {}
 
-# ==========================================
-# REGRAS E BANCOS DE DADOS (AUTOMAÇÃO)
-# ==========================================
+# DICIONÁRIO DE NOMES DO DIAGRAMA 
 if 'de_para_diagrama' not in st.session_state:
     st.session_state.de_para_diagrama = {
         "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {"in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "Modula Inversor", "out_comp": "Modula Inversor"},
@@ -92,6 +90,7 @@ if 'de_para_diagrama' not in st.session_state:
         "Termostato de segurança (TSH)": {"in_agua": "Termostato Seg. RAQ (TSH)", "in_comp": "Termostato Seg. RAQ (TSH)", "out_agua": "Status RAQ", "out_comp": "Status RAQ"},
         "Pressostato diferencial para ar (PSH)": {"in_agua": "Pressostato Seg. RAQ (PSH)", "in_comp": "Pressostato Seg. RAQ (PSH)", "out_agua": "Status RAQ", "out_comp": "Status RAQ"},
         "Resistência de aquecimento (Equipamento) (RAQ)": {"in_agua": "", "in_comp": "", "out_agua": "Habilita RAQ", "out_comp": "Habilita RAQ"},
+        "Resistência de aquecimento (Duto) (RAQ)": {"in_agua": "", "in_comp": "", "out_agua": "Habilita RAQ", "out_comp": "Habilita RAQ"},
         "Pressostato para monitorar os filtros G4 (PSH)": {"in_agua": "Pressostato G4 (PSH)", "in_comp": "Pressostato G4 (PSH)", "out_agua": "Alarme G4 Saturado", "out_comp": "Alarme G4 Saturado"},
         "Pressostato para monitorar os filtros M5 (PSH)": {"in_agua": "Pressostato M5 (PSH)", "in_comp": "Pressostato M5 (PSH)", "out_agua": "Alarme M5 Saturado", "out_comp": "Alarme M5 Saturado"},
         "Pressostato para monitorar os filtros F9 (PSH)": {"in_agua": "Pressostato F9 (PSH)", "in_comp": "Pressostato F9 (PSH)", "out_agua": "Alarme F9 Saturado", "out_comp": "Alarme F9 Saturado"},
@@ -102,7 +101,9 @@ if 'de_para_diagrama' not in st.session_state:
         "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)": {"in_agua": "Pressão Dif. F9 (PDT)", "in_comp": "Pressão Dif. F9 (PDT)", "out_agua": "", "out_comp": ""},
         "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)": {"in_agua": "Pressão Dif. H13 (PDT)", "in_comp": "Pressão Dif. H13 (PDT)", "out_agua": "", "out_comp": ""},
         "Transmissor de pressão diferencial entre salas (PDT)": {"in_agua": "Pressão Dif. Salas (PDT)", "in_comp": "Pressão Dif. Salas (PDT)", "out_agua": "", "out_comp": ""},
+        "Transmissor de pressão diferencial entre salas com display (PDIT)": {"in_agua": "Pressão Dif. Salas (PDIT)", "in_comp": "Pressão Dif. Salas (PDIT)", "out_agua": "", "out_comp": ""},
         "Transmissor de temperatura Ambiente (TT)": {"in_agua": "Temp. Salas (TT)", "in_comp": "Temp. Salas (TT)", "out_agua": "", "out_comp": ""},
+        "Transmissor de temperatura ambiente com display (TIT)": {"in_agua": "Temp. Salas (TIT)", "in_comp": "Temp. Salas (TIT)", "out_agua": "", "out_comp": ""},
         "Transmissor de temperatura e umidade ambiente (TT/MT)": {"in_agua": "Temp. / Umid. (TT/MT)", "in_comp": "Temp. / Umid. (TT/MT)", "out_agua": "", "out_comp": ""},
         "Chave Seletora Auto/Manual (Painel Elétrico)": {"in_agua": "Chave Auto / Manual", "in_comp": "Chave Auto / Manual", "out_agua": "Habilita Equipamento (TAG)", "out_comp": "Habilita Equipamento (TAG)"},
         "Chave de fluxo para água (FS/CF)": {"in_agua": "Status Fluxo de Água", "in_comp": "", "out_agua": "", "out_comp": ""}
@@ -183,30 +184,56 @@ banco_padrao_precos = {
     "Transmissor de temperatura Ambiente (TT)": 2050.00,
     "Transmissor de temperatura ambiente com display (TIT)": 2650.00,
     "Transmissor de temperatura e umidade ambiente (TT/MT)": 2050.00,
-    "Custo AI/AO": 565.00, "Custo DI/DO": 120.00,
-    "Licença Supervisório - SEM CFR-21 (Base)": 23000.00, "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)": 100.00,
-    "Licença Supervisório - COM CFR-21 (Base)": 23000.00, "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
-    "Licença Supervisório - Schneider EBO (Base)": 13000.00, "Licença Supervisório - Schneider EBO (Por Ponto I/O)": 110.00,
-    "MP-C-15A": 4649.49, "MP-C-18A": 5185.54, "MP-C-24A": 7290.75, "MP-C-36A": 9459.08,
+    "Custo AI/AO": 565.00,
+    "Custo DI/DO": 120.00,
+    "Licença Supervisório - SEM CFR-21 (Base)": 23000.00,
+    "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)": 100.00,
+    "Licença Supervisório - COM CFR-21 (Base)": 23000.00,
+    "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
+    "Licença Supervisório - Schneider EBO (Base)": 13000.00,
+    "Licença Supervisório - Schneider EBO (Por Ponto I/O)": 110.00,
+    "MP-C-15A": 4649.49,
+    "MP-C-18A": 5185.54,
+    "MP-C-24A": 7290.75,
+    "MP-C-36A": 9459.08,
     "Schneider - Sensor de Temperatura NTC (Duto)": 120.00,
     "Schneider - Sensor de Temperatura NTC (Ambiente)": 85.00,
     "Schneider - Servidor de Automação (SpaceLogic AS-P/AS-B)": 9500.00,
-    "Siemens - CPU 1214C DC/DC/DC": 2500.00, "Siemens - CPU 1215C DC/DC/DC": 3200.00,
-    "Siemens - SM 1231 AI 8x13Bit": 1900.00, "Siemens - SM 1232 AQ 4x14Bit": 2100.00,
-    "Siemens - SM 1221 DI 16x24VDC": 1200.00, "Siemens - SM 1222 DQ 16x24VDC": 1300.00,
-    "Siemens - Fonte 24VDC 2.5A": 800.00, "Siemens - Cartão de Memória 4MB": 400.00,
-    "Siemens - CPU 1511-1 PN": 5500.00, "Siemens - AI 8xU/I HS": 2800.00,
-    "Siemens - AQ 4xU/I ST": 3100.00, "Siemens - DI 16x24VDC HF": 1800.00,
-    "Siemens - DQ 16x24VDC/0.5A": 1900.00, "Siemens - Fonte PM 1507 24VDC 8A": 1500.00,
-    "Siemens - Cartão de Memória 12MB": 900.00, "Siemens - Serviço Custo AI/AO": 750.00,
+    "Siemens - CPU 1214C DC/DC/DC": 2500.00,
+    "Siemens - CPU 1215C DC/DC/DC": 3200.00,
+    "Siemens - SM 1231 AI 8x13Bit": 1900.00,
+    "Siemens - SM 1232 AQ 4x14Bit": 2100.00,
+    "Siemens - SM 1221 DI 16x24VDC": 1200.00,
+    "Siemens - SM 1222 DQ 16x24VDC": 1300.00,
+    "Siemens - Fonte 24VDC 2.5A": 800.00,
+    "Siemens - Cartão de Memória 4MB": 400.00,
+    "Siemens - CPU 1511-1 PN": 5500.00,
+    "Siemens - AI 8xU/I HS": 2800.00,
+    "Siemens - AQ 4xU/I ST": 3100.00,
+    "Siemens - DI 16x24VDC HF": 1800.00,
+    "Siemens - DQ 16x24VDC/0.5A": 1900.00,
+    "Siemens - Fonte PM 1507 24VDC 8A": 1500.00,
+    "Siemens - Cartão de Memória 12MB": 900.00,
+    "Siemens - Serviço Custo AI/AO": 750.00,
     "Siemens - Serviço Custo DI/DO": 180.00,
-    "Mercato - Controlador MDX (Expansão Direta)": 1250.00, "Mercato - Controlador MFC": 1650.00, "Mercato - Controlador MFC Plus": 2450.00,
-    "Mercato - Sensor de Temperatura NTC (Duto)": 120.00, "Mercato - Sensor de Temperatura NTC (Ambiente)": 85.00,
-    "Mercato - Sensor de Temperatura NTC com Display (Ambiente)": 350.00, "Mercato - Serviço Parametrização por Ponto": 80.00,
+    "Mercato - Controlador MDX (Expansão Direta)": 1250.00,
+    "Mercato - Controlador MFC": 1650.00,
+    "Mercato - Controlador MFC Plus": 2450.00,
+    "Mercato - Sensor de Temperatura NTC (Duto)": 120.00,
+    "Mercato - Sensor de Temperatura NTC (Ambiente)": 85.00,
+    "Mercato - Sensor de Temperatura NTC com Display (Ambiente)": 350.00,
+    "Mercato - Serviço Parametrização por Ponto": 80.00,
     "Mercato - IHM Básica 4.3\"": 1700.00,
-    "CFR21 Qualificável - Até 100 pts": 70.00, "CFR21 Qualificável - 101 a 250 pts": 50.00, "CFR21 Qualificável - Acima de 250 pts": 30.00,
-    "CFR21 Qualificado - Até 30 pts": 400.00, "CFR21 Qualificado - 31 a 60 pts": 350.00, "CFR21 Qualificado - Acima de 250 pts": 200.00,
-    "Serviço de Calibração (Por Ponto Analógico)": 180.00, "IHM Padrão 7\"": 3400.00, "IHM Premium 10\"": 8500.00, "Sem Interface (Cego)": 0.00
+    "CFR21 Qualificável - Até 100 pts": 70.00,
+    "CFR21 Qualificável - 101 a 250 pts": 50.00,
+    "CFR21 Qualificável - Acima de 250 pts": 30.00,
+    "CFR21 Qualificado - Até 30 pts": 400.00,
+    "CFR21 Qualificado - 31 a 60 pts": 350.00,
+    "CFR21 Qualificado - Acima de 250 pts": 200.00,
+    "Serviço de Calibração (Por Ponto Analógico)": 180.00,
+    "IHM Padrão 7\"": 3400.00,
+    "IHM Premium 10\"": 8500.00,
+    "Sem Interface (Cego)": 0.00
 }
 
 banco_schneider_comum = {k:v for k,v in banco_padrao_precos.items() if "Siemens" not in k and "Mercato" not in k and "CFR" not in k and "IHM" not in k}
@@ -231,7 +258,8 @@ if 'precos_banco' not in st.session_state:
         sh = conectar_google_sheets()
         aba_p = sh.worksheet("Precos").get_all_values()
         if len(aba_p) > 1:
-            st.session_state.precos_banco.update({linha[0]: float(linha[1]) for linha in aba_p[1:] if len(linha) > 1})
+            precos_bd = {linha[0]: float(linha[1]) for linha in aba_p[1:] if len(linha) > 1}
+            st.session_state.precos_banco.update(precos_bd)
     except: pass
 
 for k_n, v_n in banco_padrao_precos.items():
@@ -322,7 +350,7 @@ KITS_PADRAO = {
 def obter_cabo(inst_nome, is_output=False):
     i_up = inst_nome.upper()
     if is_output:
-        if "ON/OFF" in i_up or "ON / OFF" in i_up: return "4x1,00mm²"
+        if "ON/OFF" in i_up or "ON / OFF" in i_up: return "PP 4x1,00mm²"
         if "RAQ" in i_up or "RESISTÊNCIA" in i_up: return "2x1,00mm²"
         if "VÁLVULA" in i_up or "TCV" in i_up or "INVERSOR" in i_up or "VAZÃO" in i_up: return "3x0,75mm² + Shield"
         if "CHAVE" in i_up: return "5x1,00mm²"
@@ -335,10 +363,10 @@ def obter_cabo(inst_nome, is_output=False):
         if "(PSH)" in i_up or "(TC)" in i_up or "(TSH)" in i_up or "RAQ" in i_up or "RESISTÊNCIA" in i_up or "EXAUSTOR" in i_up or "VENTILADOR" in i_up or "COMPRESSOR" in i_up or "FLUXO" in i_up or "FS" in i_up or "CF" in i_up: return "2x1,00mm²"
     return ""
 
-def calcular_painel_fisico(qtd_ctrls):
-    if qtd_ctrls == 0: return "Sem Painel", 0.0
-    elif qtd_ctrls <= 4: return "Quadro 600x400mm", 4500.00
-    elif qtd_ctrls <= 10: return "Quadro 800x600mm", 5900.00
+def calcular_painel_fisico(qtd_controladores):
+    if qtd_controladores == 0: return "Sem Painel", 0.0
+    elif qtd_controladores <= 4: return "Quadro 600x400mm", 4500.00
+    elif qtd_controladores <= 10: return "Quadro 800x600mm", 5900.00
     else: return "Armário 1200x800mm", 9250.00
 
 def dimensionar_controladores(total_io):
@@ -353,32 +381,34 @@ def dimensionar_controladores(total_io):
 
 def dimensionar_siemens_1200(ai, ao, di, do):
     hw = {}
-    r_ai = max(0, ai - 2); r_ao = max(0, ao - 0)
-    r_di = max(0, di - 14); r_do = max(0, do - 10)
+    rem_ai = max(0, ai - 2); rem_ao = max(0, ao - 0)
+    rem_di = max(0, di - 14); rem_do = max(0, do - 10)
     if ai>0 or ao>0 or di>0 or do>0:
         hw["Siemens - CPU 1214C DC/DC/DC"] = 1
         hw["Siemens - Fonte 24VDC 2.5A"] = 1
         hw["Siemens - Cartão de Memória 4MB"] = 1
-    if r_ai > 0: hw["Siemens - SM 1231 AI 8x13Bit"] = (r_ai + 7) // 8
-    if r_ao > 0: hw["Siemens - SM 1232 AQ 4x14Bit"] = (r_ao + 3) // 4
-    if r_di > 0: hw["Siemens - SM 1221 DI 16x24VDC"] = (r_di + 15) // 16
-    if r_do > 0: hw["Siemens - SM 1222 DQ 16x24VDC"] = (r_do + 15) // 16
+    if rem_ai > 0: hw["Siemens - SM 1231 AI 8x13Bit"] = (rem_ai + 7) // 8
+    if rem_ao > 0: hw["Siemens - SM 1232 AQ 4x14Bit"] = (rem_ao + 3) // 4
+    if rem_di > 0: hw["Siemens - SM 1221 DI 16x24VDC"] = (rem_di + 15) // 16
+    if rem_do > 0: hw["Siemens - SM 1222 DQ 16x24VDC"] = (rem_do + 15) // 16
     return hw
 
 def dimensionar_siemens_1500(ai, ao, di, do):
     hw = {}
+    rem_ai = max(0, ai - 0); rem_ao = max(0, ao - 0)
+    rem_di = max(0, di - 0); rem_do = max(0, do - 0)
     if ai>0 or ao>0 or di>0 or do>0:
         hw["Siemens - CPU 1511-1 PN"] = 1
         hw["Siemens - Fonte PM 1507 24VDC 8A"] = 1
         hw["Siemens - Cartão de Memória 12MB"] = 1
-    if ai > 0: hw["Siemens - AI 8xU/I HS"] = (ai + 7) // 8
-    if ao > 0: hw["Siemens - AQ 4xU/I ST"] = (ao + 3) // 4
-    if di > 0: hw["Siemens - DI 16x24VDC HF"] = (di + 15) // 16
-    if do > 0: hw["Siemens - DQ 16x24VDC/0.5A"] = (do + 15) // 16
+    if rem_ai > 0: hw["Siemens - AI 8xU/I HS"] = (rem_ai + 7) // 8
+    if rem_ao > 0: hw["Siemens - AQ 4xU/I ST"] = (rem_ao + 3) // 4
+    if rem_di > 0: hw["Siemens - DI 16x24VDC HF"] = (rem_di + 15) // 16
+    if rem_do > 0: hw["Siemens - DQ 16x24VDC/0.5A"] = (rem_do + 15) // 16
     return hw
     
-def dimensionar_mercato(ui, ao, do, is_comp=False):
-    if is_comp and ui <= 6 and ao <= 2 and do <= 5: 
+def dimensionar_mercato(ui, ao, do, is_compressor_sys=False):
+    if is_compressor_sys and ui <= 6 and ao <= 2 and do <= 5: 
         return "Mercato - Controlador MDX (Expansão Direta)"
     elif ui <= 8 and ao <= 4 and do <= 5: 
         return "Mercato - Controlador MFC"
@@ -821,6 +851,7 @@ elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
         except Exception as e:
             st.error(f"Erro ao gerar o Word: {e}")
 
+
 # ==============================================================================
 # MÓDULO 2: LEVANTAMENTO DE AUTOMAÇÃO
 # ==============================================================================
@@ -881,7 +912,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 
                 if st.button("🪄 Analisar Documentos com IA", type="primary"):
                     if not ia_disponivel:
-                        st.error(f"⚠️ IA Indisponível. Chave API 'GEMINI_API_KEY' não configurada nos Secrets ou limite excedido. Detalhe: {erro_ia}")
+                        st.error("⚠️ IA Indisponível. Chave API 'GEMINI_API_KEY' não configurada nos Secrets do Streamlit ou limite excedido.")
                     else:
                         with st.spinner("A IA está analisando os diagramas P&ID..."):
                             for arq in arquivos_diagrama:
@@ -1094,23 +1125,14 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             
                             # REGRA SÊNIOR DE MOTORES (Chave Auto/Manual)
                             tem_motor = any(mot in g_data['nome_grupo'].upper() for mot in ["UTA", "EXAUST", "VENT", "FANCOIL", "SPLIT"])
-                            # Padrão: Se tiver motor, NÃO é exclusivo de monitoramento (desmarcado). Se não tiver, é monitoramento (marcado).
-                            # Se a string contiver "SALA", a gente força a ser Monitoramento (marcado).
-                            auto_mon_default = False if tem_motor else True
-                            if "SALA" in g_data['nome_grupo'].upper() or "MONITORAMENTO" in g_data['nome_grupo'].upper():
-                                auto_mon_default = True
-                                
-                            is_monitoramento = st.checkbox("📍 Exclusivo para Monitoramento de Salas (Desabilita chaves Auto/Manual de painel)", value=st.session_state.get(f"chk_mon_{p_data['id']}_{g_idx}", auto_mon_default), key=f"chk_mon_{p_data['id']}_{g_idx}")
+                            auto_mon_default = False 
+                            is_monitoramento = st.checkbox("📍 Exclusivo para Monitoramento/Controle (Desabilita chaves Auto/Manual de painel)", value=st.session_state.get(f"chk_mon_{p_data['id']}_{g_idx}", auto_mon_default), key=f"chk_mon_{p_data['id']}_{g_idx}")
 
                             with st.container():
                                 for inst, q in g_data['instrumentos'].items():
                                     io_v = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
                                     t_ai = q * io_v["AI"]; t_ao = q * io_v["AO"]; t_di = q * io_v["DI"]; t_do = q * io_v["DO"]
-                                    
-                                    # CHAVE SÓ CONTA SE FOR MOTOR E NÃO FOR MONITORAMENTO
-                                    if tem_motor and not is_monitoramento: 
-                                        t_di += 2
-                                        
+                                    if tem_motor and not is_monitoramento: t_di += 2
                                     if is_mercato_quadro:
                                         ui_nec = t_ai + t_di
                                         ui_chk = math.ceil(ui_nec * 1.2) if tem_sobra_20 else ui_nec
@@ -1248,10 +1270,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 for g_data in p_data['grupos_equipamentos']:
                     qtd_atual_calc = g_data.get('multiplicador', 1)
                     tem_motor = any(mot in g_data['nome_grupo'].upper() for mot in ["UTA", "EXAUST", "VENT", "FANCOIL", "SPLIT"])
-                    auto_mon_default = False if tem_motor else True
-                    if "SALA" in g_data['nome_grupo'].upper() or "MONITORAMENTO" in g_data['nome_grupo'].upper():
-                        auto_mon_default = True
-                    is_mon = st.session_state.get(f"chk_mon_{p_data['id']}_{p_data['grupos_equipamentos'].index(g_data)}", auto_mon_default)
+                    is_mon = st.session_state.get(f"chk_mon_{p_data['id']}_{p_data['grupos_equipamentos'].index(g_data)}", False)
                     
                     for inst, q in g_data['instrumentos'].items():
                         io_v = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
@@ -1285,7 +1304,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         sh = conectar_google_sheets()
                         try: ws_hist_orc = sh.worksheet("Historico_Orcamentos")
                         except:
-                            ws_hist_orc = sh.add_worksheet(title="Historico_Orcamentos", rows="1000", cols="8")
+                            ws_hist_orc = sh.add_worksheet("Historico_Orcamentos", 1000, 8)
                             ws_hist_orc.append_row(["Data/Hora", "Nome do Projeto", "Revisão", "Subtotal Hardware", "Serviços de Lógica", "Custo Total Estimado", "Configuracao_JSON", "Usuário"])
                         todas_linhas = ws_hist_orc.get_all_values()
                         c_rev = sum(1 for r in todas_linhas[1:] if r[1].strip().upper() == st.session_state.nome_projeto_orcamento.strip().upper())
@@ -1432,12 +1451,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 n_limpo = g['nome_grupo'].replace("Equipamento Novo", "").strip() or "Equipamento"
                 lista_equip_nomes.append(f"{mult}x {n_limpo}{str_tags}")
                 
-                tem_motor = any(mot in g['nome_grupo'].upper() for mot in ["UTA", "EXAUST", "VENT", "FANCOIL", "SPLIT", "SPLITÃO"])
-                auto_mon_default = False if tem_motor else True
-                if "SALA" in g['nome_grupo'].upper() or "MONITORAMENTO" in g['nome_grupo'].upper():
-                    auto_mon_default = True
+                tem_motor = any(mot in g['nome_grupo'].upper() for mot in ["UTA", "EXAUST", "VENT", "FANCOIL", "SPLIT"])
+                is_mon = st.session_state.get(f"chk_mon_{p['id']}_{g_idx}", False)
                 
-                is_mon = st.session_state.get(f"chk_mon_{p['id']}_{g_idx}", auto_mon_default)
                 is_comp = "COMPRESSOR" in g['nome_grupo'].upper() or "DIRETA" in g['nome_grupo'].upper()
                 
                 ai_g = ao_g = di_g = do_g = 0
@@ -1480,26 +1496,23 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         elif "co2" in inst.lower(): func_inst = "Medição da Qualidade do Ar (CO2)"
                         elif "fluxo" in inst.lower() or "fs" in inst.lower() or "cf" in inst.lower(): func_inst = "Confirmação de Fluxo de Água"
                         
-                        tag_especifica = get_specific_tags(inst, g.get('tags_lista', []), is_comp)
-                        str_tag_ctx = f" [TAGs: {tag_especifica}]" if tag_especifica else ""
-                        nome_equip_inst = f"{nome_equip}{str_tag_ctx}"
-
-                        lista_instrumentos_detalhados.append((nome_curto_inst, q_f, f_i))
-
-                        preco_item = st.session_state.precos_banco.get(i_real, st.session_state.precos_banco.get(inst, 0.0))
-                        io_v = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
+                        l_inst_det.append((nm_curto, q_f, f_i))
+                        
+                        pr_i = st.session_state.precos_banco.get(i_real, st.session_state.precos_banco.get(inst, 0.0))
+                        io_v = REGRA_IO.get(inst, {"AI":0, "AO":0, "DI":0, "DO":0})
                         
                         r_ai += q_f * io_v["AI"]; r_ao += q_f * io_v["AO"]; r_di += q_f * io_v["DI"]; r_do += q_f * io_v["DO"]
                         ai_g += qtd * io_v["AI"]; ao_g += qtd * io_v["AO"]; di_g += qtd * io_v["DI"]; do_g += qtd * io_v["DO"]
                         
-                        c_tot = q_f * preco_item
-                        linhas_inst.append({"Categoria": "Instrumentação", "Item": f"{i_real} ({n_limpo} - {p['nome']})", "Preço Unit.": preco_item, "Qtd": q_f, "Custo Total": c_tot})
+                        c_tot = q_f * pr_i
+                        linhas_inst.append({"Categoria": "Instrumentação", "Item": f"{i_real} ({n_limpo} - {p['nome']})", "Preço Unit.": pr_i, "Qtd": q_f, "Custo Total": c_tot})
                         linhas_pt.append({"Painel": p['nome'], "Grupo/Equipamento": n_limpo, "Instrumento": i_real, "Quantidade Total": q_f, "DI": q_f*io_v["DI"], "DO": q_f*io_v["DO"], "AI": q_f*io_v["AI"], "AO": q_f*io_v["AO"]})
                         
                         if is_siem: c_siem += c_tot
                         elif is_merc: c_merc += c_tot
                         else: c_sch += c_tot
                 
+                # ADICIONA CHAVE APENAS SE FOR MOTOR E NÃO FOR MONITORAMENTO
                 if tem_motor and not is_mon:
                     r_di += (2 * mult); di_g += 2
                     linhas_pt.append({"Painel": p['nome'], "Grupo/Equipamento": n_limpo, "Instrumento": "Chave Auto/Manual", "Quantidade Total": mult, "DI": 2*mult, "DO": 0, "AI": 0, "AO": 0})
@@ -1573,17 +1586,21 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
             i_desc = f"com IHM {p['ihm'].replace('Mercato - ', '')}" if "Cego" not in p['ihm'] else "sem interface IHM"
             s_desc = "Stand-alone" if "Sem" in p['supervisorio'] else "integrado ao supervisório EBO" if "EBO" in p['supervisorio'] else "integrado ao supervisório"
-            t_filtro = "monitoramento da saturação dos filtros" if tem_filtro_pdt else "alarme de saturação de filtros" if tem_filtro_psh else ""
-            t_res = "controle da resistência elétrica" if tem_resistencia else ""
-            t_extra = ", incluindo " + " e ".join([t for t in [t_filtro, t_res] if t]) if t_filtro or t_res else ""
+            t_filtro = "monitoramento da saturação dos filtros" if tem_f_pdt else "alarme de saturação de filtros" if tem_f_psh else ""
+            t_res = "controle da resistência elétrica" if tem_res else ""
             
+            # PROTEÇÃO CONTRA NAMEERROR (Montagem segura da string final)
+            componentes_intro = [c for c in [t_filtro, t_res] if c]
+            t_extra = ", incluindo " + " e ".join(componentes_intro) if componentes_intro else ""
             str_eqs = ", ".join(lista_equip_nomes) if lista_equip_nomes else "Equipamentos"
             str_ctrls = ", ".join(controladores_desc_lista) if controladores_desc_lista else "Controlador a definir"
             
             txt_p = f"Sistema para {str_eqs}{t_extra}.\nQuadro [TAG: {p['nome']}] {i_desc}, em {arq_at.replace(' - Linha mais econômica', '')} ({str_ctrls}), {s_desc}. Visualização e controle de:\n• Status de operação.\n"
-            if tem_filtro_pdt or tem_filtro_psh: txt_p += "• Monitoramento de saturação de filtros.\n"
-            if tem_resistencia: txt_p += "• Acionamento da resistência.\n"
-            txt_p += f"• Leitura de instrumentos ({', '.join(list(l_inst_nm))}).\n"
+            if tem_f_pdt or tem_f_psh: txt_p += "• Monitoramento de saturação de filtros.\n"
+            if tem_res: txt_p += "• Acionamento da resistência.\n"
+            
+            str_insts = ", ".join(list(l_inst_nm)) if l_inst_nm else "Instrumentos diversos"
+            txt_p += f"• Leitura de instrumentos ({str_insts}).\n"
             if cal_ativa: txt_p += "\nInstrumentos analógicos serão calibrados aferidos."
             if t_cfr_p == 'CFR21 Part 11 - Qualificável': txt_p += "\nFornecimento Qualificável (CFR 21 Part 11)."
             elif t_cfr_p == 'CFR21 Part 11 - Qualificado': txt_p += "\nFornecimento 100% Qualificado (CFR 21 Part 11) via SIARCON."
@@ -1649,7 +1666,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 for t_c in desc_comercial: st.markdown(t_c); st.markdown("<hr>", unsafe_allow_html=True)
                 st.markdown("</div>", unsafe_allow_html=True)
             
-            df_p = pd.DataFrame(linhas_pontos)
+            df_p = pd.DataFrame(linhas_pt)
             if not df_p.empty: df_p = pd.concat([df_p, pd.DataFrame([{"Painel": "TOTAL", "Grupo/Equipamento": "-", "Instrumento": "-", "Quantidade Total": pd.to_numeric(df_p['Quantidade Total'], errors='coerce').fillna(0).sum(), "DI": df_p['DI'].sum(), "DO": df_p['DO'].sum(), "AI": df_p['AI'].sum(), "AO": df_p['AO'].sum()}])], ignore_index=True)
 
             wb = openpyxl.Workbook(); ws1 = wb.active; ws1.title = "Financeiro"
@@ -1700,9 +1717,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     if is_tit: ws1.merge_cells(start_row=ri, start_column=2, end_row=ri, end_column=5)
             
             er = sr + len(df_exp) + 2
-            tcx = max(10, len(texto_descritivo_final.split('\n')) + 2) 
+            tcx = max(10, len(desc_final.split('\n')) + 2) 
             ws1.merge_cells(start_row=er, start_column=1, end_row=er+tcx, end_column=5)
-            cd = ws1.cell(er, 1, texto_descritivo_final); cd.font = Font(name="Arial", size=10); cd.alignment = Alignment(vertical="top", wrap_text=True); cd.fill = PatternFill(start_color="F2F4F4", end_color="F2F4F4", fill_type="solid")
+            cd = ws1.cell(er, 1, desc_final); cd.font = Font(name="Arial", size=10); cd.alignment = Alignment(vertical="top", wrap_text=True); cd.fill = PatternFill(start_color="F2F4F4", end_color="F2F4F4", fill_type="solid")
             for r in range(er, er+tcx+1):
                 for c in range(1, 6): ws1.cell(r, c).border = bd_t
             for col in ws1.columns: ws1.column_dimensions[get_column_letter(col[0].column)].width = max(max(len(str(c.value or '')) for c in col if c.row <= sr + len(df_exp)) + 4, 12)
