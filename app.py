@@ -526,7 +526,7 @@ elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
                 cats_existentes = sorted(df_escopos['Categoria'].unique().tolist()) if 'Categoria' in df_escopos.columns else []
                 c_cat, c_tit, c_txt = st.columns([0.3, 0.3, 0.4])
                 opcao_cat = c_cat.selectbox("Categoria", ["Nova Categoria..."] + cats_existentes)
-                cat_final = c_cat.text_input("Nome da Categoria") if opcao_cat == "Nova Categoria...": opcao_cat
+                cat_final = c_cat.text_input("Nome da Categoria") if opcao_cat == "Nova Categoria..." opcao_cat
                 ne_tit, ne_txt = c_tit.text_input("Título Curto"), c_txt.text_input("Texto Completo")
                 if st.form_submit_button("💾 Salvar Item") and cat_final and ne_tit and ne_txt:
                     salvar_no_banco("Escopos", [cat_final, ne_tit, ne_txt])
