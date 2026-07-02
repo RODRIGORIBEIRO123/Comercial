@@ -46,7 +46,7 @@ def conectar_google_sheets():
         st.error(f"Erro na conexão com Google Sheets: {e}. Verifique o link da planilha.")
         st.stop()
 
-# Configuração da Inteligência Artificial (Google Gemini) - Restaurado para 1.5-pro
+# Configuração da Inteligência Artificial (Google Gemini)
 try:
     if "GEMINI_API_KEY" in st.secrets:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
@@ -62,122 +62,51 @@ fuso_br = timezone(timedelta(hours=-3))
 # ==========================================
 # 🔐 INICIALIZAÇÃO SEGURA DE VARIÁVEIS GLOBAIS
 # ==========================================
-if "usuario_logado" not in st.session_state: 
-    st.session_state.usuario_logado = None
-if "nome_exibicao" not in st.session_state: 
-    st.session_state.nome_exibicao = ""
-if "menu_selecionado" not in st.session_state: 
-    st.session_state.menu_selecionado = "🏠 Tela Inicial"
-if "orcamento" not in st.session_state: 
-    st.session_state.orcamento = []
-if "historico_precos" not in st.session_state: 
-    st.session_state.historico_precos = []
-if 'nome_projeto_orcamento' not in st.session_state: 
-    st.session_state.nome_projeto_orcamento = ""
-if 'projeto_para_abrir' not in st.session_state: 
-    st.session_state.projeto_para_abrir = None
-if 'dados_projeto_abrir' not in st.session_state: 
-    st.session_state.dados_projeto_abrir = {}
-if 'wizard_ativo' not in st.session_state: 
-    st.session_state.wizard_ativo = False
-if 'paineis_auto' not in st.session_state: 
-    st.session_state.paineis_auto = []
-if 'confirmar_limpar' not in st.session_state: 
-    st.session_state.confirmar_limpar = False
-if 'data_precos_atualizada' not in st.session_state: 
-    st.session_state.data_precos_atualizada = "Buscando metadados da nuvem..."
-if 'resultado_ia' not in st.session_state: 
-    st.session_state.resultado_ia = {}
+if "usuario_logado" not in st.session_state: st.session_state.usuario_logado = None
+if "nome_exibicao" not in st.session_state: st.session_state.nome_exibicao = ""
+if "menu_selecionado" not in st.session_state: st.session_state.menu_selecionado = "🏠 Tela Inicial"
+if "orcamento" not in st.session_state: st.session_state.orcamento = []
+if "historico_precos" not in st.session_state: st.session_state.historico_precos = []
+if 'nome_projeto_orcamento' not in st.session_state: st.session_state.nome_projeto_orcamento = ""
+if 'projeto_para_abrir' not in st.session_state: st.session_state.projeto_para_abrir = None
+if 'dados_projeto_abrir' not in st.session_state: st.session_state.dados_projeto_abrir = {}
+if 'wizard_ativo' not in st.session_state: st.session_state.wizard_ativo = False
+if 'paineis_auto' not in st.session_state: st.session_state.paineis_auto = []
+if 'confirmar_limpar' not in st.session_state: st.session_state.confirmar_limpar = False
+if 'data_precos_atualizada' not in st.session_state: st.session_state.data_precos_atualizada = "Buscando metadados da nuvem..."
+if 'resultado_ia' not in st.session_state: st.session_state.resultado_ia = {}
 
-# ==========================================
-# REGRAS E BANCOS DE DADOS (AUTOMAÇÃO)
-# ==========================================
+# DICIONÁRIO DE NOMES DO DIAGRAMA 
 if 'de_para_diagrama' not in st.session_state:
     st.session_state.de_para_diagrama = {
-        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {
-            "in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "Modula Inversor", "out_comp": "Modula Inversor"
-        },
-        "Transmissor de temperatura e umidade para duto (TT/MT)": {
-            "in_agua": "Trans. Temp. e Umid. (TT/MT)", "in_comp": "Trans. Temp. e Umid. (TT/MT)", "out_agua": "", "out_comp": ""
-        },
-        "Transmissor de temperatura para duto (TT)": {
-            "in_agua": "Trans. Temp. (TT)", "in_comp": "Trans. Temp. (TT)", "out_agua": "", "out_comp": ""
-        },
-        "Válvula de controle ON/OFF (TCV)": {
-            "in_agua": "", "in_comp": "", "out_agua": "Habilita Válvula", "out_comp": "Habilita Válvula"
-        },
-        "Válvula de controle de água gelada proporcional (TCV)": {
-            "in_agua": "", "in_comp": "", "out_agua": "Modula VAG", "out_comp": "Habilita Compressor"
-        },
-        "Válvula de controle de água quente proporcional (TCV)": {
-            "in_agua": "", "in_comp": "", "out_agua": "Modula VAQ", "out_comp": ""
-        },
-        "Válvula de controle de vapor proporcional (TCV)": {
-            "in_agua": "", "in_comp": "", "out_agua": "Modula Vapor", "out_comp": ""
-        },
-        "Relé de Corrente - Status Compressor (TC)": {
-            "in_agua": "", "in_comp": "Status Compressor", "out_agua": "", "out_comp": "Habilita Compressor"
-        },
-        "Termostato de segurança (TSH)": {
-            "in_agua": "Termostato Seg. RAQ (TSH)", "in_comp": "Termostato Seg. RAQ (TSH)", "out_agua": "Status RAQ", "out_comp": "Status RAQ"
-        },
-        "Pressostato diferencial para ar (PSH)": {
-            "in_agua": "Pressostato Seg. RAQ (PSH)", "in_comp": "Pressostato Seg. RAQ (PSH)", "out_agua": "Status RAQ", "out_comp": "Status RAQ"
-        },
-        "Resistência de aquecimento (Equipamento) (RAQ)": {
-            "in_agua": "", "in_comp": "", "out_agua": "Habilita RAQ", "out_comp": "Habilita RAQ"
-        },
-        "Resistência de aquecimento (Duto) (RAQ)": {
-            "in_agua": "", "in_comp": "", "out_agua": "Habilita RAQ", "out_comp": "Habilita RAQ"
-        },
-        "Pressostato para monitorar os filtros G4 (PSH)": {
-            "in_agua": "Pressostato G4 (PSH)", "in_comp": "Pressostato G4 (PSH)", "out_agua": "Alarme G4 Saturado", "out_comp": "Alarme G4 Saturado"
-        },
-        "Pressostato para monitorar os filtros M5 (PSH)": {
-            "in_agua": "Pressostato M5 (PSH)", "in_comp": "Pressostato M5 (PSH)", "out_agua": "Alarme M5 Saturado", "out_comp": "Alarme M5 Saturado"
-        },
-        "Transmissor de pressão diferencial (monitorar os filtros M5) (PDT)": {
-            "in_agua": "Pressão Dif. M5 (PDT)", "in_comp": "Pressão Dif. M5 (PDT)", "out_agua": "", "out_comp": ""
-        },
-        "Pressostato para monitorar os filtros F9 (PSH)": {
-            "in_agua": "Pressostato F9 (PSH)", "in_comp": "Pressostato F9 (PSH)", "out_agua": "Alarme F9 Saturado", "out_comp": "Alarme F9 Saturado"
-        },
-        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)": {
-            "in_agua": "Pressão Dif. F9 (PDT)", "in_comp": "Pressão Dif. F9 (PDT)", "out_agua": "", "out_comp": ""
-        },
-        "Pressostato para monitorar os filtros H13/H14 (PSH)": {
-            "in_agua": "Pressostato H13/14 (PSH)", "in_comp": "Pressostato H13/14 (PSH)", "out_agua": "Alarme H13/14 Saturado", "out_comp": "Alarme H13/14 Saturado"
-        },
-        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)": {
-            "in_agua": "Pressão Dif. H13 (PDT)", "in_comp": "Pressão Dif. H13 (PDT)", "out_agua": "", "out_comp": ""
-        },
-        "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": {
-            "in_agua": "Status Func. Partida Direta (PSH)", "in_comp": "Status Func. Partida Direta (PSH)", "out_agua": "", "out_comp": ""
-        },
-        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)": {
-            "in_agua": "Pressão Dif. G4 (PDT)", "in_comp": "Pressão Dif. G4 (PDT)", "out_agua": "", "out_comp": ""
-        },
-        "Transmissor de pressão diferencial entre salas (PDT)": {
-            "in_agua": "Pressão Dif. Salas (PDT)", "in_comp": "Pressão Dif. Salas (PDT)", "out_agua": "", "out_comp": ""
-        },
-        "Transmissor de pressão diferencial entre salas com display (PDIT)": {
-            "in_agua": "Pressão Dif. Salas (PDIT)", "in_comp": "Pressão Dif. Salas (PDIT)", "out_agua": "", "out_comp": ""
-        },
-        "Transmissor de temperatura Ambiente (TT)": {
-            "in_agua": "Temp. Salas (TT)", "in_comp": "Temp. Salas (TT)", "out_agua": "", "out_comp": ""
-        },
-        "Transmissor de temperatura ambiente com display (TIT)": {
-            "in_agua": "Temp. Salas (TIT)", "in_comp": "Temp. Salas (TIT)", "out_agua": "", "out_comp": ""
-        },
-        "Transmissor de temperatura e umidade ambiente (TT/MT)": {
-            "in_agua": "Temp. / Umid. (TT/MT)", "in_comp": "Temp. / Umid. (TT/MT)", "out_agua": "", "out_comp": ""
-        },
-        "Chave Seletora Auto/Manual (Painel Elétrico)": {
-            "in_agua": "Chave Auto / Manual", "in_comp": "Chave Auto / Manual", "out_agua": "Habilita Equipamento (TAG)", "out_comp": "Habilita Equipamento (TAG)"
-        },
-        "Chave de fluxo para água (FS/CF)": {
-            "in_agua": "Status Fluxo de Água", "in_comp": "", "out_agua": "", "out_comp": ""
-        }
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {"in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "Modula Inversor", "out_comp": "Modula Inversor"},
+        "Transmissor de temperatura e umidade para duto (TT/MT)": {"in_agua": "Trans. Temp. e Umid. (TT/MT)", "in_comp": "Trans. Temp. e Umid. (TT/MT)", "out_agua": "", "out_comp": ""},
+        "Transmissor de temperatura para duto (TT)": {"in_agua": "Trans. Temp. (TT)", "in_comp": "Trans. Temp. (TT)", "out_agua": "", "out_comp": ""},
+        "Válvula de controle ON/OFF (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Habilita Válvula", "out_comp": "Habilita Válvula"},
+        "Válvula de controle de água gelada proporcional (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Modula VAG", "out_comp": "Habilita Compressor"},
+        "Válvula de controle de água quente proporcional (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Modula VAQ", "out_comp": ""},
+        "Válvula de controle de vapor proporcional (TCV)": {"in_agua": "", "in_comp": "", "out_agua": "Modula Vapor", "out_comp": ""},
+        "Relé de Corrente - Status Compressor (TC)": {"in_agua": "", "in_comp": "Status Compressor", "out_agua": "", "out_comp": "Habilita Compressor"},
+        "Termostato de segurança (TSH)": {"in_agua": "Termostato Seg. RAQ (TSH)", "in_comp": "Termostato Seg. RAQ (TSH)", "out_agua": "Status RAQ", "out_comp": "Status RAQ"},
+        "Pressostato diferencial para ar (PSH)": {"in_agua": "Pressostato Seg. RAQ (PSH)", "in_comp": "Pressostato Seg. RAQ (PSH)", "out_agua": "Status RAQ", "out_comp": "Status RAQ"},
+        "Resistência de aquecimento (Equipamento) (RAQ)": {"in_agua": "", "in_comp": "", "out_agua": "Habilita RAQ", "out_comp": "Habilita RAQ"},
+        "Resistência de aquecimento (Duto) (RAQ)": {"in_agua": "", "in_comp": "", "out_agua": "Habilita RAQ", "out_comp": "Habilita RAQ"},
+        "Pressostato para monitorar os filtros G4 (PSH)": {"in_agua": "Pressostato G4 (PSH)", "in_comp": "Pressostato G4 (PSH)", "out_agua": "Alarme G4 Saturado", "out_comp": "Alarme G4 Saturado"},
+        "Pressostato para monitorar os filtros M5 (PSH)": {"in_agua": "Pressostato M5 (PSH)", "in_comp": "Pressostato M5 (PSH)", "out_agua": "Alarme M5 Saturado", "out_comp": "Alarme M5 Saturado"},
+        "Transmissor de pressão diferencial (monitorar os filtros M5) (PDT)": {"in_agua": "Pressão Dif. M5 (PDT)", "in_comp": "Pressão Dif. M5 (PDT)", "out_agua": "", "out_comp": ""},
+        "Pressostato para monitorar os filtros F9 (PSH)": {"in_agua": "Pressostato F9 (PSH)", "in_comp": "Pressostato F9 (PSH)", "out_agua": "Alarme F9 Saturado", "out_comp": "Alarme F9 Saturado"},
+        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)": {"in_agua": "Pressão Dif. F9 (PDT)", "in_comp": "Pressão Dif. F9 (PDT)", "out_agua": "", "out_comp": ""},
+        "Pressostato para monitorar os filtros H13/H14 (PSH)": {"in_agua": "Pressostato H13/14 (PSH)", "in_comp": "Pressostato H13/14 (PSH)", "out_agua": "Alarme H13/14 Saturado", "out_comp": "Alarme H13/14 Saturado"},
+        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)": {"in_agua": "Pressão Dif. H13 (PDT)", "in_comp": "Pressão Dif. H13 (PDT)", "out_agua": "", "out_comp": ""},
+        "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": {"in_agua": "Status Func. Partida Direta (PSH)", "in_comp": "Status Func. Partida Direta (PSH)", "out_agua": "", "out_comp": ""},
+        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)": {"in_agua": "Pressão Dif. G4 (PDT)", "in_comp": "Pressão Dif. G4 (PDT)", "out_agua": "", "out_comp": ""},
+        "Transmissor de pressão diferencial entre salas (PDT)": {"in_agua": "Pressão Dif. Salas (PDT)", "in_comp": "Pressão Dif. Salas (PDT)", "out_agua": "", "out_comp": ""},
+        "Transmissor de pressão diferencial entre salas com display (PDIT)": {"in_agua": "Pressão Dif. Salas (PDIT)", "in_comp": "Pressão Dif. Salas (PDIT)", "out_agua": "", "out_comp": ""},
+        "Transmissor de temperatura Ambiente (TT)": {"in_agua": "Temp. Salas (TT)", "in_comp": "Temp. Salas (TT)", "out_agua": "", "out_comp": ""},
+        "Transmissor de temperatura ambiente com display (TIT)": {"in_agua": "Temp. Salas (TIT)", "in_comp": "Temp. Salas (TIT)", "out_agua": "", "out_comp": ""},
+        "Transmissor de temperatura e umidade ambiente (TT/MT)": {"in_agua": "Temp. / Umid. (TT/MT)", "in_comp": "Temp. / Umid. (TT/MT)", "out_agua": "", "out_comp": ""},
+        "Chave Seletora Auto/Manual (Painel Elétrico)": {"in_agua": "Chave Auto / Manual", "in_comp": "Chave Auto / Manual", "out_agua": "Habilita Equipamento (TAG)", "out_comp": "Habilita Equipamento (TAG)"},
+        "Chave de fluxo para água (FS/CF)": {"in_agua": "Status Fluxo de Água", "in_comp": "", "out_agua": "", "out_comp": ""}
     }
 
 REGRA_IO = {
@@ -255,56 +184,30 @@ banco_padrao_precos = {
     "Transmissor de temperatura Ambiente (TT)": 2050.00,
     "Transmissor de temperatura ambiente com display (TIT)": 2650.00,
     "Transmissor de temperatura e umidade ambiente (TT/MT)": 2050.00,
-    "Custo AI/AO": 565.00,
-    "Custo DI/DO": 120.00,
-    "Licença Supervisório - SEM CFR-21 (Base)": 23000.00,
-    "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)": 100.00,
-    "Licença Supervisório - COM CFR-21 (Base)": 23000.00,
-    "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
-    "Licença Supervisório - Schneider EBO (Base)": 13000.00,
-    "Licença Supervisório - Schneider EBO (Por Ponto I/O)": 110.00,
-    "MP-C-15A": 4649.49,
-    "MP-C-18A": 5185.54,
-    "MP-C-24A": 7290.75,
-    "MP-C-36A": 9459.08,
+    "Custo AI/AO": 565.00, "Custo DI/DO": 120.00,
+    "Licença Supervisório - SEM CFR-21 (Base)": 23000.00, "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)": 100.00,
+    "Licença Supervisório - COM CFR-21 (Base)": 23000.00, "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
+    "Licença Supervisório - Schneider EBO (Base)": 13000.00, "Licença Supervisório - Schneider EBO (Por Ponto I/O)": 110.00,
+    "MP-C-15A": 4649.49, "MP-C-18A": 5185.54, "MP-C-24A": 7290.75, "MP-C-36A": 9459.08,
     "Schneider - Sensor de Temperatura NTC (Duto)": 120.00,
     "Schneider - Sensor de Temperatura NTC (Ambiente)": 85.00,
     "Schneider - Servidor de Automação (SpaceLogic AS-P/AS-B)": 9500.00,
-    "Siemens - CPU 1214C DC/DC/DC": 2500.00,
-    "Siemens - CPU 1215C DC/DC/DC": 3200.00,
-    "Siemens - SM 1231 AI 8x13Bit": 1900.00,
-    "Siemens - SM 1232 AQ 4x14Bit": 2100.00,
-    "Siemens - SM 1221 DI 16x24VDC": 1200.00,
-    "Siemens - SM 1222 DQ 16x24VDC": 1300.00,
-    "Siemens - Fonte 24VDC 2.5A": 800.00,
-    "Siemens - Cartão de Memória 4MB": 400.00,
-    "Siemens - CPU 1511-1 PN": 5500.00,
-    "Siemens - AI 8xU/I HS": 2800.00,
-    "Siemens - AQ 4xU/I ST": 3100.00,
-    "Siemens - DI 16x24VDC HF": 1800.00,
-    "Siemens - DQ 16x24VDC/0.5A": 1900.00,
-    "Siemens - Fonte PM 1507 24VDC 8A": 1500.00,
-    "Siemens - Cartão de Memória 12MB": 900.00,
-    "Siemens - Serviço Custo AI/AO": 750.00,
+    "Siemens - CPU 1214C DC/DC/DC": 2500.00, "Siemens - CPU 1215C DC/DC/DC": 3200.00,
+    "Siemens - SM 1231 AI 8x13Bit": 1900.00, "Siemens - SM 1232 AQ 4x14Bit": 2100.00,
+    "Siemens - SM 1221 DI 16x24VDC": 1200.00, "Siemens - SM 1222 DQ 16x24VDC": 1300.00,
+    "Siemens - Fonte 24VDC 2.5A": 800.00, "Siemens - Cartão de Memória 4MB": 400.00,
+    "Siemens - CPU 1511-1 PN": 5500.00, "Siemens - AI 8xU/I HS": 2800.00,
+    "Siemens - AQ 4xU/I ST": 3100.00, "Siemens - DI 16x24VDC HF": 1800.00,
+    "Siemens - DQ 16x24VDC/0.5A": 1900.00, "Siemens - Fonte PM 1507 24VDC 8A": 1500.00,
+    "Siemens - Cartão de Memória 12MB": 900.00, "Siemens - Serviço Custo AI/AO": 750.00,
     "Siemens - Serviço Custo DI/DO": 180.00,
-    "Mercato - Controlador MDX (Expansão Direta)": 1250.00,
-    "Mercato - Controlador MFC": 1650.00,
-    "Mercato - Controlador MFC Plus": 2450.00,
-    "Mercato - Sensor de Temperatura NTC (Duto)": 120.00,
-    "Mercato - Sensor de Temperatura NTC (Ambiente)": 85.00,
-    "Mercato - Sensor de Temperatura NTC com Display (Ambiente)": 350.00,
-    "Mercato - Serviço Parametrização por Ponto": 80.00,
+    "Mercato - Controlador MDX (Expansão Direta)": 1250.00, "Mercato - Controlador MFC": 1650.00, "Mercato - Controlador MFC Plus": 2450.00,
+    "Mercato - Sensor de Temperatura NTC (Duto)": 120.00, "Mercato - Sensor de Temperatura NTC (Ambiente)": 85.00,
+    "Mercato - Sensor de Temperatura NTC com Display (Ambiente)": 350.00, "Mercato - Serviço Parametrização por Ponto": 80.00,
     "Mercato - IHM Básica 4.3\"": 1700.00,
-    "CFR21 Qualificável - Até 100 pts": 70.00,
-    "CFR21 Qualificável - 101 a 250 pts": 50.00,
-    "CFR21 Qualificável - Acima de 250 pts": 30.00,
-    "CFR21 Qualificado - Até 30 pts": 400.00,
-    "CFR21 Qualificado - 31 a 60 pts": 350.00,
-    "CFR21 Qualificado - Acima de 250 pts": 200.00,
-    "Serviço de Calibração (Por Ponto Analógico)": 180.00,
-    "IHM Padrão 7\"": 3400.00,
-    "IHM Premium 10\"": 8500.00,
-    "Sem Interface (Cego)": 0.00
+    "CFR21 Qualificável - Até 100 pts": 70.00, "CFR21 Qualificável - 101 a 250 pts": 50.00, "CFR21 Qualificável - Acima de 250 pts": 30.00,
+    "CFR21 Qualificado - Até 30 pts": 400.00, "CFR21 Qualificado - 31 a 60 pts": 350.00, "CFR21 Qualificado - Acima de 250 pts": 200.00,
+    "Serviço de Calibração (Por Ponto Analógico)": 180.00, "IHM Padrão 7\"": 3400.00, "IHM Premium 10\"": 8500.00, "Sem Interface (Cego)": 0.00
 }
 
 banco_schneider_comum = {k:v for k,v in banco_padrao_precos.items() if "Siemens" not in k and "Mercato" not in k and "CFR" not in k and "IHM" not in k}
@@ -337,121 +240,28 @@ for k_n, v_n in banco_padrao_precos.items():
     if k_n not in st.session_state.precos_banco:
         st.session_state.precos_banco[k_n] = v_n
 
-GRUPOS_INSTRUMENTOS = {
-    "🔹 Controle (HVAC e Máquinas)": [
-        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)",
-        "Transmissor de temperatura e umidade para duto (TT/MT)", 
-        "Transmissor de temperatura para duto (TT)",
-        "Válvula de controle ON/OFF (TCV)", 
-        "Válvula de controle de água gelada proporcional (TCV)",
-        "Válvula de controle de água quente proporcional (TCV)",
-        "Válvula de controle de vapor proporcional (TCV)",
-        "Relé de Corrente - Status Compressor (TC)", 
-        "Termostato de segurança (TSH)",
-        "Pressostato diferencial para ar (PSH)", 
-        "Resistência de aquecimento (Equipamento) (RAQ)",
-        "Resistência de aquecimento (Duto) (RAQ)"
-    ],
-    "🔸 Monitoramento (Filtros e Status)": [
-        "Pressostato para monitorar os filtros G4 (PSH)", 
-        "Pressostato para monitorar os filtros M5 (PSH)", 
-        "Pressostato para monitorar os filtros F9 (PSH)", 
-        "Pressostato para monitorar os filtros H13/H14 (PSH)",
-        "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", 
-        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)", 
-        "Transmissor de pressão diferencial (monitorar os filtros M5) (PDT)",
-        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)",
-        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)",
-        "Chave de fluxo para água (FS/CF)"
-    ],
-    "🟢 Monitoramento e Controle de Ambientes": [
-        "Transmissor de pressão diferencial entre salas (PDT)",
-        "Transmissor de pressão diferencial entre salas com display (PDIT)",
-        "Transmissor de temperatura Ambiente (TT)",
-        "Transmissor de temperatura ambiente com display (TIT)",
-        "Transmissor de temperatura e umidade ambiente (TT/MT)",
-        "Transmissor de temperatura e umidade ambiente com display (TIT/MIT)",
-        "Transmissor de CO2 ambiente (AT/AIT)"
-    ]
-}
-
-KITS_PADRAO = {
-    "❄️ UTA Padrão - Água Gelada": {
-        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1,
-        "Transmissor de temperatura e umidade para duto (TT/MT)": 1, 
-        "Válvula de controle de água gelada proporcional (TCV)": 1,
-        "Pressostato para monitorar os filtros G4 (PSH)": 1, 
-        "Pressostato para monitorar os filtros F9 (PSH)": 1
-    },
-    "🌬️ UTA Padrão - Expansão Direta": {
-        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1,
-        "Transmissor de temperatura e umidade para duto (TT/MT)": 1, 
-        "Relé de Corrente - Status Compressor (TC)": 2,
-        "Pressostato para monitorar os filtros G4 (PSH)": 1, 
-        "Pressostato para monitorar os filtros F9 (PSH)": 1
-    },
-    "🔥 UTA Padrão - Água Gelada + Resistência": {
-        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1,
-        "Transmissor de temperatura e umidade para duto (TT/MT)": 1, 
-        "Válvula de controle de água gelada proporcional (TCV)": 1,
-        "Pressostato para monitorar os filtros G4 (PSH)": 1, 
-        "Pressostato para monitorar os filtros F9 (PSH)": 1,
-        "Termostato de segurança (TSH)": 1, 
-        "Pressostato diferencial para ar (PSH)": 1, 
-        "Resistência de aquecimento (Equipamento) (RAQ)": 1
-    },
-    "🔥 UTA Expansão Direta (2 Compressores) + Resistência (Salas e Exaustão)": {
-        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1,
-        "Transmissor de temperatura e umidade para duto (TT/MT)": 1, 
-        "Relé de Corrente - Status Compressor (TC)": 2,
-        "Pressostato para monitorar os filtros G4 (PSH)": 1, 
-        "Pressostato para monitorar os filtros M5 (PSH)": 1, 
-        "Pressostato para monitorar os filtros F9 (PSH)": 1,
-        "Termostato de segurança (TSH)": 1, 
-        "Resistência de aquecimento (Equipamento) (RAQ)": 1,
-        "Transmissor de pressão diferencial entre salas (PDT)": 4, 
-        "Transmissor de temperatura e umidade ambiente (TT/MT)": 4,
-        "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 2,
-        "Pressostato diferencial para ar (PSH)": 1
-    },
-    "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1 },
-    "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 }
-}
-
+# --- FUNÇÕES DE CÁLCULO E CABO ---
 def obter_cabo(inst_nome, is_output=False):
     i_up = inst_nome.upper()
     if is_output:
-        if "ON/OFF" in i_up or "ON / OFF" in i_up: 
-            return "PP 4x1,00mm²"
-        if "RAQ" in i_up or "RESISTÊNCIA" in i_up: 
-            return "2x1,00mm²"
-        if "VÁLVULA" in i_up or "TCV" in i_up or "INVERSOR" in i_up or "VAZÃO" in i_up: 
-            return "3x0,75mm² + Shield"
-        if "CHAVE" in i_up: 
-            return "5x1,00mm²"
-        if "EXAUSTOR" in i_up or "VENTILADOR" in i_up or "COMPRESSOR" in i_up: 
-            return "2x1,00mm²"
+        if "ON/OFF" in i_up or "ON / OFF" in i_up: return "PP 4x1,00mm²"
+        if "RAQ" in i_up or "RESISTÊNCIA" in i_up: return "2x1,00mm²"
+        if "VÁLVULA" in i_up or "TCV" in i_up or "INVERSOR" in i_up or "VAZÃO" in i_up: return "3x0,75mm² + Shield"
+        if "CHAVE" in i_up: return "5x1,00mm²"
+        if "EXAUSTOR" in i_up or "VENTILADOR" in i_up or "COMPRESSOR" in i_up: return "2x1,00mm²"
         return "2x1,00mm²"
     else:
-        if "CHAVE" in i_up: 
-            return "5x1,00mm²"
-        if "(TT/MT)" in i_up or "TIT/MIT" in i_up: 
-            return "5x0,75mm² + Shield"
-        if "(PDT)" in i_up or "(PDIT)" in i_up or "(TT)" in i_up or "(PIT)" in i_up or "(FIT)" in i_up or "(TIT)" in i_up or "(TCV)" in i_up or "VÁLVULA" in i_up or "INVERSOR" in i_up or "VAZÃO" in i_up: 
-            return "3x0,75mm² + Shield"
-        if "(PSH)" in i_up or "(TC)" in i_up or "(TSH)" in i_up or "RAQ" in i_up or "RESISTÊNCIA" in i_up or "EXAUSTOR" in i_up or "VENTILADOR" in i_up or "COMPRESSOR" in i_up or "FLUXO" in i_up or "FS" in i_up or "CF" in i_up: 
-            return "2x1,00mm²"
+        if "CHAVE" in i_up: return "5x1,00mm²"
+        if "(TT/MT)" in i_up or "TIT/MIT" in i_up: return "5x0,75mm² + Shield"
+        if "(PDT)" in i_up or "(PDIT)" in i_up or "(TT)" in i_up or "(PIT)" in i_up or "(FIT)" in i_up or "(TIT)" in i_up or "(TCV)" in i_up or "VÁLVULA" in i_up or "INVERSOR" in i_up or "VAZÃO" in i_up: return "3x0,75mm² + Shield"
+        if "(PSH)" in i_up or "(TC)" in i_up or "(TSH)" in i_up or "RAQ" in i_up or "RESISTÊNCIA" in i_up or "EXAUSTOR" in i_up or "VENTILADOR" in i_up or "COMPRESSOR" in i_up or "FLUXO" in i_up or "FS" in i_up or "CF" in i_up: return "2x1,00mm²"
     return ""
 
 def calcular_painel_fisico(qtd_controladores):
-    if qtd_controladores == 0: 
-        return "Sem Painel", 0.0
-    elif qtd_controladores <= 4: 
-        return "Quadro 600x400mm", 4500.00
-    elif qtd_controladores <= 10: 
-        return "Quadro 800x600mm", 5900.00
-    else: 
-        return "Armário 1200x800mm", 9250.00
+    if qtd_controladores == 0: return "Sem Painel", 0.0
+    elif qtd_controladores <= 4: return "Quadro 600x400mm", 4500.00
+    elif qtd_controladores <= 10: return "Quadro 800x600mm", 5900.00
+    else: return "Armário 1200x800mm", 9250.00
 
 def dimensionar_controladores(total_io):
     c36 = c24 = c18 = c15 = 0
@@ -492,12 +302,9 @@ def dimensionar_siemens_1500(ai, ao, di, do):
     return hw
     
 def dimensionar_mercato(ui, ao, do, is_compressor_sys=False):
-    if is_compressor_sys and ui <= 6 and ao <= 2 and do <= 5: 
-        return "Mercato - Controlador MDX (Expansão Direta)"
-    elif ui <= 8 and ao <= 4 and do <= 5: 
-        return "Mercato - Controlador MFC"
-    elif ui <= 14 and ao <= 6 and do <= 8: 
-        return "Mercato - Controlador MFC Plus"
+    if is_compressor_sys and ui <= 6 and ao <= 2 and do <= 5: return "Mercato - Controlador MDX (Expansão Direta)"
+    elif ui <= 8 and ao <= 4 and do <= 5: return "Mercato - Controlador MFC"
+    elif ui <= 14 and ao <= 6 and do <= 8: return "Mercato - Controlador MFC Plus"
     return None
     
 def get_specific_tags(inst_nome, tags_lista, is_compressor_sys):
@@ -513,65 +320,25 @@ def get_specific_tags(inst_nome, tags_lista, is_compressor_sys):
             if subset: return "/".join(subset)
     return "/".join(tags_validas)
 
-# ==========================================
-# TELA DE LOGIN
-# ==========================================
+# ==============================================================================
+# MENU NAVEGAÇÃO E TELA DE LOGIN
+# ==============================================================================
 if st.session_state.usuario_logado is None:
-    st.markdown("""
-        <style>
-        .block-container { padding-top: 0rem !important; margin-top: -2rem !important; }
-        header {display: none !important;}
-        [data-testid="collapsedControl"] {display: none !important;}
-        .stApp { background: linear-gradient(135deg, #1C8590 0%, #8FD3B5 100%) !important; }
-        [data-testid="stForm"] { background-color: white; border-radius: 12px; padding: 30px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); border: none; position: relative; z-index: 100; }
-        [data-testid="stFormSubmitButton"] button { background-color: #2b7bc4 !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; height: 45px !important; border: none !important; margin-top: 15px !important; }
-        [data-testid="stFormSubmitButton"] button:hover { background-color: #1a5c96 !important; }
-        input { border-bottom: 2px solid #ccc !important; border-top: none !important; border-left: none !important; border-right: none !important; border-radius: 0 !important; background-color: transparent !important; box-shadow: none !important; padding-left: 0px !important; }
-        input:focus { border-bottom: 2px solid #1C8590 !important; }
-        </style>
-    """, unsafe_allow_html=True)
-
+    st.markdown("""<style>.block-container{padding-top:0rem!important;margin-top:-2rem!important;}header,[data-testid="collapsedControl"]{display:none!important;}.stApp{background:linear-gradient(135deg,#1C8590 0%,#8FD3B5 100%)!important;}[data-testid="stForm"]{background-color:white;border-radius:12px;padding:30px;box-shadow:0 8px 24px rgba(0,0,0,0.15);border:none;position:relative;z-index:100;}[data-testid="stFormSubmitButton"] button{background-color:#2b7bc4!important;color:white!important;font-weight:bold!important;border-radius:6px!important;height:45px!important;border:none!important;margin-top:15px!important;}[data-testid="stFormSubmitButton"] button:hover{background-color:#1a5c96!important;}input{border-bottom:2px solid #ccc!important;border-top:none!important;border-left:none!important;border-right:none!important;border-radius:0!important;background-color:transparent!important;box-shadow:none!important;}input:focus{border-bottom:2px solid #1C8590!important;}</style>""", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
-        st.write("")
-        col_img1, col_img2, col_img3 = st.columns([1, 2, 1])
-        with col_img2:
-            if ARQUIVO_LOGO: st.image(ARQUIVO_LOGO, use_container_width=True)
-            else: st.markdown("<h2 style='text-align: center; color: white; margin-bottom:0;'>SIARCON</h2>", unsafe_allow_html=True)
-        
+        if ARQUIVO_LOGO: st.image(ARQUIVO_LOGO, use_container_width=True)
+        else: st.markdown("<h2 style='text-align: center; color: white;'>SIARCON</h2>", unsafe_allow_html=True)
         with st.form("form_login"):
-            st.markdown("""
-                <div style="text-align: center; margin-bottom: 15px;">
-                    <div style="width: 60px; height: 60px; background-color: #4A5568; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 10px;">
-                        <svg viewBox="0 0 24 24" width="35" height="35" fill="white">
-                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                        </svg>
-                    </div>
-                    <h3 style="color: #333; margin: 0; font-size: 18px;">Bem-Vindo a plataforma comercial da SIARCON</h3>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            c_user = st.text_input("Usuário:", placeholder="Ex: rodrigo.ribeiro")
-            c_pass = st.text_input("Senha:", type="password", placeholder="••••")
-            submit_login = st.form_submit_button("Entrar no Sistema", use_container_width=True)
-            
-            if submit_login:
-                usuarios_validos = {
-                    "giovanna.ribeiro": "1234", "aline.ferraz": "1234", "janaina.dias": "1234",
-                    "victor.hugo": "1234", "rodrigo.ribeiro": "1234", "rodrigo": "1234", "engenharia": "1234",
-                    "suprimentos": "1234", "obras": "1234", "ricardo.pires": "1234"
-                }
-                user_limpo = c_user.lower().strip()
-                if user_limpo in usuarios_validos and c_pass == usuarios_validos[user_limpo]:
-                    st.session_state.usuario_logado = user_limpo
-                    st.session_state.nome_exibicao = user_limpo.split('.')[0].capitalize()
-                    st.session_state.paineis_auto = []
-                    st.session_state.nome_projeto_orcamento = ""
-                    st.session_state.wizard_ativo = False
-                    st.session_state.menu_selecionado = "🏠 Tela Inicial"
-                    st.rerun()
-                else: st.error("❌ Usuário ou senha incorretos.")
+            c_user = st.text_input("Usuário:"); c_pass = st.text_input("Senha:", type="password")
+            if st.form_submit_button("Entrar"):
+                u_v = {"giovanna.ribeiro":"1234", "aline.ferraz":"1234", "janaina.dias":"1234", "victor.hugo":"1234", "rodrigo.ribeiro":"1234", "rodrigo":"1234", "engenharia":"1234", "suprimentos":"1234", "obras":"1234", "ricardo.pires":"1234"}
+                if c_user.lower().strip() in u_v and c_pass == u_v[c_user.lower().strip()]:
+                    st.session_state.usuario_logado = c_user.lower().strip(); st.session_state.nome_exibicao = c_user.lower().strip().split('.')[0].capitalize(); st.rerun()
+                else: st.error("Usuário ou senha inválidos.")
     st.stop()
+
+# [AQUI CONTINUA O CÓDIGO RESTANTE DE ~2300 LINHAS]
 
 st.markdown("""
     <style>
