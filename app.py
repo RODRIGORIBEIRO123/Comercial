@@ -2563,97 +2563,109 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     rev_proj = c_proj2.text_input("Revisão", value="R-00", key="hidro_rev_proj")
     st.markdown("---")
 
-    # 1. BANCO DE DADOS MATRIZ DE COMPONENTES DETALHADOS (Aba Cavalete Hidráulico COMPLETA)
-    bitolas_projeto = ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "6\"", "8\""]
-    
+    # 1. BANCO DE DADOS MATRIZ DE COMPONENTES DETALHADOS (Baseado na Aba Cavalete Hidráulico Completa)
+    bitolas_projeto = ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "5\"", "6\"", "8\"", "10\"", "12\""]
     banco_padrao_componentes = []
     
-    # Dicionários de preços de referência Sênior (Limpos e sem SyntaxError)
-    dict_p_tubo = {"1/2\"": 46.08, "3/4\"": 58.20, "1\"": 72.10, "1.1/4\"": 95.30, "1.1/2\"": 115.00, "2\"": 158.40, "2.1/2\"": 220.00, "3\"": 295.00, "4\"": 420.00, "6\"": 680.00, "8\"": 980.00}
-    dict_p_valv = {"1/2\"": 343.10, "3/4\"": 450.00, "1\"": 580.00, "1.1/4\"": 750.00, "1.1/2\"": 750.00, "2\"": 920.00, "2.1/2\"": 750.00, "3\"": 920.00, "4\"": 1280.00, "6\"": 1950.00, "8\"": 3100.00}
-    dict_p_filtro = {"1/2\"": 120.00, "3/4\"": 175.00, "1\"": 260.00, "1.1/4\"": 340.00, "1.1/2\"": 580.00, "2\"": 790.00, "2.1/2\"": 1150.00, "3\"": 1480.00, "4\"": 2350.00, "6\"": 4100.00, "8\"": 6800.00}
-    dict_p_curva = {"1/2\"": 18.50, "3/4\"": 24.00, "1\"": 32.50, "1.1/4\"": 42.00, "1.1/2\"": 48.00, "2\"": 65.00, "2.1/2\"": 98.00, "3\"": 142.00, "4\"": 235.00, "6\"": 490.00, "8\"": 840.00}
-    dict_p_uniao = {"1/2\"": 56.41, "3/4\"": 72.00, "1\"": 95.00, "1.1/4\"": 120.00, "1.1/2\"": 250.00, "2\"": 250.00, "2.1/2\"": 250.00, "3\"": 250.00, "4\"": 250.00, "6\"": 250.00, "8\"": 250.00}
-    dict_p_niple = {"1/2\"": 4.61, "3/4\"": 6.20, "1\"": 9.80, "1.1/4\"": 15.00, "1.1/2\"": 28.00, "2\"": 28.00, "2.1/2\"": 28.00, "3\"": 28.00, "4\"": 28.00, "6\"": 28.00, "8\"": 28.00}
+    # Dicionários de Preços Estimados (Podem ser alterados via Excel depois)
+    dict_p_tubo = {"1/2\"": 46.08, "3/4\"": 58.20, "1\"": 72.10, "1.1/4\"": 95.30, "1.1/2\"": 115.00, "2\"": 158.40, "2.1/2\"": 220.00, "3\"": 295.00, "4\"": 420.00, "5\"": 520.00, "6\"": 680.00, "8\"": 980.00, "10\"": 1250.00, "12\"": 1600.00}
+    dict_p_valv = {"1/2\"": 343.10, "3/4\"": 450.00, "1\"": 580.00, "1.1/4\"": 750.00, "1.1/2\"": 750.00, "2\"": 920.00, "2.1/2\"": 750.00, "3\"": 920.00, "4\"": 1280.00, "5\"": 1600.00, "6\"": 1950.00, "8\"": 3100.00, "10\"": 4200.00, "12\"": 5800.00}
+    dict_p_filtro = {"1/2\"": 120.00, "3/4\"": 175.00, "1\"": 260.00, "1.1/4\"": 340.00, "1.1/2\"": 580.00, "2\"": 790.00, "2.1/2\"": 1150.00, "3\"": 1480.00, "4\"": 2350.00, "5\"": 3100.00, "6\"": 4100.00, "8\"": 6800.00, "10\"": 9500.00, "12\"": 13000.00}
+    dict_p_curva = {"1/2\"": 18.50, "3/4\"": 24.00, "1\"": 32.50, "1.1/4\"": 42.00, "1.1/2\"": 48.00, "2\"": 65.00, "2.1/2\"": 98.00, "3\"": 142.00, "4\"": 235.00, "5\"": 340.00, "6\"": 490.00, "8\"": 840.00, "10\"": 1200.00, "12\"": 1800.00}
+    dict_p_uniao = {"1/2\"": 56.41, "3/4\"": 72.00, "1\"": 95.00, "1.1/4\"": 120.00, "1.1/2\"": 150.00, "2\"": 180.00, "2.1/2\"": 250.00, "3\"": 320.00, "4\"": 480.00, "5\"": 650.00, "6\"": 820.00, "8\"": 1150.00, "10\"": 1600.00, "12\"": 2200.00}
+    dict_p_niple = {"1/2\"": 4.61, "3/4\"": 6.20, "1\"": 9.80, "1.1/4\"": 15.00, "1.1/2\"": 18.00, "2\"": 28.00, "2.1/2\"": 35.00}
     
-    # Geração automatizada da matriz de insumos por bitola
+    # Geração automatizada da árvore de materiais
     for b in bitolas_projeto:
-        is_flangeado = b in ["1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "6\"", "8\""]
-        is_grande = b in ["2.1/2\"", "3\"", "4\"", "6\"", "8\""]
+        is_flangeado = b in ["2.1/2\"", "3\"", "4\"", "5\"", "6\"", "8\"", "10\"", "12\""]
         
-        # Puxa os valores dos dicionários de forma segura
-        p_tubo = dict_p_tubo.get(b, 420.00)
-        p_valv = dict_p_valv.get(b, 1450.00)
-        p_filtro = dict_p_filtro.get(b, 1150.00)
-        p_curva = dict_p_curva.get(b, 98.00)
-        p_uniao = dict_p_uniao.get(b, 140.00)
-        p_niple = dict_p_niple.get(b, 18.00)
+        banco_padrao_componentes.append({"Item / Componente": f"Tubo em aço carbono SCH40 sem costura - Ø {b}", "Preço Unitário (R$)": dict_p_tubo.get(b, 200.0), "Unidade": "m"})
         
-        banco_padrao_componentes.extend([
-            {"Item / Componente": f"Tubo Aço Carbono SCH40 - {b}", "Preço Unitário (R$)": p_tubo, "Unidade": "m"},
-            {"Item / Componente": f"Válvula Borboleta Flangeada - {b}" if is_grande else f"Válvula de Esfera Monobloco - {b}", "Preço Unitário (R$)": p_valv, "Unidade": "pç"},
-            {"Item / Componente": f"Filtro Y Flangeado Ferro Fundido - {b}" if is_flangeado else f"Filtro Y Roscado Bronze - {b}", "Preço Unitário (R$)": p_filtro, "Unidade": "pç"},
-            {"Item / Componente": f"Curva 90° SCH40 - {b}" if is_flangeado else f"Curva 90° Ferro Maleável Galvanizado - {b}", "Preço Unitário (R$)": p_curva, "Unidade": "pç"},
-            {"Item / Componente": f"Flange Sobreposto Slip-On Aço Forjado - {b}" if is_flangeado else f"União com Assento Cônico Bronze/Galv - {b}", "Preço Unitário (R$)": p_uniao, "Unidade": "pç"},
-            {"Item / Componente": f"Niple Duplo Ferro Maleável Galvanizado - {b}", "Preço Unitário (R$)": p_niple, "Unidade": "pç"},
-            {"Item / Componente": f"Conexão TEE 90° SCH40 - {b}" if is_flangeado else f"Conexão TEE 90° Ferro Maleável Galvanizado - {b}", "Preço Unitário (R$)": p_curva * 1.5, "Unidade": "pç"}
-        ])
-        
-    # Inclusão de periféricos de instrumentação e miscelâneas da aba Cavalete Hidráulico
+        if is_flangeado:
+            banco_padrao_componentes.extend([
+                {"Item / Componente": f"Válvula borboleta flangeada - Ø {b}", "Preço Unitário (R$)": dict_p_valv.get(b, 1500.0), "Unidade": "pç"},
+                {"Item / Componente": f"Filtro Y Flangeado Ferro Fundido - Ø {b}", "Preço Unitário (R$)": dict_p_filtro.get(b, 1200.0), "Unidade": "pç"},
+                {"Item / Componente": f"Curva 90° Aço carbono preto SCH40 - Ø {b}", "Preço Unitário (R$)": dict_p_curva.get(b, 150.0), "Unidade": "pç"},
+                {"Item / Componente": f"Flange sobreposto tipo slip-on aço forjado - Ø {b}", "Preço Unitário (R$)": dict_p_uniao.get(b, 250.0), "Unidade": "pç"},
+                {"Item / Componente": f"Conexão T 90° Aço carbono preto SCH40 - Ø {b}", "Preço Unitário (R$)": dict_p_curva.get(b, 150.0) * 1.5, "Unidade": "pç"}
+            ])
+        else:
+            banco_padrao_componentes.extend([
+                {"Item / Componente": f"Válvula de bloqueio tipo esfera - Ø {b}", "Preço Unitário (R$)": dict_p_valv.get(b, 400.0), "Unidade": "pç"},
+                {"Item / Componente": f"Filtro \"Y\" Corpo, tampa e tampão de bronze filtro de aço inoxidável - Ø {b}", "Preço Unitário (R$)": dict_p_filtro.get(b, 200.0), "Unidade": "pç"},
+                {"Item / Componente": f"Curva 90° Ferro maleável galvanizado - Ø {b}", "Preço Unitário (R$)": dict_p_curva.get(b, 30.0), "Unidade": "pç"},
+                {"Item / Componente": f"União com assento cônico em bronze, rosca - Ø {b}", "Preço Unitário (R$)": dict_p_uniao.get(b, 80.0), "Unidade": "pç"},
+                {"Item / Componente": f"Conexão T 90° Ferro maleável galvanizado - Ø {b}", "Preço Unitário (R$)": dict_p_curva.get(b, 30.0) * 1.2, "Unidade": "pç"},
+                {"Item / Componente": f"Niple duplo Ferro maleável galvanizado - Ø {b}", "Preço Unitário (R$)": dict_p_niple.get(b, 10.0), "Unidade": "pç"}
+            ])
+
+    # Componentes Universais de Instrumentação
     banco_padrao_componentes.extend([
-        {"Item / Componente": "Tubo Sifão Tipo Trombeta - 1/2\"", "Preço Unitário (R$)": 152.04, "Unidade": "pç"},
-        {"Item / Componente": "Robinete com Furo de Alívio Macho/Fêmea - 1/2\"", "Preço Unitário (R$)": 211.53, "Unidade": "pç"},
-        {"Item / Componente": "Manômetro de Pressão Caixa Inox Escala Corrente", "Preço Unitário (R$)": 185.00, "Unidade": "pç"},
-        {"Item / Componente": "Termômetro Industrial Reto Haste Latão", "Preço Unitário (R$)": 142.00, "Unidade": "pç"},
+        {"Item / Componente": "Tubo sifão tipo trombeta - Ø 1/2\"", "Preço Unitário (R$)": 152.04, "Unidade": "pç"},
+        {"Item / Componente": "Robinete com furo de alivio, macho/fêmea, rosca - Ø 1/2\"", "Preço Unitário (R$)": 211.53, "Unidade": "pç"},
+        {"Item / Componente": "Manômetro de pressão caixa em aço inox diametro nominal 100mm, mostrador em fundo branco e gravação preta, classe de exatidão B , ponteiro com ajuste micrométrico escala corrente.", "Preço Unitário (R$)": 185.00, "Unidade": "pç"},
+        {"Item / Componente": "Termômetro industrial angular/reto, haste em latão , visor de vidro, com proteção em alumínio", "Preço Unitário (R$)": 142.00, "Unidade": "pç"},
+        {"Item / Componente": "Válvula de controle ou balanceamento (Fornecida junto ao equipamento)", "Preço Unitário (R$)": 0.00, "Unidade": "pç"},
         {"Item / Componente": "Mão de Obra de Montagem Hidráulica (Por Polegada)", "Preço Unitário (R$)": 120.00, "Unidade": "pol"},
         {"Item / Componente": "Mão de Obra de Isolamento Térmico (Por Polegada)", "Preço Unitário (R$)": 95.00, "Unidade": "pol"}
     ])
 
-    # 2. INTEGRAÇÃO DA RECEITA DO CAVALETE (Desmontagem em itens individuais)
+    # 2. INTELIGÊNCIA DE ENGENHARIA (Receita exata do Cavalete)
     def calcular_composicao_cavalete(bitola, vias, equipamento):
         num_vias = 3 if "3" in str(vias) else 2
-        is_flangeado = bitola in ["1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "6\"", "8\""]
-        is_grande = bitola in ["2.1/2\"", "3\"", "4\"", "6\"", "8\""]
+        is_flangeado = bitola in ["2.1/2\"", "3\"", "4\"", "5\"", "6\"", "8\"", "10\"", "12\""]
         
-        nome_bloqueio = f"Válvula Borboleta Flangeada - {bitola}" if is_grande else f"Válvula de Esfera Monobloco - {bitola}"
-        nome_filtro = f"Filtro Y Flangeado Ferro Fundido - {bitola}" if is_flangeado else f"Filtro Y Roscado Bronze - {bitola}"
-        nome_curva = f"Curva 90° SCH40 - {bitola}" if is_flangeado else f"Curva 90° Ferro Maleável Galvanizado - {bitola}"
-        nome_uniao = f"Flange Sobreposto Slip-On Aço Forjado - {bitola}" if is_flangeado else f"União com Assento Cônico Bronze/Galv - {bitola}"
-        nome_tee = f"Conexão TEE 90° SCH40 - {bitola}" if is_flangeado else f"Conexão TEE 90° Ferro Maleável Galvanizado - {bitola}"
+        # Amarração exata das nomenclaturas
+        nome_tubo = f"Tubo em aço carbono SCH40 sem costura - Ø {bitola}"
+        nome_bloqueio = f"Válvula borboleta flangeada - Ø {bitola}" if is_flangeado else f"Válvula de bloqueio tipo esfera - Ø {bitola}"
+        nome_filtro = f"Filtro Y Flangeado Ferro Fundido - Ø {bitola}" if is_flangeado else f"Filtro \"Y\" Corpo, tampa e tampão de bronze filtro de aço inoxidável - Ø {bitola}"
+        nome_curva = f"Curva 90° Aço carbono preto SCH40 - Ø {bitola}" if is_flangeado else f"Curva 90° Ferro maleável galvanizado - Ø {bitola}"
+        nome_uniao = f"Flange sobreposto tipo slip-on aço forjado - Ø {bitola}" if is_flangeado else f"União com assento cônico em bronze, rosca - Ø {bitola}"
+        nome_tee = f"Conexão T 90° Aço carbono preto SCH40 - Ø {bitola}" if is_flangeado else f"Conexão T 90° Ferro maleável galvanizado - Ø {bitola}"
+        nome_niple = f"Niple duplo Ferro maleável galvanizado - Ø {bitola}"
         
         qtd_tubo = 3.5 if "UTA" in equipamento.upper() or "CHILLER" in equipamento.upper() else 2.0
-        qtd_curvas = 6 if num_vias == 3 else 4
-        qtd_bloqueios = 3 if num_vias == 3 else 2
-        qtd_unioes = 10 if is_flangeado else 3
         
-        # Construção da árvore completa de materiais integrada
-        recita = [
-            {"nome": f"Tubo Aço Carbono SCH40 - {bitola}", "qtd": qtd_tubo},
-            {"nome": nome_bloqueio, "qtd": float(qtd_bloqueios)},
-            {"nome": nome_filtro, "qtd": 1.0},
-            {"nome": nome_curva, "qtd": float(qtd_curvas)},
-            {"nome": nome_uniao, "qtd": float(qtd_unioes)},
-            {"nome": "Tubo Sifão Tipo Trombeta - 1/2\"", "qtd": 2.0 if "CHILLER" in equipamento.upper() else 1.0},
-            {"nome": "Robinete com Furo de Alívio Macho/Fêmea - 1/2\"", "qtd": 2.0 if "CHILLER" in equipamento.upper() else 1.0},
-            {"nome": "Manômetro de Pressão Caixa Inox Escala Corrente", "qtd": 2.0},
-            {"nome": "Termômetro Industrial Reto Haste Latão", "qtd": 2.0}
+        qtd_curvas = 4.0
+        qtd_bloqueios = 3.0
+        qtd_filtro = 1.0
+        qtd_uniao_flange = 4.0 if is_flangeado else 2.0
+        qtd_tee = 1.0
+        qtd_niple = 0.0 if is_flangeado else 3.0
+        
+        if num_vias == 3:
+            qtd_curvas += 2.0
+            qtd_bloqueios += 1.0
+            qtd_tee += 1.0
+            if not is_flangeado: qtd_niple += 2.0
+            
+        receita = [
+            {"nome": nome_tubo, "qtd": qtd_tubo},
+            {"nome": nome_bloqueio, "qtd": qtd_bloqueios},
+            {"nome": nome_filtro, "qtd": qtd_filtro},
+            {"nome": nome_curva, "qtd": qtd_curvas},
+            {"nome": nome_uniao, "qtd": qtd_uniao_flange},
+            {"nome": nome_tee, "qtd": qtd_tee},
+            {"nome": "Tubo sifão tipo trombeta - Ø 1/2\"", "qtd": 1.0},
+            {"nome": "Robinete com furo de alivio, macho/fêmea, rosca - Ø 1/2\"", "qtd": 1.0},
+            {"nome": "Manômetro de pressão caixa em aço inox diametro nominal 100mm, mostrador em fundo branco e gravação preta, classe de exatidão B , ponteiro com ajuste micrométrico escala corrente.", "qtd": 2.0},
+            {"nome": "Termômetro industrial angular/reto, haste em latão , visor de vidro, com proteção em alumínio", "qtd": 2.0},
+            {"nome": "Válvula de controle ou balanceamento (Fornecida junto ao equipamento)", "qtd": 1.0}
         ]
         
-        # Substitui curvas por TEE se houver derivação de 3 vias
-        if num_vias == 3:
-            recita.append({"nome": nome_tee, "qtd": 1.0})
         if not is_flangeado:
-            recita.append({"nome": f"Niple Duplo Ferro Maleável Galvanizado - {bitola}", "qtd": 4.0})
+            receita.append({"nome": nome_niple, "qtd": qtd_niple})
             
-        return recita
+        return receita
 
-    # Sincronização e persistência do Session State
+    # Sincronização do Session State
     if 'banco_precos_hidraulica' not in st.session_state:
         st.session_state.banco_precos_hidraulica = banco_padrao_componentes.copy()
         try:
             sh_hidro = conectar_google_sheets()
             aba_h = sh_hidro.worksheet("Precos_Hidraulica_Itens").get_all_records()
-            if len(aba_h) > 0: st.session_state.banco_precos_hidraulica = aba_h
+            if len(aba_h) > 0:
+                st.session_state.banco_precos_hidraulica = aba_h
         except: pass
 
     if 'cavaletes_selecionados' not in st.session_state: st.session_state.cavaletes_selecionados = []
@@ -2662,12 +2674,14 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     aba_cadastro_hidro, aba_precos_hidro, aba_resumo_hidro = st.tabs(["🔧 Seleção e Dimensionamento", "💲 Tabela de Preços (Itens)", "📊 Resumo e Lista Consolidada"])
 
     with aba_cadastro_hidro:
-        st.subheader("Configuração Estrutural")
+        st.subheader("Configuração Estrutural de Hidráulica")
+        
         metodo_dimensionamento = st.radio(
             "Selecione o método de dimensionamento do projeto:",
             ["📏 Definir diretamente por Bitola comercial", "🌊 Dimensionar automaticamente por Vazão de Água"],
             horizontal=True
         )
+        
         st.markdown("<br>", unsafe_allow_html=True)
         
         with st.form("form_add_cavalete_hidro"):
@@ -2682,6 +2696,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 bitola_final = col3.selectbox("Selecione a Bitola comercial:", bitolas_projeto)
             else:
                 vazao_m3 = col3.number_input("Insira a Vazão de Água do circuito (m³/h):", min_value=0.1, step=0.5, value=5.0)
+                # Cálculo automatizado: Velocidade máxima de 1.2 m/s para prevenir erosão e ruído
                 vazao_m3_s = vazao_m3 / 3600.0
                 area_necessaria = vazao_m3_s / 1.2
                 diametro_mm = math.sqrt((4.0 * area_necessaria) / math.pi) * 1000.0
@@ -2701,7 +2716,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 
             col_q, col_t = st.columns([1, 2])
             qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
-            tag_equip = col_t.text_input("TAG identificadora do equipamento:", placeholder="Ex: UTA-01-A, UTA-01-B...")
+            tag_equip = col_t.text_input("TAG identificadora do equipamento:", placeholder="Ex: UTA-01-A, CH-01...")
             
             if st.form_submit_button("➕ Adicionar Cavalete ao Levantamento", type="primary"):
                 try:
@@ -2711,7 +2726,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     elif "1.1/2" in bitola_final: pol_dec = 1.5
                     elif "2.1/2" in bitola_final: pol_dec = 2.5
                     else: pol_dec = float(bitola_final.replace('"', ''))
-                except: pol_dec = 1.0
+                except:
+                    pol_dec = 1.0
                 
                 composicao_kit = calcular_composicao_cavalete(bitola_final, tipo_vias, tipo_equip)
                 dict_precos_memoria = {row["Item / Componente"]: float(row["Preço Unitário (R$)"]) for row in st.session_state.banco_precos_hidraulica}
@@ -2722,18 +2738,30 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     custo_material_total_kit += (pr_u * comp["qtd"])
                     
                 preco_mo_mont = dict_precos_memoria.get("Mão de Obra de Montagem Hidráulica (Por Polegada)", 120.0)
-                preco_mo_sol = dict_precos_memoria.get("Mão de Obra de Isolamento Térmico (Por Polegada)", 95.0)
+                preco_mo_isol = dict_precos_memoria.get("Mão de Obra de Isolamento Térmico (Por Polegada)", 95.0)
                 
                 mo_mont_calculado = preco_mo_mont * pol_dec * 12.0
-                mo_isol_calculado = preco_mo_sol * pol_dec * 8.0
+                mo_isol_calculado = preco_mo_isol * pol_dec * 8.0
                 
-                st.session_state.cavaletes_selecionados.append({
-                    "id": str(uuid.uuid4()), "tag": tag_equip if tag_equip else "S/ TAG",
-                    "equipamento": tipo_equip, "vias": tipo_vias, "bitola": bitola_final, "quantidade": qtd,
-                    "vazao": vazao_calculada, "custo_mat_unit": custo_material_total_kit,
-                    "mo_mont_unit": mo_mont_calculado, "mo_isol_unit": mo_isol_calculado, "composicao": composicao_kit
-                })
-                st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
+                novo_cavalete = {
+                    "id": str(uuid.uuid4()),
+                    "tag": tag_equip if tag_equip else "S/ TAG",
+                    "equipamento": tipo_equip,
+                    "vias": tipo_vias,
+                    "bitola": bitola_final,
+                    "quantidade": qtd,
+                    "vazao": vazao_calculada,
+                    "custo_mat_unit": custo_material_total_kit,
+                    "mo_mont_unit": mo_mont_calculado,
+                    "mo_isol_unit": mo_isol_calculado,
+                    "composicao": composicao_kit
+                }
+                
+                st.session_state.cavaletes_selecionados.append(novo_cavalete)
+                if vazao_calculada > 0:
+                    st.toast(f"🌊 Dimensionado por vazão ({vazao_calculada} m³/h): Bitola recomendada {bitola_final}", icon="✅")
+                else:
+                    st.toast(f"✅ Conjunto {bitola_final} adicionado por bitola comercial!", icon="👍")
                 st.rerun()
 
         st.markdown("### 📋 Cavaletes Adicionados")
@@ -2744,12 +2772,15 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 c_inf, c_tg, c_qt, c_rm = st.columns([4, 3, 2, 2])
                 vazao_memoria = cav.get('vazao', 0.0)
                 str_vaz = f" ({vazao_memoria} m³/h)" if vazao_memoria > 0 else ""
+                
                 c_inf.write(f"**Cavalete {cav['equipamento']} ({cav['vias']})** - Ø {cav['bitola']}{str_vaz}")
                 c_tg.write(f"TAG: `{cav.get('tag', 'S/ TAG')}`")
                 c_qt.write(f"Quantidade: **{cav['quantidade']} cjs**")
+                
                 if c_rm.button("🗑️", key=f"rm_h_cv_{cav['id']}"):
                     st.session_state.cavaletes_selecionados.pop(idx)
                     st.rerun()
+                    
             if st.button("🗑️ Excluir Todos os Itens de Hidráulica", type="secondary"):
                 st.session_state.cavaletes_selecionados = []
                 st.rerun()
@@ -2758,23 +2789,31 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         st.header("Gestão Sênior de Preços (Componentes de Hidráulica)")
         st.info(f"📅 **Última modificação da base de dados:** {st.session_state.data_precos_hidro_itens}")
         
-        st.markdown("### 🔄 Sincronização em Lote")
+        st.markdown("### 🔄 Atualização em Lote via Planilha")
         ch1, ch2 = st.columns(2)
+        
         with ch1:
             def gerar_planilha_itens_hidro(com_precos_atuais):
                 buf_h_itens = io.BytesIO()
                 wb_hi = openpyxl.Workbook()
-                ws_hi = wb_hi.active; ws_hi.title = "Precos_Componentes"
+                ws_hi = wb_hi.active
+                ws_hi.title = "Precos_Componentes"
+                
                 ws_hi.append(["Item / Componente", "Preço Unitário (R$)", "Unidade"])
                 f_head = PatternFill(start_color="1C8590", end_color="1C8590", fill_type="solid")
                 for c_idx in range(1, 4):
                     ws_hi.cell(row=1, column=c_idx).font = Font(bold=True, color="FFFFFF")
                     ws_hi.cell(row=1, column=c_idx).fill = f_head
+                    
                 for r_comp in st.session_state.banco_precos_hidraulica:
                     pr_v = r_comp["Preço Unitário (R$)"] if com_precos_atuais else ""
                     ws_hi.append([r_comp["Item / Componente"], pr_v, r_comp["Unidade"]])
-                ws_hi.column_dimensions['A'].width = 55
-                wb_hi.save(buf_h_itens); buf_h_itens.seek(0)
+                    
+                ws_hi.column_dimensions['A'].width = 75
+                ws_hi.column_dimensions['B'].width = 25
+                ws_hi.column_dimensions['C'].width = 15
+                wb_hi.save(buf_h_itens)
+                buf_h_itens.seek(0)
                 return buf_h_itens
 
             st.download_button("📥 Planilha Componentes (Com Valores Atuais)", data=gerar_planilha_itens_hidro(True), file_name="Precos_Itens_Hidraulica.xlsx", use_container_width=True)
@@ -2838,7 +2877,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             
             df_precos_lookup = pd.DataFrame(st.session_state.banco_precos_hidraulica)
             
-            # --- CORREÇÃO DO NAMEERROR APLICADA AQUI ---
             dict_lookup_valores = dict(zip(df_precos_lookup["Item / Componente"], df_precos_lookup["Preço Unitário (R$)"]))
             dict_lookup_unidades = dict(zip(df_precos_lookup["Item / Componente"], df_precos_lookup["Unidade"]))
             
@@ -2854,6 +2892,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 total_hidro_montagem += mo_mont_sub
                 total_hidro_isolamento += mo_isol_sub
                 
+                # Alimentação da matriz única de componentes
                 for comp_g in cav.get("composicao", []):
                     nome_item_g = comp_g["nome"]
                     qtd_tot_item_g = comp_g["qtd"] * cav["quantidade"]
