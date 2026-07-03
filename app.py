@@ -2780,7 +2780,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 total_mo_isolamento += isol_linha
                 
                 tabela_resumo.append({
-                    "TAG": cav['tag'],
+                   tabela_resumo.append({
+                    "TAG": cav.get('tag', 'S/ TAG'),
+                    "Equipamento": f"{cav['equipamento']} ({cav['vias']})",
                     "Equipamento": f"{cav['equipamento']} ({cav['vias']})",
                     "Bitola": f"Ø {cav['bitola']}",
                     "Qtd": cav['quantidade'],
@@ -2845,8 +2847,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 if chave_bom not in agrupado_bom:
                     agrupado_bom[chave_bom] = {"qtd": 0, "tags": []}
                 agrupado_bom[chave_bom]["qtd"] += cav['quantidade']
-                if cav['tag'] != "S/ TAG":
-                    agrupado_bom[chave_bom]["tags"].append(cav['tag'])
+               tag_atual = cav.get('tag', 'S/ TAG')
+                if tag_atual != "S/ TAG":
+                    agrupado_bom[chave_bom]["tags"].append(tag_atual)
                 
             for equip_desc, dados in agrupado_bom.items():
                 str_tags = f" [TAGs: {', '.join(dados['tags'])}]" if dados['tags'] else ""
