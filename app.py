@@ -2861,7 +2861,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             
             df_precos_lookup = pd.DataFrame(st.session_state.banco_precos_hidraulica)
             dict_lookup_valores = dict(zip(df_precos_lookup["Item / Componente"], df_precos_lookup["Preço Unitário (R$)"]))
-            dict_lookup_unidades = dict(zip(df_lookup["Item / Componente"], df_precos_lookup["Unidade"]))
+            dict_lookup_unidades = dict(zip(df_precos_lookup["Item / Componente"], df_precos_lookup["Unidade"]))
             
             materiais_condensados_lista = {}
             resumo_financeiro_quadros = []
