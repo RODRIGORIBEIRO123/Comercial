@@ -2673,103 +2673,95 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
 
     aba_cadastro_hidro, aba_precos_hidro, aba_resumo_hidro = st.tabs(["🔧 Seleção e Dimensionamento", "💲 Tabela de Preços (Itens)", "📊 Resumo e Lista Consolidada"])
 
-    with aba_cadastro_hidro:
-        st.subheader("Configuração Estrutural de Hidráulica")
+# Removemos o "with st.form" para permitir que a tela atualize em tempo real!
+        col1, col2, col3 = st.columns(3)
+        tipo_equip = col1.selectbox("Tipo de Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"])
         
-        metodo_dimensionamento = st.radio(
-            "Selecione o método de dimensionamento do projeto:",
-            ["📏 Definir diretamente por Bitola comercial", "🌊 Dimensionar automaticamente por Vazão de Água"],
-            horizontal=True
-        )
-        st.markdown("<br>", unsafe_allow_html=True)
+        # TRAVA DE ENGENHARIA: Chiller e Bomba devem ser obrigatoriamente 2 Vias
+        if tipo_equip in ["Chiller", "Bomba"]:
+            tipo_vias = col2.selectbox("Tipo de Cavalete (Válvula):", ["2 Vias"], disabled=True)
+        else:
+            tipo_vias = col2.selectbox("Tipo de Cavalete (Válvula):", ["2 Vias", "3 Vias"])
         
-        with st.form("form_add_cavalete_hidro"):
-            col1, col2, col3 = st.columns(3)
-            tipo_equip = col1.selectbox("Tipo de Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"])
+        bitola_final = "1/2\""
+        vazao_calculada = 0.0
+        
+        if "Bitola comercial" in metodo_dimensionamento:
+            bitola_final = col3.selectbox("Selecione a Bitola comercial:", bitolas_projeto)
+        else:
+            vazao_m3 = col3.number_input("Insira a Vazão de Água do circuito (m³/h):", min_value=0.1, step=0.5, value=5.0)
+            # Cálculo automatizado: Velocidade máxima de 1.2 m/s para prevenir erosão e ruído
+            vazao_m3_s = vazao_m3 / 3600.0
+            area_necessaria = vazao_m3_s / 1.2
+            diametro_mm = math.sqrt((4.0 * area_necessaria) / math.pi) * 1000.0
+            vazao_calculada = vazao_m3
             
-            # TRAVA DE ENGENHARIA: Chiller e Bomba devem ser obrigatóriamente 2 Vias
-            if tipo_equip in ["Chiller", "Bomba"]:
-                tipo_vias = col2.selectbox("Tipo de Cavalete (Válvula):", ["2 Vias"], disabled=True)
-            else:
-                tipo_vias = col2.selectbox("Tipo de Cavalete (Válvula):", ["2 Vias", "3 Vias"])
+            if diametro_mm <= 16.0: bitola_final = "1/2\""
+            elif diametro_mm <= 22.0: bitola_final = "3/4\""
+            elif diametro_mm <= 28.0: bitola_final = "1\""
+            elif diametro_mm <= 36.0: bitola_final = "1.1/4\""
+            elif diametro_mm <= 42.0: bitola_final = "1.1/2\""
+            elif diametro_mm <= 54.0: bitola_final = "2\""
+            elif diametro_mm <= 70.0: bitola_final = "2.1/2\""
+            elif diametro_mm <= 82.0: bitola_final = "3\""
+            elif diametro_mm <= 105.0: bitola_final = "4\""
+            elif diametro_mm <= 130.0: bitola_final = "5\""
+            elif diametro_mm <= 155.0: bitola_final = "6\""
+            elif diametro_mm <= 205.0: bitola_final = "8\""
+            elif diametro_mm <= 260.0: bitola_final = "10\""
+            else: bitola_final = "12\""
             
-            bitola_final = "1/2\""
-            vazao_calculada = 0.0
+        # ACESSÓRIOS CONDICIONAIS CHILLER
+        inc_mot = False
+        inc_bal = False
+        if tipo_equip == "Chiller":
+            st.markdown("---")
+            st.markdown("**Acessórios Exclusivos do Chiller:**")
+            ca1, ca2 = st.columns(2)
+            inc_mot = ca1.checkbox("Incluir Válvula motorizada ON/OFF?", value=True)
+            inc_bal = ca2.checkbox("Incluir Válvula de balanceamento?", value=True)
+            st.markdown("---")
             
-            if "Bitola comercial" in metodo_dimensionamento:
-                bitola_final = col3.selectbox("Selecione a Bitola comercial:", todas_bitolas)
-            else:
-                vazao_m3 = col3.number_input("Insira a Vazão de Água do circuito (m³/h):", min_value=0.1, step=0.5, value=5.0)
-                # Cálculo automatizado: Velocidade máxima de 1.2 m/s para prevenir erosão e ruído
-                vazao_m3_s = vazao_m3 / 3600.0
-                area_necessaria = vazao_m3_s / 1.2
-                diametro_mm = math.sqrt((4.0 * area_necessaria) / math.pi) * 1000.0
-                vazao_calculada = vazao_m3
-                
-                if diametro_mm <= 16.0: bitola_final = "1/2\""
-                elif diametro_mm <= 22.0: bitola_final = "3/4\""
-                elif diametro_mm <= 28.0: bitola_final = "1\""
-                elif diametro_mm <= 36.0: bitola_final = "1.1/4\""
-                elif diametro_mm <= 42.0: bitola_final = "1.1/2\""
-                elif diametro_mm <= 54.0: bitola_final = "2\""
-                elif diametro_mm <= 70.0: bitola_final = "2.1/2\""
-                elif diametro_mm <= 82.0: bitola_final = "3\""
-                elif diametro_mm <= 105.0: bitola_final = "4\""
-                elif diametro_mm <= 130.0: bitola_final = "5\""
-                elif diametro_mm <= 155.0: bitola_final = "6\""
-                elif diametro_mm <= 205.0: bitola_final = "8\""
-                elif diametro_mm <= 260.0: bitola_final = "10\""
-                else: bitola_final = "12\""
-                
-            # ACESSÓRIOS CONDICIONAIS CHILLER
-            inc_mot = False
-            inc_bal = False
-            if tipo_equip == "Chiller":
-                st.markdown("---")
-                st.markdown("**Acessórios Exclusivos do Chiller:**")
-                ca1, ca2 = st.columns(2)
-                inc_mot = ca1.checkbox("Incluir Válvula motorizada ON/OFF?", value=True)
-                inc_bal = ca2.checkbox("Incluir Válvula de balanceamento?", value=True)
-                
-            col_q, col_t = st.columns([1, 2])
-            qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
-            tag_equip = col_t.text_input("TAG identificadora do equipamento:", placeholder="Ex: UTA-01, CH-01...")
+        col_q, col_t = st.columns([1, 2])
+        qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
+        tag_equip = col_t.text_input("TAG identificadora do equipamento:", placeholder="Ex: UTA-01, CH-01...")
+        
+        # O botão agora é padrão (sem st.form_submit_button)
+        if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary"):
+            try:
+                if "1/2" in bitola_final: pol_dec = 0.5
+                elif "3/4" in bitola_final: pol_dec = 0.75
+                elif "1.1/4" in bitola_final: pol_dec = 1.25
+                elif "1.1/2" in bitola_final: pol_dec = 1.5
+                elif "2.1/2" in bitola_final: pol_dec = 2.5
+                else: pol_dec = float(bitola_final.replace('"', ''))
+            except: pol_dec = 1.0
             
-            if st.form_submit_button("➕ Adicionar Cavalete ao Levantamento", type="primary"):
-                try:
-                    if "1/2" in bitola_final: pol_dec = 0.5
-                    elif "3/4" in bitola_final: pol_dec = 0.75
-                    elif "1.1/4" in bitola_final: pol_dec = 1.25
-                    elif "1.1/2" in bitola_final: pol_dec = 1.5
-                    elif "2.1/2" in bitola_final: pol_dec = 2.5
-                    else: pol_dec = float(bitola_final.replace('"', ''))
-                except: pol_dec = 1.0
+            composicao_kit = calcular_composicao_cavalete(bitola_final, tipo_vias, tipo_equip, inc_mot, inc_bal)
+            
+            # Normalização de chaves para cálculo preciso
+            dict_precos_memoria = {str(row["Item / Componente"]).strip().lower(): float(row["Preço Unitário (R$)"]) for row in st.session_state.banco_precos_hidraulica}
+            
+            custo_material_total_kit = 0.0
+            for comp in composicao_kit:
+                nome_normalizado = str(comp["nome"]).strip().lower()
+                pr_u = dict_precos_memoria.get(nome_normalizado, 0.0)
+                custo_material_total_kit += (pr_u * comp["qtd"])
                 
-                composicao_kit = calcular_composicao_cavalete(bitola_final, tipo_vias, tipo_equip, inc_mot, inc_bal)
-                
-                # Normalização de chaves para evitar o erro do "nada mudou" 
-                dict_precos_memoria = {str(row["Item / Componente"]).strip().lower(): float(row["Preço Unitário (R$)"]) for row in st.session_state.banco_precos_hidraulica}
-                
-                custo_material_total_kit = 0.0
-                for comp in composicao_kit:
-                    nome_normalizado = str(comp["nome"]).strip().lower()
-                    pr_u = dict_precos_memoria.get(nome_normalizado, 0.0)
-                    custo_material_total_kit += (pr_u * comp["qtd"])
-                    
-                preco_mo_mont = dict_precos_memoria.get("mão de obra de montagem hidráulica (por polegada)", 120.0)
-                preco_mo_isol = dict_precos_memoria.get("mão de obra de isolamento térmico (por polegada)", 95.0)
-                
-                mo_mont_calculado = preco_mo_mont * pol_dec * 12.0
-                mo_isol_calculado = preco_mo_isol * pol_dec * 8.0
-                
-                st.session_state.cavaletes_selecionados.append({
-                    "id": str(uuid.uuid4()), "tag": tag_equip if tag_equip else "S/ TAG",
-                    "equipamento": tipo_equip, "vias": tipo_vias, "bitola": bitola_final, "quantidade": qtd,
-                    "vazao": vazao_calculada, "custo_mat_unit": custo_material_total_kit,
-                    "mo_mont_unit": mo_mont_calculado, "mo_isol_unit": mo_isol_calculado, "composicao": composicao_kit
-                })
-                st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
-                st.rerun()
+            preco_mo_mont = dict_precos_memoria.get("mão de obra de montagem hidráulica (por polegada)", 120.0)
+            preco_mo_isol = dict_precos_memoria.get("mão de obra de isolamento térmico (por polegada)", 95.0)
+            
+            mo_mont_calculado = preco_mo_mont * pol_dec * 12.0
+            mo_isol_calculado = preco_mo_isol * pol_dec * 8.0
+            
+            st.session_state.cavaletes_selecionados.append({
+                "id": str(uuid.uuid4()), "tag": tag_equip if tag_equip else "S/ TAG",
+                "equipamento": tipo_equip, "vias": tipo_vias, "bitola": bitola_final, "quantidade": qtd,
+                "vazao": vazao_calculada, "custo_mat_unit": custo_material_total_kit,
+                "mo_mont_unit": mo_mont_calculado, "mo_isol_unit": mo_isol_calculado, "composicao": composicao_kit
+            })
+            st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
+            st.rerun()
 
         st.markdown("### 📋 Cavaletes Adicionados")
         if not st.session_state.cavaletes_selecionados:
