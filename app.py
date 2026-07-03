@@ -2823,8 +2823,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
 
         st.markdown("---")
         st.subheader("Edição Manual Direta")
-        df_grid_hidro = pd.DataFrame(st.session_state.banco_precos_hidraulica)
-        df_grid_hidro_editado = st.data_editor(df_grid_hidro, use_container_width=True, num_rows="dynamic", hide_index=True, key="grid_manual_hidro_itens")
+        df_precos_lookup = pd.DataFrame(st.session_state.banco_precos_hidraulica)
+        dict_lookup_valores = dict(zip(df_precos_lookup["Item / Componente"], df_precos_lookup["Preço Unitário (R$)"]))
+        dict_lookup_unidades = dict(zip(df_precos_lookup["Item / Componente"], df_precos_lookup["Unidade"]))
         
         if st.button("💾 Salvar Componentes no Banco de Dados Cloud", type="primary", key="btn_save_cloud_hidro_it"):
             st.session_state.banco_precos_hidraulica = df_grid_hidro_editado.to_dict('records')
