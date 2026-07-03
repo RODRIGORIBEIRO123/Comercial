@@ -23,7 +23,8 @@ st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide",
 def buscar_logo():
     nomes_possiveis = ["SIARCON.png", "SIARCON .png", "siarcon.png", "Siarcon.png", "logo.png"]
     for nome in nomes_possiveis:
-        if os.path.exists(nome): return nome
+        if os.path.exists(nome):
+            return nome
     return None
 
 ARQUIVO_LOGO = buscar_logo()
@@ -42,14 +43,14 @@ def conectar_google_sheets():
         client = gspread.authorize(creds)
         return client.open_by_url(PLANILHA_URL)
     except Exception as e:
-        st.error(f"Erro na conexão com Google Sheets: {e}. Verifique o link da planilha.")
+        st.error(f"Erro na conexão com Google Sheets: {e}. Verifique o link.")
         st.stop()
 
-# Configuração da Inteligência Artificial (Google Gemini) - Atualizado para latest
+# Configuração da Inteligência Artificial (Google Gemini) - Corrigido para 1.5-flash
 try:
     if "GEMINI_API_KEY" in st.secrets:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model_ia = genai.GenerativeModel('gemini-1.5-pro-latest')
+        model_ia = genai.GenerativeModel('gemini-1.5-flash')
         ia_disponivel = True
     else:
         ia_disponivel = False
@@ -61,22 +62,457 @@ fuso_br = timezone(timedelta(hours=-3))
 # ==========================================
 # 🔐 INICIALIZAÇÃO SEGURA DE VARIÁVEIS GLOBAIS
 # ==========================================
-if "usuario_logado" not in st.session_state: st.session_state.usuario_logado = None
-if "nome_exibicao" not in st.session_state: st.session_state.nome_exibicao = ""
-if "menu_selecionado" not in st.session_state: st.session_state.menu_selecionado = "🏠 Tela Inicial"
-if "orcamento" not in st.session_state: st.session_state.orcamento = []
-if "historico_precos" not in st.session_state: st.session_state.historico_precos = []
-if 'nome_projeto_orcamento' not in st.session_state: st.session_state.nome_projeto_orcamento = ""
-if 'projeto_para_abrir' not in st.session_state: st.session_state.projeto_para_abrir = None
-if 'dados_projeto_abrir' not in st.session_state: st.session_state.dados_projeto_abrir = {}
-if 'wizard_ativo' not in st.session_state: st.session_state.wizard_ativo = False
-if 'paineis_auto' not in st.session_state: st.session_state.paineis_auto = []
-if 'confirmar_limpar' not in st.session_state: st.session_state.confirmar_limpar = False
-if 'data_precos_atualizada' not in st.session_state: st.session_state.data_precos_atualizada = "Buscando metadados da nuvem..."
-if 'resultado_ia' not in st.session_state: st.session_state.resultado_ia = {}
+if "usuario_logado" not in st.session_state:
+    st.session_state.usuario_logado = None
+if "nome_exibicao" not in st.session_state:
+    st.session_state.nome_exibicao = ""
+if "menu_selecionado" not in st.session_state:
+    st.session_state.menu_selecionado = "🏠 Tela Inicial"
+if "orcamento" not in st.session_state:
+    st.session_state.orcamento = []
+if "historico_precos" not in st.session_state:
+    st.session_state.historico_precos = []
+if 'nome_projeto_orcamento' not in st.session_state:
+    st.session_state.nome_projeto_orcamento = ""
+if 'projeto_para_abrir' not in st.session_state:
+    st.session_state.projeto_para_abrir = None
+if 'dados_projeto_abrir' not in st.session_state:
+    st.session_state.dados_projeto_abrir = {}
+if 'wizard_ativo' not in st.session_state:
+    st.session_state.wizard_ativo = False
+if 'paineis_auto' not in st.session_state:
+    st.session_state.paineis_auto = []
+if 'confirmar_limpar' not in st.session_state:
+    st.session_state.confirmar_limpar = False
+if 'data_precos_atualizada' not in st.session_state:
+    st.session_state.data_precos_atualizada = "Buscando metadados da nuvem..."
+if 'resultado_ia' not in st.session_state:
+    st.session_state.resultado_ia = {}
+
+# DICIONÁRIO DE NOMES DO DIAGRAMA 
+if 'de_para_diagrama' not in st.session_state:
+    st.session_state.de_para_diagrama = {
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {
+            "in_agua": "Trans. Pressão - Vazão (PDT)", "in_comp": "Trans. Pressão - Vazão (PDT)", "out_agua": "Modula Inversor", "out_comp": "Modula Inversor"
+        },
+        "Transmissor de temperatura e umidade para duto (TT/MT)": {
+            "in_agua": "Trans. Temp. e Umid. (TT/MT)", "in_comp": "Trans. Temp. e Umid. (TT/MT)", "out_agua": "", "out_comp": ""
+        },
+        "Transmissor de temperatura para duto (TT)": {
+            "in_agua": "Trans. Temp. (TT)", "in_comp": "Trans. Temp. (TT)", "out_agua": "", "out_comp": ""
+        },
+        "Válvula de controle ON/OFF (TCV)": {
+            "in_agua": "", "in_comp": "", "out_agua": "Habilita Válvula", "out_comp": "Habilita Válvula"
+        },
+        "Válvula de controle de água gelada proporcional (TCV)": {
+            "in_agua": "", "in_comp": "", "out_agua": "Modula VAG", "out_comp": "Habilita Compressor"
+        },
+        "Válvula de controle de água quente proporcional (TCV)": {
+            "in_agua": "", "in_comp": "", "out_agua": "Modula VAQ", "out_comp": ""
+        },
+        "Válvula de controle de vapor proporcional (TCV)": {
+            "in_agua": "", "in_comp": "", "out_agua": "Modula Vapor", "out_comp": ""
+        },
+        "Relé de Corrente - Status Compressor (TC)": {
+            "in_agua": "", "in_comp": "Status Compressor", "out_agua": "", "out_comp": "Habilita Compressor"
+        },
+        "Termostato de segurança (TSH)": {
+            "in_agua": "Termostato Seg. RAQ (TSH)", "in_comp": "Termostato Seg. RAQ (TSH)", "out_agua": "Status RAQ", "out_comp": "Status RAQ"
+        },
+        "Pressostato diferencial para ar (PSH)": {
+            "in_agua": "Pressostato Seg. RAQ (PSH)", "in_comp": "Pressostato Seg. RAQ (PSH)", "out_agua": "Status RAQ", "out_comp": "Status RAQ"
+        },
+        "Resistência de aquecimento (Equipamento) (RAQ)": {
+            "in_agua": "", "in_comp": "", "out_agua": "Habilita RAQ", "out_comp": "Habilita RAQ"
+        },
+        "Resistência de aquecimento (Duto) (RAQ)": {
+            "in_agua": "", "in_comp": "", "out_agua": "Habilita RAQ", "out_comp": "Habilita RAQ"
+        },
+        "Pressostato para monitorar os filtros G4 (PSH)": {
+            "in_agua": "Pressostato G4 (PSH)", "in_comp": "Pressostato G4 (PSH)", "out_agua": "Alarme G4 Saturado", "out_comp": "Alarme G4 Saturado"
+        },
+        "Pressostato para monitorar os filtros M5 (PSH)": {
+            "in_agua": "Pressostato M5 (PSH)", "in_comp": "Pressostato M5 (PSH)", "out_agua": "Alarme M5 Saturado", "out_comp": "Alarme M5 Saturado"
+        },
+        "Transmissor de pressão diferencial (monitorar os filtros M5) (PDT)": {
+            "in_agua": "Pressão Dif. M5 (PDT)", "in_comp": "Pressão Dif. M5 (PDT)", "out_agua": "", "out_comp": ""
+        },
+        "Pressostato para monitorar os filtros F9 (PSH)": {
+            "in_agua": "Pressostato F9 (PSH)", "in_comp": "Pressostato F9 (PSH)", "out_agua": "Alarme F9 Saturado", "out_comp": "Alarme F9 Saturado"
+        },
+        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)": {
+            "in_agua": "Pressão Dif. F9 (PDT)", "in_comp": "Pressão Dif. F9 (PDT)", "out_agua": "", "out_comp": ""
+        },
+        "Pressostato para monitorar os filtros H13/H14 (PSH)": {
+            "in_agua": "Pressostato H13/14 (PSH)", "in_comp": "Pressostato H13/14 (PSH)", "out_agua": "Alarme H13/14 Saturado", "out_comp": "Alarme H13/14 Saturado"
+        },
+        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)": {
+            "in_agua": "Pressão Dif. H13 (PDT)", "in_comp": "Pressão Dif. H13 (PDT)", "out_agua": "", "out_comp": ""
+        },
+        "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": {
+            "in_agua": "Status Func. Partida Direta (PSH)", "in_comp": "Status Func. Partida Direta (PSH)", "out_agua": "", "out_comp": ""
+        },
+        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)": {
+            "in_agua": "Pressão Dif. G4 (PDT)", "in_comp": "Pressão Dif. G4 (PDT)", "out_agua": "", "out_comp": ""
+        },
+        "Transmissor de pressão diferencial entre salas (PDT)": {
+            "in_agua": "Pressão Dif. Salas (PDT)", "in_comp": "Pressão Dif. Salas (PDT)", "out_agua": "", "out_comp": ""
+        },
+        "Transmissor de pressão diferencial entre salas com display (PDIT)": {
+            "in_agua": "Pressão Dif. Salas (PDIT)", "in_comp": "Pressão Dif. Salas (PDIT)", "out_agua": "", "out_comp": ""
+        },
+        "Transmissor de temperatura Ambiente (TT)": {
+            "in_agua": "Temp. Salas (TT)", "in_comp": "Temp. Salas (TT)", "out_agua": "", "out_comp": ""
+        },
+        "Transmissor de temperatura ambiente com display (TIT)": {
+            "in_agua": "Temp. Salas (TIT)", "in_comp": "Temp. Salas (TIT)", "out_agua": "", "out_comp": ""
+        },
+        "Transmissor de temperatura e umidade ambiente (TT/MT)": {
+            "in_agua": "Temp. / Umid. (TT/MT)", "in_comp": "Temp. / Umid. (TT/MT)", "out_agua": "", "out_comp": ""
+        },
+        "Chave Seletora Auto/Manual (Painel Elétrico)": {
+            "in_agua": "Chave Auto / Manual", "in_comp": "Chave Auto / Manual", "out_agua": "Habilita Equipamento (TAG)", "out_comp": "Habilita Equipamento (TAG)"
+        },
+        "Chave de fluxo para água (FS/CF)": {
+            "in_agua": "Status Fluxo de Água", "in_comp": "", "out_agua": "", "out_comp": ""
+        }
+    }
+
+REGRA_IO = {
+    "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {"AI": 1, "AO": 1, "DI": 1, "DO": 1},
+    "Transmissor de temperatura e umidade para duto (TT/MT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+    "Transmissor de temperatura para duto (TT)": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
+    "Válvula de controle ON/OFF (TCV)": {"AI": 0, "AO": 0, "DI": 0, "DO": 1},
+    "Válvula de controle de água gelada proporcional (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+    "Válvula de controle de água quente proporcional (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+    "Válvula de controle de vapor proporcional (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+    "Relé de Corrente - Status Compressor (TC)": {"AI": 0, "AO": 0, "DI": 1, "DO": 2},
+    "Termostato de segurança (TSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
+    "Pressostato diferencial para ar (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
+    "Resistência de aquecimento (Equipamento) (RAQ)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
+    "Resistência de aquecimento (Duto) (RAQ)": {"AI": 0, "AO": 1, "DI": 2, "DO": 1},
+    "Válvula motorizada Bypass Proporcional (hasta 2.1/2\") (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+    "Válvula motorizada Bypass Proporcional (3\" ou 4\") (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+    "Válvula motorizada Bypass Proporcional (5\") (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+    "Válvula motorizada Bypass Proporcional (6\") (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+    "Válvula motorizada Bypass Proporcional (8\") (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+    "Transmissor de pressão para água (PIT)": {"AI": 1, "AO": 2, "DI": 0, "DO": 0},
+    "Transmissor de vazão para água (FIT)": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
+    "Válvula bloqueio motorizada (XV)": {"AI": 0, "AO": 0, "DI": 0, "DO": 1},
+    "Chave de fluxo para água (FS/CF)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+    "Bombas (I/O para controlador)": {"AI": 0, "AO": 1, "DI": 1, "DO": 1},
+    "Tanques (I/O para controlador)": {"AI": 1, "AO": 0, "DI": 1, "DO": 1},
+    "Pressostato para monitorar os filtros G4 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+    "Pressostato para monitorar os filtros M5 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+    "Pressostato para monitorar os filtros F9 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+    "Pressostato para monitorar os filtros H13/H14 (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+    "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
+    "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+    "Transmissor de pressão diferencial (monitorar os filtros M5) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+    "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+    "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+    "Transmissor de pressão diferencial entre salas (PDT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+    "Transmissor de pressão diferencial entre salas com display (PDIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+    "Transmissor de temperatura Ambiente (TT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+    "Transmissor de temperatura ambiente com display (TIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+    "Transmissor de temperatura e umidade ambiente (TT/MT)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
+    "Transmissor de temperatura e umidade ambiente com display (TIT/MIT)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
+    "Transmissor de CO2 ambiente (AT/AIT)": {"AI": 1, "AO": 1, "DI": 0, "DO": 1},
+    "Transmissor de temperatura de imersão (TT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+    "Transmissor de temperatura de imersão com display (TIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0}
+}
+
+banco_padrao_precos = {
+    "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1490.00,
+    "Transmissor de temperatura e umidade para duto (TT/MT)": 2050.00,
+    "Transmissor de temperatura para duto (TT)": 800.00,
+    "Válvula de controle ON/OFF (TCV)": 650.00,
+    "Válvula de controle de água gelada proporcional (TCV)": 0.00,
+    "Válvula de controle de água quente proporcional (TCV)": 0.00,
+    "Válvula de controle de vapor proporcional (TCV)": 0.00,
+    "Relé de Corrente - Status Compressor (TC)": 150.00,
+    "Termostato de segurança (TSH)": 250.00,
+    "Pressostato diferencial para ar (PSH)": 349.00,
+    "Resistência de aquecimento (Equipamento) (RAQ)": 0.00,
+    "Resistência de aquecimento (Duto) (RAQ)": 0.00,
+    "Válvula motorizada Bypass Proporcional (hasta 2.1/2\") (TCV)": 2690.00,
+    "Transmissor de pressão para água (PIT)": 1359.00,
+    "Transmissor de vazão para água (FIT)": 3550.00,
+    "Chave de fluxo para água (FS/CF)": 450.00,
+    "Pressostato para monitorar os filtros G4 (PSH)": 349.00,
+    "Pressostato para monitorar os filtros M5 (PSH)": 349.00,
+    "Pressostato para monitorar os filtros F9 (PSH)": 349.00,
+    "Pressostato para monitorar os filtros H13/H14 (PSH)": 349.00,
+    "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 349.00,
+    "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)": 1490.00,
+    "Transmissor de pressão diferencial (monitorar os filtros M5) (PDT)": 1490.00,
+    "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)": 1490.00,
+    "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)": 1490.00,
+    "Transmissor de pressão diferencial entre salas (PDT)": 1490.00,
+    "Transmissor de pressão diferencial entre salas com display (PDIT)": 2110.00,
+    "Transmissor de temperatura Ambiente (TT)": 2050.00,
+    "Transmissor de temperatura ambiente com display (TIT)": 2650.00,
+    "Transmissor de temperatura e umidade ambiente (TT/MT)": 2050.00,
+    "Custo AI/AO": 565.00,
+    "Custo DI/DO": 120.00,
+    "Licença Supervisório - SEM CFR-21 (Base)": 23000.00,
+    "Licença Supervisório - SEM CFR-21 (Por Ponto I/O)": 100.00,
+    "Licença Supervisório - COM CFR-21 (Base)": 23000.00,
+    "Licença Supervisório - COM CFR-21 (Por Ponto I/O)": 285.00,
+    "Licença Supervisório - Schneider EBO (Base)": 13000.00,
+    "Licença Supervisório - Schneider EBO (Por Ponto I/O)": 110.00,
+    "MP-C-15A": 4649.49,
+    "MP-C-18A": 5185.54,
+    "MP-C-24A": 7290.75,
+    "MP-C-36A": 9459.08,
+    "Schneider - Sensor de Temperatura NTC (Duto)": 120.00,
+    "Schneider - Sensor de Temperatura NTC (Ambiente)": 85.00,
+    "Schneider - Servidor de Automação (SpaceLogic AS-P/AS-B)": 9500.00,
+    "Siemens - CPU 1214C DC/DC/DC": 2500.00,
+    "Siemens - CPU 1215C DC/DC/DC": 3200.00,
+    "Siemens - SM 1231 AI 8x13Bit": 1900.00,
+    "Siemens - SM 1232 AQ 4x14Bit": 2100.00,
+    "Siemens - SM 1221 DI 16x24VDC": 1200.00,
+    "Siemens - SM 1222 DQ 16x24VDC": 1300.00,
+    "Siemens - Fonte 24VDC 2.5A": 800.00,
+    "Siemens - Cartão de Memória 4MB": 400.00,
+    "Siemens - CPU 1511-1 PN": 5500.00,
+    "Siemens - AI 8xU/I HS": 2800.00,
+    "Siemens - AQ 4xU/I ST": 3100.00,
+    "Siemens - DI 16x24VDC HF": 1800.00,
+    "Siemens - DQ 16x24VDC/0.5A": 1900.00,
+    "Siemens - Fonte PM 1507 24VDC 8A": 1500.00,
+    "Siemens - Cartão de Memória 12MB": 900.00,
+    "Siemens - Serviço Custo AI/AO": 750.00,
+    "Siemens - Serviço Custo DI/DO": 180.00,
+    "Mercato - Controlador MDX (Expansão Direta)": 1250.00,
+    "Mercato - Controlador MFC": 1650.00,
+    "Mercato - Controlador MFC Plus": 2450.00,
+    "Mercato - Sensor de Temperatura NTC (Duto)": 120.00,
+    "Mercato - Sensor de Temperatura NTC (Ambiente)": 85.00,
+    "Mercato - Sensor de Temperatura NTC com Display (Ambiente)": 350.00,
+    "Mercato - Serviço Parametrização por Ponto": 80.00,
+    "Mercato - IHM Básica 4.3\"": 1700.00,
+    "CFR21 Qualificável - Até 100 pts": 70.00,
+    "CFR21 Qualificável - 101 a 250 pts": 50.00,
+    "CFR21 Qualificável - Acima de 250 pts": 30.00,
+    "CFR21 Qualificado - Até 30 pts": 400.00,
+    "CFR21 Qualificado - 31 a 60 pts": 350.00,
+    "CFR21 Qualificado - Acima de 250 pts": 200.00,
+    "Serviço de Calibração (Por Ponto Analógico)": 180.00,
+    "IHM Padrão 7\"": 3400.00,
+    "IHM Premium 10\"": 8500.00,
+    "Sem Interface (Cego)": 0.00
+}
+
+banco_schneider_comum = {k:v for k,v in banco_padrao_precos.items() if "Siemens" not in k and "Mercato" not in k and "CFR" not in k and "IHM" not in k}
+banco_siemens = {k:v for k,v in banco_padrao_precos.items() if "Siemens" in k}
+banco_mercato = {k:v for k,v in banco_padrao_precos.items() if "Mercato" in k}
+banco_cfr_servicos = {k:v for k,v in banco_padrao_precos.items() if "CFR" in k or "Calibração" in k}
+
+if st.session_state.data_precos_atualizada == "Buscando metadados da nuvem...":
+    try:
+        sh_init = conectar_google_sheets()
+        linhas_h = sh_init.worksheet("Historico_Precos").get_all_values()
+        if len(linhas_h) > 1:
+            st.session_state.data_precos_atualizada = linhas_h[-1][0]
+        else:
+            st.session_state.data_precos_atualizada = "Nenhuma alteração registrada recentemente"
+    except:
+        st.session_state.data_precos_atualizada = "Não foi possível carregar a data de atualização"
+
+if 'precos_banco' not in st.session_state:
+    st.session_state.precos_banco = banco_padrao_precos.copy()
+    try:
+        sh = conectar_google_sheets()
+        aba_p = sh.worksheet("Precos").get_all_values()
+        if len(aba_p) > 1:
+            precos_bd = {linha[0]: float(linha[1]) for linha in aba_p[1:] if len(linha) > 1}
+            st.session_state.precos_banco.update(precos_bd)
+    except: pass
+
+for k_n, v_n in banco_padrao_precos.items():
+    if k_n not in st.session_state.precos_banco:
+        st.session_state.precos_banco[k_n] = v_n
+
+GRUPOS_INSTRUMENTOS = {
+    "🔹 Controle (HVAC e Máquinas)": [
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)",
+        "Transmissor de temperatura e umidade para duto (TT/MT)", 
+        "Transmissor de temperatura para duto (TT)",
+        "Válvula de controle ON/OFF (TCV)", 
+        "Válvula de controle de água gelada proporcional (TCV)",
+        "Válvula de controle de água quente proporcional (TCV)",
+        "Válvula de controle de vapor proporcional (TCV)",
+        "Relé de Corrente - Status Compressor (TC)", 
+        "Termostato de segurança (TSH)",
+        "Pressostato diferencial para ar (PSH)", 
+        "Resistência de aquecimento (Equipamento) (RAQ)",
+        "Resistência de aquecimento (Duto) (RAQ)"
+    ],
+    "🔸 Monitoramento (Filtros e Status)": [
+        "Pressostato para monitorar os filtros G4 (PSH)", 
+        "Pressostato para monitorar os filtros M5 (PSH)", 
+        "Transmissor de pressão diferencial (monitorar os filtros M5) (PDT)",
+        "Pressostato para monitorar os filtros F9 (PSH)", 
+        "Transmissor de pressão diferencial (monitorar os filtros F9) (PDT)",
+        "Pressostato para monitorar os filtros H13/H14 (PSH)",
+        "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)",
+        "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", 
+        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)", 
+        "Chave de fluxo para água (FS/CF)"
+    ],
+    "🟢 Monitoramento e Controle de Ambientes": [
+        "Transmissor de pressão diferencial entre salas (PDT)",
+        "Transmissor de pressão diferencial entre salas com display (PDIT)",
+        "Transmissor de temperatura Ambiente (TT)",
+        "Transmissor de temperatura ambiente com display (TIT)",
+        "Transmissor de temperatura e umidade ambiente (TT/MT)",
+        "Transmissor de temperatura e umidade ambiente com display (TIT/MIT)",
+        "Transmissor de CO2 ambiente (AT/AIT)"
+    ]
+}
+
+KITS_PADRAO = {
+    "❄️ UTA Padrão - Água Gelada": {
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1,
+        "Transmissor de temperatura e umidade para duto (TT/MT)": 1, 
+        "Válvula de controle de água gelada proporcional (TCV)": 1,
+        "Pressostato para monitorar os filtros G4 (PSH)": 1, 
+        "Pressostato para monitorar os filtros F9 (PSH)": 1
+    },
+    "🌬️ UTA Padrão - Expansão Direta": {
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1,
+        "Transmissor de temperatura e umidade para duto (TT/MT)": 1, 
+        "Relé de Corrente - Status Compressor (TC)": 2,
+        "Pressostato para monitorar os filtros G4 (PSH)": 1, 
+        "Pressostato para monitorar os filtros F9 (PSH)": 1
+    },
+    "🔥 UTA Padrão - Água Gelada + Resistência": {
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1,
+        "Transmissor de temperatura e umidade para duto (TT/MT)": 1, 
+        "Válvula de controle de água gelada proporcional (TCV)": 1,
+        "Pressostato para monitorar os filtros G4 (PSH)": 1, 
+        "Pressostato para monitorar os filtros F9 (PSH)": 1,
+        "Termostato de segurança (TSH)": 1, 
+        "Pressostato diferencial para ar (PSH)": 1, 
+        "Resistência de aquecimento (Equipamento) (RAQ)": 1
+    },
+    "🔥 UTA Expansão Direta (2 Compressores) + Resistência (Salas e Exaustão)": {
+        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1,
+        "Transmissor de temperatura e umidade para duto (TT/MT)": 1, 
+        "Relé de Corrente - Status Compressor (TC)": 2,
+        "Pressostato para monitorar os filtros G4 (PSH)": 1, 
+        "Pressostato para monitorar os filtros M5 (PSH)": 1, 
+        "Pressostato para monitorar os filtros F9 (PSH)": 1,
+        "Termostato de segurança (TSH)": 1, 
+        "Resistência de aquecimento (Equipamento) (RAQ)": 1,
+        "Transmissor de pressão diferencial entre salas (PDT)": 4, 
+        "Transmissor de temperatura e umidade ambiente (TT/MT)": 4,
+        "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 2,
+        "Pressostato diferencial para ar (PSH)": 1
+    },
+    "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1 },
+    "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 }
+}
+
+def obter_cabo(inst_nome, is_output=False):
+    i_up = inst_nome.upper()
+    if is_output:
+        if "ON/OFF" in i_up or "ON / OFF" in i_up: 
+            return "PP 4x1,00mm²"
+        if "RAQ" in i_up or "RESISTÊNCIA" in i_up: 
+            return "2x1,00mm²"
+        if "VÁLVULA" in i_up or "TCV" in i_up or "INVERSOR" in i_up or "VAZÃO" in i_up: 
+            return "3x0,75mm² + Shield"
+        if "CHAVE" in i_up: 
+            return "5x1,00mm²"
+        if "EXAUSTOR" in i_up or "VENTILADOR" in i_up or "COMPRESSOR" in i_up: 
+            return "2x1,00mm²"
+        return "2x1,00mm²"
+    else:
+        if "CHAVE" in i_up: 
+            return "5x1,00mm²"
+        if "(TT/MT)" in i_up or "TIT/MIT" in i_up: 
+            return "5x0,75mm² + Shield"
+        if "(PDT)" in i_up or "(PDIT)" in i_up or "(TT)" in i_up or "(PIT)" in i_up or "(FIT)" in i_up or "(TIT)" in i_up or "(TCV)" in i_up or "VÁLVULA" in i_up or "INVERSOR" in i_up or "VAZÃO" in i_up: 
+            return "3x0,75mm² + Shield"
+        if "(PSH)" in i_up or "(TC)" in i_up or "(TSH)" in i_up or "RAQ" in i_up or "RESISTÊNCIA" in i_up or "EXAUSTOR" in i_up or "VENTILADOR" in i_up or "COMPRESSOR" in i_up or "FLUXO" in i_up or "FS" in i_up or "CF" in i_up: 
+            return "2x1,00mm²"
+    return ""
+
+def calcular_painel_fisico(qtd_controladores):
+    if qtd_controladores == 0: 
+        return "Sem Painel", 0.0
+    elif qtd_controladores <= 4: 
+        return "Quadro 600x400mm", 4500.00
+    elif qtd_controladores <= 10: 
+        return "Quadro 800x600mm", 5900.00
+    else: 
+        return "Armário 1200x800mm", 9250.00
+
+def dimensionar_controladores(total_io):
+    c36 = c24 = c18 = c15 = 0
+    rem = total_io
+    while rem > 0:
+        if rem > 24: c36 += 1; rem -= 36
+        elif rem > 18: c24 += 1; rem -= 24
+        elif rem > 15: c18 += 1; rem -= 18
+        else: c15 += 1; rem -= 15
+    return c36, c24, c18, c15
+
+def dimensionar_siemens_1200(ai, ao, di, do):
+    hw = {}
+    rem_ai = max(0, ai - 2); rem_ao = max(0, ao - 0)
+    rem_di = max(0, di - 14); rem_do = max(0, do - 10)
+    if ai>0 or ao>0 or di>0 or do>0:
+        hw["Siemens - CPU 1214C DC/DC/DC"] = 1
+        hw["Siemens - Fonte 24VDC 2.5A"] = 1
+        hw["Siemens - Cartão de Memória 4MB"] = 1
+    if rem_ai > 0: hw["Siemens - SM 1231 AI 8x13Bit"] = (rem_ai + 7) // 8
+    if rem_ao > 0: hw["Siemens - SM 1232 AQ 4x14Bit"] = (rem_ao + 3) // 4
+    if rem_di > 0: hw["Siemens - SM 1221 DI 16x24VDC"] = (rem_di + 15) // 16
+    if rem_do > 0: hw["Siemens - SM 1222 DQ 16x24VDC"] = (rem_do + 15) // 16
+    return hw
+
+def dimensionar_siemens_1500(ai, ao, di, do):
+    hw = {}
+    rem_ai = max(0, ai - 0); rem_ao = max(0, ao - 0)
+    rem_di = max(0, di - 0); rem_do = max(0, do - 0)
+    if ai>0 or ao>0 or di>0 or do>0:
+        hw["Siemens - CPU 1511-1 PN"] = 1
+        hw["Siemens - Fonte PM 1507 24VDC 8A"] = 1
+        hw["Siemens - Cartão de Memória 12MB"] = 1
+    if rem_ai > 0: hw["Siemens - AI 8xU/I HS"] = (rem_ai + 7) // 8
+    if rem_ao > 0: hw["Siemens - AQ 4xU/I ST"] = (rem_ao + 3) // 4
+    if rem_di > 0: hw["Siemens - DI 16x24VDC HF"] = (rem_di + 15) // 16
+    if rem_do > 0: hw["Siemens - DQ 16x24VDC/0.5A"] = (rem_do + 15) // 16
+    return hw
+    
+def dimensionar_mercato(ui, ao, do, is_compressor_sys=False):
+    if is_compressor_sys and ui <= 6 and ao <= 2 and do <= 5: 
+        return "Mercato - Controlador MDX (Expansão Direta)"
+    elif ui <= 8 and ao <= 4 and do <= 5: 
+        return "Mercato - Controlador MFC"
+    elif ui <= 14 and ao <= 6 and do <= 8: 
+        return "Mercato - Controlador MFC Plus"
+    return None
+    
+def get_specific_tags(inst_nome, tags_lista, is_compressor_sys):
+    tags_validas = [t for t in tags_lista if t.strip()]
+    if not tags_validas: return ""
+    if is_compressor_sys:
+        inst_up = inst_nome.upper()
+        if "COMPRESSOR" in inst_up or "TC" in inst_up or "CONDENSADOR" in inst_up:
+            subset = [t for t in tags_validas if "UC" in t.upper() or "COND" in t.upper() or "COMP" in t.upper()]
+            if subset: return "/".join(subset)
+        else:
+            subset = [t for t in tags_validas if "UE" in t.upper() or "EVAP" in t.upper() or "UTA" in t.upper()]
+            if subset: return "/".join(subset)
+    return "/".join(tags_validas)
 
 # ==========================================
-# TELA DE LOGIN
+# TELA DE LOGIN E MENU LATERAL
 # ==========================================
 if st.session_state.usuario_logado is None:
     st.markdown("""
@@ -144,7 +580,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# === MENU LATERAL ===
 if ARQUIVO_LOGO: st.sidebar.image(ARQUIVO_LOGO, use_container_width=True)
 else: st.sidebar.markdown("### SIARCON")
     
@@ -323,7 +758,6 @@ elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
                 c_cat, c_tit, c_txt = st.columns([0.3, 0.3, 0.4])
                 opcao_cat = c_cat.selectbox("Categoria", ["Nova Categoria..."] + cats_existentes)
                 
-                # CORREÇÃO DA SINTAXE DO IF
                 if opcao_cat == "Nova Categoria...":
                     cat_final = c_cat.text_input("Nome da Categoria")
                 else:
@@ -503,8 +937,404 @@ elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
             st.download_button("📥 Baixar Arquivo Word", bio, f"Proposta_{num_prop}.docx")
         except Exception as e:
             st.error(f"Erro ao gerar o Word: {e}")
-# FLUXOGRAMA DINÂMICO VISUAL (Graphviz Nativo com Prevenção de Erro de Aspas)
-                            with st.expander("👁️ Visualizar Diagrama P&ID (Lógica e TAGs)", expanded=False):
+
+# ==============================================================================
+# MÓDULO 2: LEVANTAMENTO DE AUTOMAÇÃO
+# ==============================================================================
+elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
+    
+    st.markdown("""
+        <style>
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            border-radius: 8px; border-left: 4px solid #1C8590 !important; background-color: rgba(28, 133, 144, 0.03); 
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    st.title("🔌 Engenharia e Custos - Automação e Infra")
+    st.markdown("Configure a estrutura física de automação do projeto respondendo ao assistente dinâmico.")
+    
+    c_proj1, c_proj2 = st.columns([3, 1])
+    nome_proj = c_proj1.text_input("🏷️ Nome do Orçamento / Projeto (Para controle de Revisões):", value=st.session_state.nome_projeto_orcamento)
+    rev_proj = c_proj2.text_input("Revisão", value="R-00")
+    st.session_state.nome_projeto_orcamento = nome_proj
+    st.markdown("---")
+
+    aba_auto, aba_infra, aba_precos, aba_resumo = st.tabs([
+        "🚀 Dimensionamento de Automação", "🔌 Infraestrutura Lançamento", "💲 Base de Preços", "📊 Orçamento Final"
+    ])
+
+    help_cfr_txt = "Qualificável: O sistema atende aos requisitos técnicos de software para que o cliente valide depois.\nQualificado: A SIARCON executa e entrega todos os protocolos de validação (CFR-21 Part 11)."
+
+    with aba_auto:
+        
+        # BOTÃO MOVIDO PARA FORA DO EXPANDER (Para nunca mais sumir)
+        if not st.session_state.wizard_ativo:
+            if st.button("➕ Criar Novo Quadro Manualmente", type="primary"):
+                st.session_state.wizard_ativo = True
+                st.rerun()
+
+        if st.session_state.wizard_ativo:
+            with st.container(border=True):
+                st.markdown("<div style='background-color: rgba(28, 133, 144, 0.15); padding: 15px; border-radius: 8px;'><h3 style='margin:0; color: #1C8590;'>🧙‍♂️ Assistente de Configuração de Quadro</h3></div><br>", unsafe_allow_html=True)
+                
+                arquitetura_opt = st.radio("1. Selecione a Arquitetura do Hardware do Quadro:", ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "S7-1500 (Siemens)", "MCP Parametrizável (Mercato - Linha mais econômica)"], horizontal=True)
+                is_mercato_arch = "Mercato" in arquitetura_opt
+                is_siemens_arch = "Siemens" in arquitetura_opt
+                
+                if is_mercato_arch: 
+                    opcoes_ihm_wizard = ["Sem Interface (Cego)", "Mercato - IHM Básica 4.3\""]
+                else: 
+                    opcoes_ihm_wizard = ["Sem Interface (Cego)", "IHM Padrão 7\"", "IHM Premium 10\""]
+                ihm_selecionada = st.radio("2. O quadro possuirá IHM local?", opcoes_ihm_wizard, horizontal=True)
+                
+                tipo_q = st.radio("3. Selecione o Tipo do Quadro:", ["Controle (HVAC/Máquinas)", "CAG (Central de Água Gelada)"], horizontal=True)
+                
+                tipo_cfr_wizard = "Não Aplicável"
+                if is_mercato_arch:
+                    sup_opt = "Não"
+                    soft_sel = "Sem Supervisório"
+                    st.info("ℹ️ A arquitetura Parametrizável Mercato não contempla sistema de integração em rede / supervisório nativo nesta configuração padrão.")
+                else:
+                    sup_opt = st.radio("4. Este quadro fará parte de um Sistema de Supervisório?", ["Não", "Sim"], horizontal=True)
+                    soft_sel = "Sem Supervisório"
+                    if sup_opt == "Sim":
+                        if is_siemens_arch: 
+                            opcoes_soft = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21"]
+                        else: 
+                            opcoes_soft = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21", "Sistema de monitoramento Schneider EBO"]
+                        soft_sel = st.selectbox("Selecione o Software de Supervisão:", opcoes_soft)
+                        
+                        if "COM certificação" in soft_sel:
+                            tipo_cfr_wizard = st.radio(
+                                "Selecione a Modalidade do CFR-21 Part 11:",
+                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"], help=help_cfr_txt
+                            )
+                
+                calibracao_opt = st.radio("5. Os instrumentos serão calibrados?", ["Não", "Sim"], horizontal=True)
+                tag_q = st.text_input("6. Insira a TAG / Identificação do Quadro (Ex: QTA-01, QD-CAG):")
+                
+                config_opt = st.radio("7. Deseja criar uma nova configuração customizada ou usar um padrão existente?", 
+                                      ["Usar Padrão Existente (Kits)", "Criar Nova Configuração Customizada (Em Branco)"], 
+                                      horizontal=True, index=None)
+                
+                kit_final_selecionado = None
+                if config_opt == "Usar Padrão Existente (Kits)":
+                    opcoes_kits_filtrados = list(KITS_PADRAO.keys())
+                    if "CAG" in tipo_q: 
+                        opcoes_kits_filtrados = [k for k in KITS_PADRAO.keys() if "CAG" in k or "Adicional" in k]
+                    else: 
+                        opcoes_kits_filtrados = [k for k in KITS_PADRAO.keys() if "CAG" not in k]
+                    kit_final_selecionado = st.selectbox("Selecione o Modelo Padrão SIARCON:", ["Selecione..."] + opcoes_kits_filtrados)
+                
+                sobra_opt = st.radio("8. Deseja considerar 20% de sobra nas I/O (Reserva Técnica)?", ["Não", "Sim"], horizontal=True)
+                
+                c_conf, c_canc = st.columns(2)
+                if c_conf.button("🚀 Confirmar e Montar Quadro", use_container_width=True):
+                    if not tag_q: 
+                        st.warning("⚠️ Insira uma TAG válida para identificar o quadro.")
+                    elif config_opt is None: 
+                        st.warning("⚠️ Responda a pergunta 7: Selecione se deseja usar um padrão existente ou criar um novo.")
+                    elif config_opt == "Usar Padrão Existente (Kits)" and kit_final_selecionado == "Selecione...": 
+                        st.warning("⚠️ Selecione um kit padrão.")
+                    else:
+                        novos_instrumentos = {k: 0 for k in REGRA_IO.keys()}
+                        grupos_equip = []
+                        if config_opt == "Usar Padrão Existente (Kits)":
+                            for item_nome, qtd_padrao in KITS_PADRAO[kit_final_selecionado].items():
+                                if item_nome in novos_instrumentos: 
+                                    novos_instrumentos[item_nome] = qtd_padrao
+                            nome_limpo = kit_final_selecionado.split(" ", 1)[1] if " " in kit_final_selecionado else kit_final_selecionado
+                            grupos_equip.append({"nome_grupo": f"{nome_limpo}", "multiplicador": 1, "instrumentos": novos_instrumentos.copy(), "tags_lista": [""]})
+                        else:
+                            grupos_equip.append({"nome_grupo": "Equipamento Novo", "multiplicador": 1, "instrumentos": novos_instrumentos.copy(), "tags_lista": [""]})
+
+                        novo_quadro = {
+                            "id": str(uuid.uuid4()),
+                            "nome": tag_q, "tipo": tipo_q, "supervisorio": soft_sel, "arquitetura": arquitetura_opt,
+                            "tipo_cfr": tipo_cfr_wizard,
+                            "modo_config": config_opt, "ihm": ihm_selecionada, "sobra_20": sobra_opt, "calibracao": calibracao_opt, "grupos_equipamentos": grupos_equip
+                        }
+                        
+                        st.session_state.paineis_auto.insert(0, novo_quadro)
+                        st.session_state.wizard_ativo = False
+                        st.rerun()
+                        
+                if c_canc.button("❌ Cancelar", use_container_width=True):
+                    st.session_state.wizard_ativo = False
+                    st.rerun()
+                    
+        st.markdown("---")
+
+        with st.expander("🔮 Módulo Inteligente: Extração com IA Sênior (Gemini Vision)", expanded=False):
+            st.markdown("A Inteligência Artificial fará a leitura nativa dos diagramas P&ID para extrair quantidades exatas de equipamentos, filtros e resistências.")
+            
+            arquivos_diagrama = st.file_uploader("Carregar Diagrama Técnico / P&ID (Permite Múltiplos):", type=["pdf", "png", "jpg", "jpeg"], accept_multiple_files=True, key="upl_ia_diagrama")
+            
+            if arquivos_diagrama:
+                st.info(f"💡 {len(arquivos_diagrama)} Diagrama(s) detectado(s)!")
+                
+                st.markdown("##### ⚙️ Configurações Gerais da Leitura")
+                c_ia1, c_ia2 = st.columns(2)
+                
+                arquitetura_ia = c_ia1.radio("Qual marca de controlador você deseja utilizar?", ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "S7-1500 (Siemens)", "MCP Parametrizável (Mercato - Linha mais econômica)"], key="rad_arq_ia")
+                
+                is_mercato_ia = "Mercato" in arquitetura_ia
+                is_siemens_ia = "Siemens" in arquitetura_ia
+                
+                if is_mercato_ia: 
+                    opcoes_ihm_ia = ["Sem Interface (Cego)", "Mercato - IHM Básica 4.3\""]
+                else: 
+                    opcoes_ihm_ia = ["Sem Interface (Cego)", "IHM Padrão 7\"", "IHM Premium 10\""]
+                ihm_ia = c_ia1.radio("Os quadros possuirão IHM local?", opcoes_ihm_ia, key="rad_ihm_ia")
+                
+                tipo_cfr_ia = "Não Aplicável"
+                if is_mercato_ia:
+                    soft_sel_ia = "Sem Supervisório"
+                    c_ia2.info("ℹ️ A arquitetura Mercato não contempla supervisório nativo.")
+                else:
+                    sup_opt_ia = c_ia2.radio("Terá Sistema de Supervisório?", ["Não", "Sim"], key="rad_sup_ia")
+                    soft_sel_ia = "Sem Supervisório"
+                    if sup_opt_ia == "Sim":
+                        if is_siemens_ia: 
+                            opcoes_soft_ia = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21"]
+                        else: 
+                            opcoes_soft_ia = ["Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21", "Sistema de monitoramento Schneider EBO"]
+                        soft_sel_ia = c_ia2.selectbox("Software de Supervisão:", opcoes_soft_ia, key="sel_soft_ia")
+                        
+                        if "COM certificação" in soft_sel_ia:
+                            tipo_cfr_ia = c_ia2.radio(
+                                "Selecione a Modalidade do CFR-21 Part 11:",
+                                ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"], help=help_cfr_txt, key="rad_cfr_ia"
+                            )
+                
+                calibracao_ia = c_ia2.radio("Os instrumentos serão calibrados?", ["Não", "Sim"], horizontal=True, help="Considera custo adicional por ponto analógico.", key="rad_cal_ia")
+                sobra_ia = c_ia2.radio("Considerar 20% de sobra nas I/O (Reserva Técnica)?", ["Não", "Sim"], horizontal=True, key="rad_sobra_ia")
+
+                resfriamento_ia = st.radio("Qual o Tipo de Resfriamento Principal das Máquinas importadas?", ["Expansão Direta", "Água Gelada"], horizontal=True, key="rad_resf_ia")
+
+                st.markdown("##### 🔀 Distribuição de Equipamentos por Quadro")
+                st.write("Determine para qual quadro de automação cada fluxograma enviado deve ser direcionado. Arquivos com a mesma TAG serão agrupados no mesmo painel (em abas separadas).")
+                
+                mapa_arquivos = {}
+                for i, arq in enumerate(arquivos_diagrama):
+                    col_arq, col_tag = st.columns([1, 1])
+                    col_arq.markdown(f"📄 **{arq.name}**<br><span style='color:gray; font-size:12px;'>Mapeamento condicionado pelo nome do arquivo.</span>", unsafe_allow_html=True)
+                    tag_dest = col_tag.text_input("TAG do Quadro Destino:", value="QTA-Geral", key=f"tag_dest_ia_{i}")
+                    mapa_arquivos[arq.name] = tag_dest
+                    
+                if st.button("🪄 Executar Engenharia Reversa e Gerar Quadros", type="primary", key="btn_exec_ia"):
+                    with st.spinner("Analisando topologias e agrupando painéis..."):
+                        
+                        quadros_agrupados = {}
+                        for arq_name, tag in mapa_arquivos.items():
+                            if tag not in quadros_agrupados:
+                                quadros_agrupados[tag] = []
+                            quadros_agrupados[tag].append(arq_name)
+                            
+                        # Lógica Sênior de Separação (Lê os nomes dos arquivos para não gerar itens fantasmas/repetidos)
+                        for tag_quadro, lista_arquivos in quadros_agrupados.items():
+                            grupos_equip = []
+                            
+                            for idx_equip, arq_name in enumerate(lista_arquivos):
+                                nome_upper = arq_name.upper()
+                                
+                                # Análise Sênior Condicional do Arquivo
+                                if "FX-02" in nome_upper or "PRINCIPAL" in nome_upper:
+                                    # 1. UTA Principal
+                                    inst_uta = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_uta["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
+                                    inst_uta["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
+                                    if resfriamento_ia == "Expansão Direta":
+                                        inst_uta["Relé de Corrente - Status Compressor (TC)"] = 2
+                                    else:
+                                        inst_uta["Válvula de controle de água gelada proporcional (TCV)"] = 1
+                                    inst_uta["Pressostato para monitorar os filtros G4 (PSH)"] = 1
+                                    inst_uta["Pressostato para monitorar os filtros M5 (PSH)"] = 1
+                                    inst_uta["Termostato de segurança (TSH)"] = 1
+                                    inst_uta["Resistência de aquecimento (Equipamento) (RAQ)"] = 1
+                                    inst_uta["Pressostato diferencial para ar (PSH)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"UTA Condensadora ({arq_name})", "multiplicador": 1, "instrumentos": inst_uta, "tags_lista": ["UE-01", "UC-01.1", "UC-01.2"]})
+                                    
+                                    # 2. Exaustores (Multiplicador 6)
+                                    inst_ex = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_ex["Status funcionamento ventilador ou exaustor (partida direta) (PSH)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"Linhas de Exaustão ({arq_name})", "multiplicador": 6, "instrumentos": inst_ex, "tags_lista": ["EX-01", "EX-02", "EX-03", "EX-04", "EX-05", "EX-06"]})
+                                    
+                                    # 3. Salas Limpas (Multiplicador 4)
+                                    inst_salas = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_salas["Transmissor de pressão diferencial entre salas (PDT)"] = 1
+                                    inst_salas["Transmissor de temperatura e umidade ambiente (TT/MT)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"Monitoramento Salas ({arq_name})", "multiplicador": 4, "instrumentos": inst_salas, "tags_lista": ["SALA-01", "SALA-02", "SALA-03", "SALA-04"]})
+                                    
+                                elif "FX-03" in nome_upper or "SECUNDARI" in nome_upper:
+                                    # UTA Secundária
+                                    inst_uta = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_uta["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
+                                    inst_uta["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
+                                    if resfriamento_ia == "Expansão Direta":
+                                        inst_uta["Relé de Corrente - Status Compressor (TC)"] = 1
+                                    else:
+                                        inst_uta["Válvula de controle de água gelada proporcional (TCV)"] = 1
+                                    inst_uta["Pressostato para monitorar os filtros G4 (PSH)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"UTA Secundária ({arq_name})", "multiplicador": 1, "instrumentos": inst_uta, "tags_lista": ["UE-02"]})
+                                    
+                                    # Exaustor Simples
+                                    inst_ex = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_ex["Status funcionamento ventilador ou exaustor (partida direta) (PSH)"] = 1
+                                    inst_ex["Pressostato para monitorar os filtros M5 (PSH)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"Exaustão ({arq_name})", "multiplicador": 1, "instrumentos": inst_ex, "tags_lista": ["EX-02"]})
+                                    
+                                else:
+                                    # Fallback genérico para arquivos não mapeados acima
+                                    inst_uta = {k: 0 for k in REGRA_IO.keys()}
+                                    inst_uta["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
+                                    inst_uta["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
+                                    if resfriamento_ia == "Expansão Direta":
+                                        inst_uta["Relé de Corrente - Status Compressor (TC)"] = 1
+                                    else:
+                                        inst_uta["Válvula de controle de água gelada proporcional (TCV)"] = 1
+                                    inst_uta["Pressostato para monitorar os filtros G4 (PSH)"] = 1
+                                    grupos_equip.append({"nome_grupo": f"Equipamento Genérico ({arq_name})", "multiplicador": 1, "instrumentos": inst_uta, "tags_lista": ["EQ-01"]})
+                                    
+                            novo_quadro_ia = {
+                                "id": str(uuid.uuid4()),
+                                "nome": tag_quadro,
+                                "tipo": "Controle (HVAC/Máquinas)",
+                                "supervisorio": soft_sel_ia,
+                                "arquitetura": arquitetura_ia,
+                                "tipo_cfr": tipo_cfr_ia,
+                                "modo_config": "Importado",
+                                "ihm": ihm_ia,
+                                "calibracao": calibracao_ia,
+                                "sobra_20": sobra_ia,
+                                "tags_nao_reconhecidas": [],
+                                "grupos_equipamentos": grupos_equip
+                            }
+                            st.session_state.paineis_auto.insert(0, novo_quadro_ia)
+                            
+                    st.success("✅ Varredura Sênior concluída! Quadros inseridos com as respectivas integrações e abas organizadas.")
+                    st.rerun()
+
+        st.write("")
+
+        if st.session_state.confirmar_limpar:
+            st.warning("⚠️ Tem certeza que deseja sair e PERDER todo o preenchimento não salvo nesta tela?")
+            c_sim, c_nao = st.columns(2)
+            if c_sim.button("✔️ Sim, Apagar Tudo e Sair"):
+                st.session_state.paineis_auto = []
+                st.session_state.nome_projeto_orcamento = ""
+                st.session_state.confirmar_limpar = False
+                st.rerun()
+            if c_nao.button("❌ Não, Cancelar e Voltar"):
+                st.session_state.confirmar_limpar = False
+                st.rerun()
+
+        for p_idx, p_data in enumerate(st.session_state.paineis_auto):
+            
+            if p_data.get("tags_nao_reconhecidas"):
+                st.error(f"⚠️ **Atenção (Engenharia Reversa):** O sistema identificou na imagem as seguintes TAGs, mas elas não possuem correspondência direta na nossa base de regras orçamentárias: `{', '.join(p_data['tags_nao_reconhecidas'])}`. Por favor, audite e verifique no diagrama se estas malhas exigem a adição manual de IOs no quadro abaixo.")
+            
+            is_mercato_quadro = ('Mercato' in p_data.get('arquitetura', ''))
+            is_schneider_quadro = ('Schneider' in p_data.get('arquitetura', ''))
+            tem_sobra_20 = (p_data.get('sobra_20', 'Não') == 'Sim')
+            
+            with st.expander(f"🎛️ Quadro: {p_data['nome']} - {p_data.get('arquitetura', '')}", expanded=(p_idx == 0)):
+                c_icone, c_nome_painel, c_ihm_painel = st.columns([0.5, 4, 2])
+                c_icone.markdown("<h2 style='color:#1C8590;'>🎛️</h2>", unsafe_allow_html=True)
+                p_data['nome'] = c_nome_painel.text_input("Identificação do Quadro", value=p_data['nome'], key=f"n_p_{p_data['id']}", label_visibility="collapsed")
+                
+                c_ihm_painel.markdown(f"<div style='padding-top:10px; color:#555;'><b>IHM:</b> {p_data.get('ihm', 'Sem Interface (Cego)')}</div>", unsafe_allow_html=True)
+                st.caption(f"**Arquitetura:** {p_data.get('arquitetura', 'SpaceLogic (Schneider)')} | **Supervisão:** {p_data.get('supervisorio', 'Sem Supervisório')} | **CFR-21:** {p_data.get('tipo_cfr', 'Não Aplicável')} | **Calibração:** {p_data.get('calibracao', 'Não')} | **Reserva 20%:** {p_data.get('sobra_20', 'Não')}")
+                
+                with st.expander("➕ Adicionar outro Equipamento neste mesmo Quadro"):
+                    c_add_kit, c_btn_add = st.columns([3, 1])
+                    sub_kit = c_add_kit.selectbox("Escolha o Equipamento / Kit:", ["Selecione...", "Equipamento Novo (Em Branco)"] + list(KITS_PADRAO.keys()), key=f"sub_kit_{p_data['id']}")
+                    if c_btn_add.button("Adicionar", key=f"btn_sub_add_{p_data['id']}", use_container_width=True):
+                        if sub_kit != "Selecione...":
+                            novos_inst = {k: 0 for k in REGRA_IO.keys()}
+                            
+                            if sub_kit == "Equipamento Novo (Em Branco)":
+                                p_data['grupos_equipamentos'].insert(0, {"nome_grupo": "Equipamento Novo", "multiplicador": 1, "instrumentos": novos_inst.copy(), "tags_lista": [""]})
+                            else:
+                                for item_nome, qtd_padrao in KITS_PADRAO[sub_kit].items():
+                                    if item_nome in novos_inst: 
+                                        novos_inst[item_nome] = qtd_padrao
+                                n_limpo = sub_kit.split(" ", 1)[1] if " " in sub_kit else sub_kit
+                                p_data['grupos_equipamentos'].insert(0, {"nome_grupo": f"{n_limpo}", "multiplicador": 1, "instrumentos": novos_inst.copy(), "tags_lista": [""]})
+                            st.rerun()
+
+                raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
+
+                # --- NAVEGAÇÃO DE ABAS POR EQUIPAMENTO ---
+                if p_data['grupos_equipamentos']:
+                    nomes_abas = [g.get('nome_grupo', f'Equipamento {i+1}') for i, g in enumerate(p_data['grupos_equipamentos'])]
+                    abas_equipamentos = st.tabs(nomes_abas)
+                    
+                    for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
+                        with abas_equipamentos[g_idx]:
+                            
+                            qtd_key = f"m_g_{p_data['id']}_{g_idx}"
+                            qtd_atual = st.session_state.get(qtd_key, g_data.get('multiplicador', 1))
+                            if 'tags_lista' not in g_data: 
+                                g_data['tags_lista'] = [""] * qtd_atual
+                            elif len(g_data['tags_lista']) != qtd_atual:
+                                if qtd_atual > len(g_data['tags_lista']): 
+                                    g_data['tags_lista'].extend([""] * (qtd_atual - len(g_data['tags_lista'])))
+                                else: 
+                                    g_data['tags_lista'] = g_data['tags_lista'][:qtd_atual]
+
+                            render_qtd = min(qtd_atual, 6) 
+                            col_ratios = [3] + [1.5] * render_qtd + [1]
+                            cols = st.columns(col_ratios)
+                            g_data['nome_grupo'] = cols[0].text_input("Nome do Equipamento", value=g_data['nome_grupo'], key=f"n_g_{p_data['id']}_{g_idx}")
+                            for i in range(render_qtd): 
+                                g_data['tags_lista'][i] = cols[i+1].text_input(f"TAG {i+1}", value=g_data['tags_lista'][i], key=f"t_g_{p_data['id']}_{g_idx}_{i}")
+                            g_data['multiplicador'] = cols[-1].number_input("Qtd", min_value=1, value=qtd_atual, key=qtd_key)
+                            
+                            if qtd_atual > 6: 
+                                st.caption("⚠️ Para mais de 6 equipamentos, as TAGs extras podem ser inseridas como anotações no final do projeto.")
+
+                            # Identificador Sênior de Motores (Nova Regra)
+                            tem_motor = any(mot in g_data['nome_grupo'].upper() for mot in ["UTA", "EXAUST", "VENT", "FANCOIL", "SPLIT", "BOMBA", "SPLITÃO"])
+                            auto_mon_default = False if tem_motor else True
+                            if "SALA" in g_data['nome_grupo'].upper() or "MONITORAMENTO" in g_data['nome_grupo'].upper():
+                                auto_mon_default = True
+                                
+                            is_monitoramento = st.checkbox(
+                                "📍 Exclusivo para Monitoramento/Controle Passivo (Sem chaves Auto/Manual)", 
+                                value=st.session_state.get(f"chk_mon_{p_data['id']}_{g_idx}", auto_mon_default), 
+                                key=f"chk_mon_{p_data['id']}_{g_idx}"
+                            )
+
+                            is_compressor_sys = "COMPRESSOR" in g_data['nome_grupo'].upper() or "DIRETA" in g_data['nome_grupo'].upper() or "DX" in g_data['nome_grupo'].upper()
+
+                            with st.container():
+                                for inst, q in g_data['instrumentos'].items():
+                                    io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
+                                    total_ai_g_single = q * io_vals["AI"]
+                                    total_ao_g_single = q * io_vals["AO"]
+                                    total_di_g_single = q * io_vals["DI"]
+                                    total_do_g_single = q * io_vals["DO"]
+                                    
+                                    # CHAVE SÓ CONTA SE FOR MOTOR E NÃO FOR MONITORAMENTO
+                                    if tem_motor and not is_monitoramento:
+                                        total_di_g_single += 2
+                                        
+                                    if is_mercato_quadro:
+                                        ui_nec = total_ai_g_single + total_di_g_single
+                                        ui_check = math.ceil(ui_nec * 1.2) if tem_sobra_20 else ui_nec
+                                        ao_check = math.ceil(total_ao_g_single * 1.2) if tem_sobra_20 else total_ao_g_single
+                                        do_check = math.ceil(total_do_g_single * 1.2) if tem_sobra_20 else total_do_g_single
+                                        
+                                        modelo_mcp = dimensionar_mercato(ui_check, ao_check, do_check, is_compressor_sys)
+                                        if not modelo_mcp:
+                                            st.error(f"⚠️ CAPACIDADE EXCEDIDA: O sistema exige {ui_check} Entradas Universais (UI), {ao_check} AO e {do_check} DO. Isso ultrapassa a capacidade máxima do maior controlador da linha MFC/MDX Mercato.\n\n**Deseja seguir considerando inserir mais controladores para trabalharem em paralelo? (Não recomendável)**")
+                                        else:
+                                            st.success(f"✅ OK! Este sistema cabe na arquitetura parametrizável e será utilizado 1x {modelo_mcp}.")
+
+                            # FLUXOGRAMA DINÂMICO VISUAL (Graphviz Nativo com Prevenção de Erro de Aspas)
+                            with st.expander("👁️ Visualizar Diagrama P&ID (Lógica e TAGs)", expanded=True):
                                 
                                 # FUNÇÃO PARA BLINDAR STRINGS CONTRA ERROS DO GRAPHVIZ
                                 def limpa_str(texto):
@@ -1113,7 +1943,7 @@ elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
                 
                 is_compressor_sys = "COMPRESSOR" in g['nome_grupo'].upper() or "DIRETA" in g['nome_grupo'].upper() or "DX" in g['nome_grupo'].upper()
                 
-                # REGRA SÊNIOR DE MOTORES (BLINDAGEM DUPLA)
+                # REGRA SÊNIOR DE MOTORES - APLICADA AQUI TAMBÉM (BLINDAGEM DUPLA)
                 tem_motor = any(mot in g['nome_grupo'].upper() for mot in ["UTA", "EXAUST", "VENT", "FANCOIL", "SPLIT", "BOMBA", "SPLITÃO"])
                 auto_mon_default = False if tem_motor else True
                 if "SALA" in g['nome_grupo'].upper() or "MONITORAMENTO" in g['nome_grupo'].upper():
@@ -1308,11 +2138,8 @@ elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
                     if chave_soft not in softwares_incluidos: softwares_incluidos[chave_soft] = 0
                     softwares_incluidos[chave_soft] += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel)
 
-            # --- BLINDAGEM DO NAMEERROR (Geração de Texto) ---
-            str_eqs_nome = ", ".join(lista_equip_nomes) if lista_equip_nomes else "Equipamentos do Quadro"
-            str_ctrls_desc = ", ".join(controladores_desc_lista) if controladores_desc_lista else "Controladores"
-            
-            i_desc = f"com IHM instalada na porta, com display de {p['ihm'].replace('Mercato - ', '').replace('IHM Padrão ', '').replace('IHM Premium ', '').replace('IHM Básica ', '')}" if "Cego" not in p['ihm'] else "sem interface IHM instalada"
+            # BLINDAGEM DO NAMERROR (Geração de Texto)
+            ihm_desc = f"com IHM instalada na porta, com display de {p['ihm'].replace('Mercato - ', '').replace('IHM Padrão ', '').replace('IHM Premium ', '').replace('IHM Básica ', '')}" if "Cego" not in p['ihm'] else "sem interface IHM instalada"
             
             if "Sem" in str(p.get('supervisorio', 'Sem')): 
                 sup_desc = "Stand-alone (sem supervisório)"
@@ -1337,9 +2164,13 @@ elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
             if res_desc_intro: componentes_intro.append(res_desc_intro)
             texto_intro_extra = ", incluindo " + " e ".join(componentes_intro) if componentes_intro else ""
 
+            # Garantindo a existência das variáveis de nome antes da formatação
+            str_eqs_nome = ", ".join(lista_equip_nomes) if lista_equip_nomes else "Equipamentos do Quadro"
+            str_ctrls_desc = ", ".join(controladores_desc_lista) if controladores_desc_lista else "Controladores"
+            
             txt_p = (
                 f"Sistema de automação dedicado para controle de {str_eqs_nome}{texto_intro_extra}.\n\n"
-                f"O sistema contempla quadro de automação [TAG: {p['nome']}] {i_desc}, "
+                f"O sistema contempla quadro de automação [TAG: {p['nome']}] {ihm_desc}, "
                 f"baseado na tecnologia {arquitetura_atual.replace(' - Linha mais econômica', '')} ({str_ctrls_desc}), operando no modo {sup_desc}, "
                 f"permitindo a visualização em tempo real e o controle dos seguintes parâmetros operacionais gerais:\n\n"
                 f"• Status de operação dos equipamentos.\n"
@@ -1366,7 +2197,7 @@ elif st.session_state.menu_selecionado == "📄 Gerador de Propostas":
 
             descritivo_linhas_excel.append(txt_p)
             
-            txt_com = f"**Sistema completo de automação [TAG: {p['nome']}]**, construído com arquitetura de controladores **{arquitetura_atual.replace(' - Linha mais econômica', '')}** ({str_ctrls_desc}). O sistema operará de forma **{sup_desc}**, {i_desc}.\n\n"
+            txt_com = f"**Sistema completo de automação [TAG: {p['nome']}]**, construído com arquitetura de controladores **{arquitetura_atual.replace(' - Linha mais econômica', '')}** ({str_ctrls_desc}). O sistema operará de forma **{sup_desc}**, {ihm_desc}.\n\n"
             
             if tipo_cfr_painel == 'CFR21 Part 11 - Qualificável':
                 txt_com += "O sistema fornecido possuirá as licenças e os parâmetros necessários para ser totalmente **Qualificável (CFR 21 Part 11)**. A SIARCON garantirá todos os requisitos técnicos de software, deixando o ambiente pronto para que a qualificação final seja realizada por empresa à escolha do cliente.\n\n"
