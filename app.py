@@ -88,6 +88,8 @@ if 'data_precos_atualizada' not in st.session_state:
     st.session_state.data_precos_atualizada = "Buscando metadados da nuvem..."
 if 'resultado_ia' not in st.session_state:
     st.session_state.resultado_ia = {}
+if 'cavaletes_selecionados' not in st.session_state: 
+    st.session_state.cavaletes_selecionados = []
 
 # DICIONÁRIO DE NOMES DO DIAGRAMA 
 if 'de_para_diagrama' not in st.session_state:
@@ -594,7 +596,7 @@ if st.sidebar.button("🚪 Sair do Perfil", type="secondary"):
     st.rerun()
 
 st.sidebar.markdown("---")
-opcoes_menu = ["🏠 Tela Inicial", "📄 Gerador de Propostas", "🔌 Levantamento de Automação"]
+opcoes_menu = ["🏠 Tela Inicial", "📄 Gerador de Propostas", "🔌 Levantamento de Automação", "💧 Levantamento de Hidráulica"]
 menu_ui = st.sidebar.radio("Módulos do Sistema", opcoes_menu, index=opcoes_menu.index(st.session_state.menu_selecionado))
 st.sidebar.markdown("---")
 
@@ -2548,3 +2550,159 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         st.success(f"✅ Sucesso! Orçamento para '{st.session_state.nome_projeto_orcamento}' salvo com a revisão {revisao_atual}!")
                     except Exception as e: 
                         st.error(f"Erro ao salvar no banco: {e}")
+
+
+# ==============================================================================
+# MÓDULO 3: LEVANTAMENTO DE HIDRÁULICA (CAVALETES)
+# ==============================================================================
+elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
+    st.markdown("""<style>[data-testid="stVerticalBlockBorderWrapper"] { border-radius: 8px; border-left: 4px solid #1C8590 !important; background-color: rgba(28, 133, 144, 0.03); }</style>""", unsafe_allow_html=True)
+    st.title("💧 Engenharia e Custos - Cavaletes Hidráulicos")
+    
+    c_proj1, c_proj2 = st.columns([3, 1])
+    st.session_state.nome_projeto_orcamento = c_proj1.text_input("🏷️ Nome do Projeto:", value=st.session_state.nome_projeto_orcamento, key="hidro_nome_proj")
+    rev_proj = c_proj2.text_input("Revisão", value="R-00", key="hidro_rev_proj")
+    st.markdown("---")
+
+    # 1. BANCO DE DADOS DE CAVALETES (Fácil Atualização)
+    # Estrutura: "Equipamento - Vias": { "Bitola": {"material": valor, "mo_montagem": valor, "mo_isolamento": valor} }
+    BANCO_CAVALETES = {
+        "UTA / FANCOIL - 2 VIAS": {
+            "1/2\"":   {"material": 3944.56, "mo_montagem": 2450.0, "mo_isolamento": 2400.0},
+            "3/4\"":   {"material": 4500.00, "mo_montagem": 2450.0, "mo_isolamento": 2400.0}, # Estimado (Atualize conforme Excel)
+            "1\"":     {"material": 5800.48, "mo_montagem": 2450.0, "mo_isolamento": 2400.0},
+            "1.1/2\"": {"material": 7873.51, "mo_montagem": 2700.0, "mo_isolamento": 2400.0},
+            "2\"":     {"material": 10567.03, "mo_montagem": 2700.0, "mo_isolamento": 2400.0},
+            "2.1/2\"": {"material": 13774.31, "mo_montagem": 2700.0, "mo_isolamento": 2900.0},
+            "3\"":     {"material": 18359.64, "mo_montagem": 4000.0, "mo_isolamento": 3900.0},
+            "4\"":     {"material": 28225.75, "mo_montagem": 4000.0, "mo_isolamento": 4300.0},
+            "6\"":     {"material": 45000.00, "mo_montagem": 5000.0, "mo_isolamento": 4500.0}, # Estimado
+            "8\"":     {"material": 65000.00, "mo_montagem": 6000.0, "mo_isolamento": 5500.0}  # Estimado
+        },
+        "CHILLER - 2 VIAS": {
+            "1.1/2\"": {"material": 7918.57, "mo_montagem": 1800.0, "mo_isolamento": 2000.0},
+            "2\"":     {"material": 12559.13, "mo_montagem": 2000.0, "mo_isolamento": 2200.0},
+            "2.1/2\"": {"material": 18178.86, "mo_montagem": 2400.0, "mo_isolamento": 2500.0},
+            "3\"":     {"material": 21678.63, "mo_montagem": 3000.0, "mo_isolamento": 3000.0},
+            "4\"":     {"material": 34094.67, "mo_montagem": 3000.0, "mo_isolamento": 3000.0},
+            "6\"":     {"material": 53017.45, "mo_montagem": 4500.0, "mo_isolamento": 3000.0},
+            "8\"":     {"material": 72801.80, "mo_montagem": 6500.0, "mo_isolamento": 4000.0}
+        }
+        # Nota: Você pode adicionar as chaves "BOMBA - 2 VIAS", "FANCOLETE - 3 VIAS" copiando o formato acima.
+    }
+
+    aba_cadastro, aba_resumo_hidro = st.tabs(["🔧 Seleção de Cavaletes", "📊 Resumo Financeiro"])
+
+    with aba_cadastro:
+        st.subheader("Adicionar Novo Cavalete")
+        with st.form("form_add_cavalete"):
+            col1, col2, col3, col4 = st.columns(4)
+            
+            tipo_equip = col1.selectbox("Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"])
+            tipo_vias = col2.selectbox("Tipo de Válvula:", ["2 Vias", "3 Vias"])
+            bitola = col3.selectbox("Diâmetro (Bitola):", ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "6\"", "8\""])
+            qtd = col4.number_input("Quantidade:", min_value=1, step=1)
+            
+            if st.form_submit_button("➕ Adicionar ao Projeto", type="primary"):
+                # Lógica para encontrar o preço na base (usando chaves flexíveis)
+                chave_busca = f"{tipo_equip.upper()} - {tipo_vias.upper()}"
+                if "UTA" in chave_busca or "FANCOIL" in chave_busca:
+                    chave_banco = f"UTA / FANCOIL - {tipo_vias.upper()}"
+                else:
+                    chave_banco = chave_busca
+
+                if chave_banco in BANCO_CAVALETES and bitola in BANCO_CAVALETES[chave_banco]:
+                    custos = BANCO_CAVALETES[chave_banco][bitola]
+                else:
+                    st.warning(f"⚠️ Valores para '{chave_banco}' ({bitola}) não encontrados no banco automático. Entrando com R$ 0,00. Atualize o dicionário.")
+                    custos = {"material": 0.0, "mo_montagem": 0.0, "mo_isolamento": 0.0}
+                
+                novo_item = {
+                    "id": str(uuid.uuid4()),
+                    "equipamento": tipo_equip,
+                    "vias": tipo_vias,
+                    "bitola": bitola,
+                    "quantidade": qtd,
+                    "custo_mat_unit": custos["material"],
+                    "mo_mont_unit": custos["mo_montagem"],
+                    "mo_isol_unit": custos["mo_isolamento"]
+                }
+                st.session_state.cavaletes_selecionados.append(novo_item)
+                st.success(f"✅ {qtd}x Cavalete(s) de {bitola} ({tipo_equip}) adicionado(s)!")
+                st.rerun()
+
+        st.markdown("### 📋 Lista de Cavaletes no Projeto")
+        if len(st.session_state.cavaletes_selecionados) == 0:
+            st.info("Nenhum cavalete selecionado até o momento.")
+        else:
+            for idx, cav in enumerate(st.session_state.cavaletes_selecionados):
+                c_desc, c_qtd, c_del = st.columns([6, 2, 2])
+                c_desc.write(f"**{cav['equipamento']} ({cav['vias']})** - Bitola: {cav['bitola']}")
+                c_qtd.write(f"Qtd: **{cav['quantidade']}**")
+                if c_del.button("🗑️ Remover", key=f"del_cav_{cav['id']}"):
+                    st.session_state.cavaletes_selecionados.pop(idx)
+                    st.rerun()
+            
+            if st.button("🗑️ Limpar Todos os Cavaletes", type="secondary"):
+                st.session_state.cavaletes_selecionados = []
+                st.rerun()
+
+    with aba_resumo_hidro:
+        st.header("Consolidação Financeira - Hidráulica")
+        
+        if not st.session_state.cavaletes_selecionados:
+            st.warning("Adicione cavaletes na aba de seleção para visualizar o orçamento.")
+        else:
+            total_mat = 0.0
+            total_mo_montagem = 0.0
+            total_mo_isolamento = 0.0
+            
+            tabela_resumo = []
+            
+            for cav in st.session_state.cavaletes_selecionados:
+                mat_linha = cav['custo_mat_unit'] * cav['quantidade']
+                mont_linha = cav['mo_mont_unit'] * cav['quantidade']
+                isol_linha = cav['mo_isol_unit'] * cav['quantidade']
+                
+                total_mat += mat_linha
+                total_mo_montagem += mont_linha
+                total_mo_isolamento += isol_linha
+                
+                tabela_resumo.append({
+                    "Equipamento": f"{cav['equipamento']} ({cav['vias']})",
+                    "Bitola": cav['bitola'],
+                    "Qtd": cav['quantidade'],
+                    "Total Material": f"R$ {mat_linha:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                    "Total M.O.": f"R$ {(mont_linha + isol_linha):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                    "Custo Total": f"R$ {(mat_linha + mont_linha + isol_linha):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                })
+                
+            total_geral_hidro = total_mat + total_mo_montagem + total_mo_isolamento
+            
+            c1, c2, c3 = st.columns(3)
+            c1.info(f"**Materiais:**\nR$ {total_mat:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            c2.warning(f"**Mão de Obra (Montagem + Isolamento):**\nR$ {(total_mo_montagem + total_mo_isolamento):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            c3.success(f"**CUSTO TOTAL:**\nR$ {total_geral_hidro:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            
+            st.markdown("### Detalhamento Condensado")
+            df_resumo_hidro = pd.DataFrame(tabela_resumo)
+            st.dataframe(df_resumo_hidro, use_container_width=True, hide_index=True)
+            
+            st.markdown("---")
+            st.markdown("### 📝 Escopo de Fornecimento Condensado (BOM)")
+            texto_bom = "Fornecimento e montagem de Cavaletes Hidráulicos contendo:\n"
+            
+            # Agrupar por tipo e bitola para o texto condensado
+            agrupado_bom = {}
+            for cav in st.session_state.cavaletes_selecionados:
+                chave_bom = f"{cav['equipamento']} ({cav['vias']}) - Ø {cav['bitola']}"
+                if chave_bom not in agrupado_bom:
+                    agrupado_bom[chave_bom] = 0
+                agrupado_bom[chave_bom] += cav['quantidade']
+                
+            for equipamento, qty in agrupado_bom.items():
+                texto_bom += f"• {qty} conj. - Cavalete para {equipamento}, completo com válvulas de bloqueio, filtro Y, união/flanges e instrumentação periférica;\n"
+                
+            texto_bom += "\n**Serviços Inclusos:**\n• Montagem mecânica e acoplamento das tubulações;\n• Aplicação de isolamento térmico na malha."
+            
+            st.text_area("Texto Sugerido para Proposta Técnica:", value=texto_bom, height=200)
