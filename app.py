@@ -2839,14 +2839,16 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.markdown("### 📝 Escopo de Fornecimento Condensado (Proposta Comercial)")
             texto_bom = "Fornecimento e montagem de Cavaletes Hidráulicos e acessórios, compostos por:\n\n"
             
-            # Agrupar por tipo e bitola para o texto comercial (agora incluindo as TAGs correspondentes)
+# Agrupar por tipo e bitola para o texto comercial (agora incluindo as TAGs correspondentes)
             agrupado_bom = {}
             for cav in st.session_state.cavaletes_selecionados:
                 chave_bom = f"{cav['equipamento']} ({cav['vias']}) - Ø {cav['bitola']}"
                 if chave_bom not in agrupado_bom:
                     agrupado_bom[chave_bom] = {"qtd": 0, "tags": []}
+                
                 agrupado_bom[chave_bom]["qtd"] += cav['quantidade']
-               tag_atual = cav.get('tag', 'S/ TAG')
+                
+                tag_atual = cav.get('tag', 'S/ TAG')
                 if tag_atual != "S/ TAG":
                     agrupado_bom[chave_bom]["tags"].append(tag_atual)
                 
