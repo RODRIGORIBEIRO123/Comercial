@@ -1255,15 +1255,14 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             novos_inst = {k: 0 for k in REGRA_IO.keys()}
                             
                             if sub_kit == "Equipamento Novo (Em Branco)":
-                                p_data['grupos_equipamentos'].insert(0, {"nome_grupo": "Equipamento Novo", "multiplicador": 1, "instrumentos": novos_inst.copy(), "tags_lista": [""]})
+                                p_data['grupos_equipamentos'].append({"nome_grupo": "Equipamento Novo", "multiplicador": 1, "instrumentos": novos_inst.copy(), "tags_lista": [""]})
                             else:
                                 for item_nome, qtd_padrao in KITS_PADRAO[sub_kit].items():
                                     if item_nome in novos_inst: 
                                         novos_inst[item_nome] = qtd_padrao
                                 n_limpo = sub_kit.split(" ", 1)[1] if " " in sub_kit else sub_kit
-                                p_data['grupos_equipamentos'].insert(0, {"nome_grupo": f"{n_limpo}", "multiplicador": 1, "instrumentos": novos_inst.copy(), "tags_lista": [""]})
+                                p_data['grupos_equipamentos'].append({"nome_grupo": f"{n_limpo}", "multiplicador": 1, "instrumentos": novos_inst.copy(), "tags_lista": [""]})
                             st.rerun()
-
                 raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
 
                 # --- NAVEGAÇÃO DE ABAS POR EQUIPAMENTO ---
