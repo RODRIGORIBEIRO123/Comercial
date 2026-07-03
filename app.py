@@ -2564,71 +2564,93 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     rev_proj = c_proj2.text_input("Revisão", value="R-00", key="hidro_rev_proj")
     st.markdown("---")
 
-    # 1. BANCO DE DADOS DE CAVALETES (Fácil Atualização)
-    # Estrutura: "Equipamento - Vias": { "Bitola": {"material": valor, "mo_montagem": valor, "mo_isolamento": valor} }
-    BANCO_CAVALETES = {
-        "UTA / FANCOIL - 2 VIAS": {
-            "1/2\"":   {"material": 3944.56, "mo_montagem": 2450.0, "mo_isolamento": 2400.0},
-            "3/4\"":   {"material": 4500.00, "mo_montagem": 2450.0, "mo_isolamento": 2400.0}, # Estimado (Atualize conforme Excel)
-            "1\"":     {"material": 5800.48, "mo_montagem": 2450.0, "mo_isolamento": 2400.0},
-            "1.1/2\"": {"material": 7873.51, "mo_montagem": 2700.0, "mo_isolamento": 2400.0},
-            "2\"":     {"material": 10567.03, "mo_montagem": 2700.0, "mo_isolamento": 2400.0},
-            "2.1/2\"": {"material": 13774.31, "mo_montagem": 2700.0, "mo_isolamento": 2900.0},
-            "3\"":     {"material": 18359.64, "mo_montagem": 4000.0, "mo_isolamento": 3900.0},
-            "4\"":     {"material": 28225.75, "mo_montagem": 4000.0, "mo_isolamento": 4300.0},
-            "6\"":     {"material": 45000.00, "mo_montagem": 5000.0, "mo_isolamento": 4500.0}, # Estimado
-            "8\"":     {"material": 65000.00, "mo_montagem": 6000.0, "mo_isolamento": 5500.0}  # Estimado
-        },
-        "CHILLER - 2 VIAS": {
-            "1.1/2\"": {"material": 7918.57, "mo_montagem": 1800.0, "mo_isolamento": 2000.0},
-            "2\"":     {"material": 12559.13, "mo_montagem": 2000.0, "mo_isolamento": 2200.0},
-            "2.1/2\"": {"material": 18178.86, "mo_montagem": 2400.0, "mo_isolamento": 2500.0},
-            "3\"":     {"material": 21678.63, "mo_montagem": 3000.0, "mo_isolamento": 3000.0},
-            "4\"":     {"material": 34094.67, "mo_montagem": 3000.0, "mo_isolamento": 3000.0},
-            "6\"":     {"material": 53017.45, "mo_montagem": 4500.0, "mo_isolamento": 3000.0},
-            "8\"":     {"material": 72801.80, "mo_montagem": 6500.0, "mo_isolamento": 4000.0}
-        }
-        # Nota: Você pode adicionar as chaves "BOMBA - 2 VIAS", "FANCOLETE - 3 VIAS" copiando o formato acima.
-    }
+    # 1. BANCO DE DADOS DE CAVALETES (Formato Tabela/Flat para integração com Excel e Pandas)
+    banco_padrao_cavaletes = [
+        {"Tipo": "UTA / FANCOIL - 2 VIAS", "Bitola": "1/2\"", "Material": 3944.56, "Montagem": 2450.0, "Isolamento": 2400.0},
+        {"Tipo": "UTA / FANCOIL - 2 VIAS", "Bitola": "3/4\"", "Material": 4500.00, "Montagem": 2450.0, "Isolamento": 2400.0},
+        {"Tipo": "UTA / FANCOIL - 2 VIAS", "Bitola": "1\"", "Material": 5800.48, "Montagem": 2450.0, "Isolamento": 2400.0},
+        {"Tipo": "UTA / FANCOIL - 2 VIAS", "Bitola": "1.1/4\"", "Material": 6500.00, "Montagem": 2700.0, "Isolamento": 2400.0},
+        {"Tipo": "UTA / FANCOIL - 2 VIAS", "Bitola": "1.1/2\"", "Material": 7873.51, "Montagem": 2700.0, "Isolamento": 2400.0},
+        {"Tipo": "UTA / FANCOIL - 2 VIAS", "Bitola": "2\"", "Material": 10567.03, "Montagem": 2700.0, "Isolamento": 2400.0},
+        {"Tipo": "UTA / FANCOIL - 2 VIAS", "Bitola": "2.1/2\"", "Material": 13774.31, "Montagem": 2700.0, "Isolamento": 2900.0},
+        {"Tipo": "UTA / FANCOIL - 2 VIAS", "Bitola": "3\"", "Material": 18359.64, "Montagem": 4000.0, "Isolamento": 3900.0},
+        {"Tipo": "UTA / FANCOIL - 2 VIAS", "Bitola": "4\"", "Material": 28225.75, "Montagem": 4000.0, "Isolamento": 4300.0},
+        {"Tipo": "UTA / FANCOIL - 2 VIAS", "Bitola": "6\"", "Material": 45000.00, "Montagem": 5000.0, "Isolamento": 4500.0},
+        {"Tipo": "UTA / FANCOIL - 2 VIAS", "Bitola": "8\"", "Material": 65000.00, "Montagem": 6000.0, "Isolamento": 5500.0},
+        {"Tipo": "CHILLER - 2 VIAS", "Bitola": "1.1/2\"", "Material": 7918.57, "Montagem": 1800.0, "Isolamento": 2000.0},
+        {"Tipo": "CHILLER - 2 VIAS", "Bitola": "2\"", "Material": 12559.13, "Montagem": 2000.0, "Isolamento": 2200.0},
+        {"Tipo": "CHILLER - 2 VIAS", "Bitola": "2.1/2\"", "Material": 18178.86, "Montagem": 2400.0, "Isolamento": 2500.0},
+        {"Tipo": "CHILLER - 2 VIAS", "Bitola": "3\"", "Material": 21678.63, "Montagem": 3000.0, "Isolamento": 3000.0},
+        {"Tipo": "CHILLER - 2 VIAS", "Bitola": "4\"", "Material": 34094.67, "Montagem": 3000.0, "Isolamento": 3000.0},
+        {"Tipo": "CHILLER - 2 VIAS", "Bitola": "6\"", "Material": 53017.45, "Montagem": 4500.0, "Isolamento": 3000.0},
+        {"Tipo": "CHILLER - 2 VIAS", "Bitola": "8\"", "Material": 72801.80, "Montagem": 6500.0, "Isolamento": 4000.0}
+    ]
 
-    aba_cadastro, aba_resumo_hidro = st.tabs(["🔧 Seleção de Cavaletes", "📊 Resumo Financeiro"])
+    # Inicialização na Session State para persistência e edição
+    if 'banco_cavaletes' not in st.session_state:
+        st.session_state.banco_cavaletes = banco_padrao_cavaletes.copy()
+        try:
+            sh_hidro = conectar_google_sheets()
+            aba_h = sh_hidro.worksheet("Precos_Hidraulica").get_all_records()
+            if len(aba_h) > 0:
+                st.session_state.banco_cavaletes = aba_h
+        except:
+            pass
+            
+    if 'cavaletes_selecionados' not in st.session_state: 
+        st.session_state.cavaletes_selecionados = []
 
-    with aba_cadastro:
+    if 'data_precos_hidro' not in st.session_state:
+        st.session_state.data_precos_hidro = "Base Local / Padrão"
+
+    aba_cadastro_hidro, aba_precos_hidro, aba_resumo_hidro = st.tabs(["🔧 Seleção de Cavaletes", "💲 Base de Preços", "📊 Resumo Financeiro"])
+
+    with aba_cadastro_hidro:
         st.subheader("Adicionar Novo Cavalete")
         with st.form("form_add_cavalete"):
-            col1, col2, col3, col4 = st.columns(4)
-            
+            col1, col2, col3 = st.columns(3)
             tipo_equip = col1.selectbox("Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"])
             tipo_vias = col2.selectbox("Tipo de Válvula:", ["2 Vias", "3 Vias"])
             bitola = col3.selectbox("Diâmetro (Bitola):", ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "6\"", "8\""])
+            
+            col4, col5 = st.columns([1, 2])
             qtd = col4.number_input("Quantidade:", min_value=1, step=1)
+            tag_equip = col5.text_input("TAG do(s) Equipamento(s):", placeholder="Ex: UTA-01, UTA-02...")
             
             if st.form_submit_button("➕ Adicionar ao Projeto", type="primary"):
-                # Lógica para encontrar o preço na base (usando chaves flexíveis)
+                # Define a chave de busca para encontrar no Banco
                 chave_busca = f"{tipo_equip.upper()} - {tipo_vias.upper()}"
                 if "UTA" in chave_busca or "FANCOIL" in chave_busca:
                     chave_banco = f"UTA / FANCOIL - {tipo_vias.upper()}"
                 else:
                     chave_banco = chave_busca
 
-                if chave_banco in BANCO_CAVALETES and bitola in BANCO_CAVALETES[chave_banco]:
-                    custos = BANCO_CAVALETES[chave_banco][bitola]
-                else:
-                    st.warning(f"⚠️ Valores para '{chave_banco}' ({bitola}) não encontrados no banco automático. Entrando com R$ 0,00. Atualize o dicionário.")
-                    custos = {"material": 0.0, "mo_montagem": 0.0, "mo_isolamento": 0.0}
+                # Procurar valores na base atual
+                custos = {"Material": 0.0, "Montagem": 0.0, "Isolamento": 0.0}
+                item_encontrado = False
+                
+                for item_bd in st.session_state.banco_cavaletes:
+                    if item_bd["Tipo"] == chave_banco and item_bd["Bitola"] == bitola:
+                        custos = {"Material": float(item_bd.get("Material", 0)), "Montagem": float(item_bd.get("Montagem", 0)), "Isolamento": float(item_bd.get("Isolamento", 0))}
+                        item_encontrado = True
+                        break
+
+                if not item_encontrado:
+                    st.warning(f"⚠️ Valores para '{chave_banco}' ({bitola}) não encontrados no banco atual. Entrando com R$ 0,00. Por favor, atualize a Base de Preços.")
                 
                 novo_item = {
                     "id": str(uuid.uuid4()),
+                    "tag": tag_equip if tag_equip else "S/ TAG",
                     "equipamento": tipo_equip,
                     "vias": tipo_vias,
                     "bitola": bitola,
                     "quantidade": qtd,
-                    "custo_mat_unit": custos["material"],
-                    "mo_mont_unit": custos["mo_montagem"],
-                    "mo_isol_unit": custos["mo_isolamento"]
+                    "custo_mat_unit": custos["Material"],
+                    "mo_mont_unit": custos["Montagem"],
+                    "mo_isol_unit": custos["Isolamento"]
                 }
                 st.session_state.cavaletes_selecionados.append(novo_item)
-                st.success(f"✅ {qtd}x Cavalete(s) de {bitola} ({tipo_equip}) adicionado(s)!")
+                st.success(f"✅ {qtd}x Cavalete(s) de {bitola} ({tipo_equip}) adicionado(s) com sucesso!")
                 st.rerun()
 
         st.markdown("### 📋 Lista de Cavaletes no Projeto")
@@ -2636,8 +2658,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.info("Nenhum cavalete selecionado até o momento.")
         else:
             for idx, cav in enumerate(st.session_state.cavaletes_selecionados):
-                c_desc, c_qtd, c_del = st.columns([6, 2, 2])
-                c_desc.write(f"**{cav['equipamento']} ({cav['vias']})** - Bitola: {cav['bitola']}")
+                c_desc, c_tag, c_qtd, c_del = st.columns([4, 3, 2, 2])
+                c_desc.write(f"**{cav['equipamento']} ({cav['vias']})** - Ø {cav['bitola']}")
+                c_tag.write(f"TAG: `{cav['tag']}`")
                 c_qtd.write(f"Qtd: **{cav['quantidade']}**")
                 if c_del.button("🗑️ Remover", key=f"del_cav_{cav['id']}"):
                     st.session_state.cavaletes_selecionados.pop(idx)
@@ -2646,6 +2669,95 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             if st.button("🗑️ Limpar Todos os Cavaletes", type="secondary"):
                 st.session_state.cavaletes_selecionados = []
                 st.rerun()
+
+    with aba_precos_hidro:
+        st.header("Gestão da Base de Preços - Cavaletes")
+        st.info(f"📅 **Última atualização:** {st.session_state.data_precos_hidro}")
+        
+        st.markdown("### 🔄 Atualização via Excel")
+        c_cot1, c_cot2 = st.columns(2)
+        
+        with c_cot1:
+            def gerar_planilha_hidro(com_precos):
+                buf_hidro = io.BytesIO()
+                wb_h = openpyxl.Workbook()
+                ws_h = wb_h.active
+                ws_h.title = "Cavaletes"
+                
+                cabecalhos = ["Tipo", "Bitola", "Material (R$)", "M.O. Montagem (R$)", "M.O. Isolamento (R$)"]
+                ws_h.append(cabecalhos)
+                
+                fill_h = PatternFill(start_color="1C8590", end_color="1C8590", fill_type="solid")
+                for col in range(1, 6):
+                    ws_h.cell(row=1, column=col).font = Font(bold=True, color="FFFFFF")
+                    ws_h.cell(row=1, column=col).fill = fill_h
+                    
+                for item in st.session_state.banco_cavaletes:
+                    if com_precos:
+                        ws_h.append([item["Tipo"], item["Bitola"], item["Material"], item["Montagem"], item["Isolamento"]])
+                    else:
+                        ws_h.append([item["Tipo"], item["Bitola"], "", "", ""])
+                        
+                for col in ws_h.columns:
+                    ws_h.column_dimensions[get_column_letter(col[0].column)].width = 25
+                    
+                wb_h.save(buf_hidro)
+                buf_hidro.seek(0)
+                return buf_hidro
+
+            st.download_button("📥 Planilha Hidráulica (Com Preços)", data=gerar_planilha_hidro(True), file_name="Precos_Cavaletes_Atuais.xlsx", use_container_width=True)
+            st.download_button("📥 Planilha Hidráulica (Em Branco)", data=gerar_planilha_hidro(False), file_name="Precos_Cavaletes_Em_Branco.xlsx", use_container_width=True)
+
+        with c_cot2:
+            upload_hidro = st.file_uploader("📂 Importar Planilha de Cavaletes", type=["xlsx", "xls"], label_visibility="collapsed")
+            if upload_hidro is not None:
+                try:
+                    df_up = pd.read_excel(upload_hidro)
+                    if set(["Tipo", "Bitola", "Material (R$)", "M.O. Montagem (R$)", "M.O. Isolamento (R$)"]).issubset(df_up.columns):
+                        nova_base = []
+                        for _, row in df_up.iterrows():
+                            if pd.notna(row["Tipo"]) and pd.notna(row["Bitola"]):
+                                nova_base.append({
+                                    "Tipo": str(row["Tipo"]).strip(),
+                                    "Bitola": str(row["Bitola"]).strip(),
+                                    "Material": float(row["Material (R$)"]) if pd.notna(row["Material (R$)"]) else 0.0,
+                                    "Montagem": float(row["M.O. Montagem (R$)"]) if pd.notna(row["M.O. Montagem (R$)"]) else 0.0,
+                                    "Isolamento": float(row["M.O. Isolamento (R$)"]) if pd.notna(row["M.O. Isolamento (R$)"]) else 0.0
+                                })
+                        st.session_state.banco_cavaletes = nova_base
+                        st.success("✅ Base de Cavaletes atualizada na memória! Salve no banco de dados abaixo.")
+                    else:
+                        st.error("Colunas inválidas na planilha.")
+                except Exception as e:
+                    st.error(f"Erro ao ler planilha: {e}")
+
+        st.markdown("---")
+        st.subheader("Edição Manual da Base de Cavaletes")
+        df_edit_cavaletes = pd.DataFrame(st.session_state.banco_cavaletes)
+        df_edit_cavaletes_editado = st.data_editor(df_edit_cavaletes, use_container_width=True, num_rows="dynamic", hide_index=True)
+
+        if st.button("💾 Salvar Base de Cavaletes no Banco de Dados", type="primary"):
+            st.session_state.banco_cavaletes = df_edit_cavaletes_editado.to_dict('records')
+            dh_agora_h = datetime.now(fuso_br).strftime("%d/%m/%Y %H:%M:%S")
+            try:
+                sh_h = conectar_google_sheets()
+                try: ws_h = sh_h.worksheet("Precos_Hidraulica")
+                except: 
+                    ws_h = sh_h.add_worksheet("Precos_Hidraulica", 1000, 5)
+                    ws_h.append_row(["Tipo", "Bitola", "Material", "Montagem", "Isolamento"])
+                
+                ws_h.clear()
+                # Transforma lista de dicts em lista de listas para o gspread
+                linhas_upload = [["Tipo", "Bitola", "Material", "Montagem", "Isolamento"]]
+                for row_dict in st.session_state.banco_cavaletes:
+                    linhas_upload.append([row_dict.get("Tipo",""), row_dict.get("Bitola",""), row_dict.get("Material",0), row_dict.get("Montagem",0), row_dict.get("Isolamento",0)])
+                
+                ws_h.append_rows(linhas_upload)
+                st.session_state.data_precos_hidro = dh_agora_h
+                st.toast("✅ Base de Hidráulica salva com sucesso!", icon="💾")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao salvar: {e}")
 
     with aba_resumo_hidro:
         st.header("Consolidação Financeira - Hidráulica")
@@ -2656,7 +2768,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             total_mat = 0.0
             total_mo_montagem = 0.0
             total_mo_isolamento = 0.0
-            
             tabela_resumo = []
             
             for cav in st.session_state.cavaletes_selecionados:
@@ -2669,12 +2780,13 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 total_mo_isolamento += isol_linha
                 
                 tabela_resumo.append({
+                    "TAG": cav['tag'],
                     "Equipamento": f"{cav['equipamento']} ({cav['vias']})",
-                    "Bitola": cav['bitola'],
+                    "Bitola": f"Ø {cav['bitola']}",
                     "Qtd": cav['quantidade'],
-                    "Total Material": f"R$ {mat_linha:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-                    "Total M.O.": f"R$ {(mont_linha + isol_linha):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-                    "Custo Total": f"R$ {(mat_linha + mont_linha + isol_linha):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    "Material Unit.": f"R$ {cav['custo_mat_unit']:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                    "MO Unit.": f"R$ {(cav['mo_mont_unit'] + cav['mo_isol_unit']):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                    "Total Custo": f"R$ {(mat_linha + mont_linha + isol_linha):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                 })
                 
             total_geral_hidro = total_mat + total_mo_montagem + total_mo_isolamento
@@ -2682,27 +2794,66 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             c1, c2, c3 = st.columns(3)
             c1.info(f"**Materiais:**\nR$ {total_mat:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             c2.warning(f"**Mão de Obra (Montagem + Isolamento):**\nR$ {(total_mo_montagem + total_mo_isolamento):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-            c3.success(f"**CUSTO TOTAL:**\nR$ {total_geral_hidro:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            c3.success(f"**CUSTO TOTAL HIDRÁULICA:**\nR$ {total_geral_hidro:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             
-            st.markdown("### Detalhamento Condensado")
+            st.markdown("### 📋 Quantitativo de Custos")
             df_resumo_hidro = pd.DataFrame(tabela_resumo)
             st.dataframe(df_resumo_hidro, use_container_width=True, hide_index=True)
             
-            st.markdown("---")
-            st.markdown("### 📝 Escopo de Fornecimento Condensado (BOM)")
-            texto_bom = "Fornecimento e montagem de Cavaletes Hidráulicos contendo:\n"
+            # Botão de Exportação para o Excel da Hidráulica
+            buf_resumo_h = io.BytesIO()
+            wb_rh = openpyxl.Workbook()
+            ws_rh = wb_rh.active
+            ws_rh.title = "Resumo Cavaletes"
             
-            # Agrupar por tipo e bitola para o texto condensado
+            # Cabeçalho Bonito no Excel
+            ws_rh.merge_cells("A1:G1")
+            ws_rh.cell(row=1, column=1, value="ORÇAMENTO DE CAVALETES HIDRÁULICOS - SIARCON").font = Font(bold=True, color="1C8590", size=14)
+            ws_rh.cell(row=1, column=1).alignment = Alignment(horizontal="center")
+            
+            for r_idx, row in enumerate(dataframe_to_rows(df_resumo_hidro, index=False, header=True), start=3):
+                for c_idx, value in enumerate(row, start=1):
+                    cel = ws_rh.cell(row=r_idx, column=c_idx, value=value)
+                    if r_idx == 3:
+                        cel.fill = PatternFill(start_color="1C8590", end_color="1C8590", fill_type="solid")
+                        cel.font = Font(bold=True, color="FFFFFF")
+                        
+            # Linha de Totais no Excel
+            r_tot = len(df_resumo_hidro) + 4
+            ws_rh.merge_cells(start_row=r_tot, start_column=1, end_row=r_tot, end_column=6)
+            cel_t = ws_rh.cell(row=r_tot, column=1, value="TOTAL GERAL ESTIMADO:")
+            cel_t.font = Font(bold=True); cel_t.alignment = Alignment(horizontal="right")
+            ws_rh.cell(row=r_tot, column=7, value=f"R$ {total_geral_hidro:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")).font = Font(bold=True)
+
+            for col in ws_rh.columns:
+                max_len = max(len(str(cell.value or '')) for cell in col)
+                ws_rh.column_dimensions[get_column_letter(col[0].column)].width = max(max_len + 2, 12)
+                
+            wb_rh.save(buf_resumo_h)
+            buf_resumo_h.seek(0)
+            
+            st.download_button(label="📥 Baixar Orçamento de Hidráulica (Excel)", data=buf_resumo_h.getvalue(), file_name="Orcamento_Hidraulica.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            
+            st.markdown("---")
+            st.markdown("### 📝 Escopo de Fornecimento Condensado (Proposta Comercial)")
+            texto_bom = "Fornecimento e montagem de Cavaletes Hidráulicos e acessórios, compostos por:\n\n"
+            
+            # Agrupar por tipo e bitola para o texto comercial (agora incluindo as TAGs correspondentes)
             agrupado_bom = {}
             for cav in st.session_state.cavaletes_selecionados:
                 chave_bom = f"{cav['equipamento']} ({cav['vias']}) - Ø {cav['bitola']}"
                 if chave_bom not in agrupado_bom:
-                    agrupado_bom[chave_bom] = 0
-                agrupado_bom[chave_bom] += cav['quantidade']
+                    agrupado_bom[chave_bom] = {"qtd": 0, "tags": []}
+                agrupado_bom[chave_bom]["qtd"] += cav['quantidade']
+                if cav['tag'] != "S/ TAG":
+                    agrupado_bom[chave_bom]["tags"].append(cav['tag'])
                 
-            for equipamento, qty in agrupado_bom.items():
-                texto_bom += f"• {qty} conj. - Cavalete para {equipamento}, completo com válvulas de bloqueio, filtro Y, união/flanges e instrumentação periférica;\n"
+            for equip_desc, dados in agrupado_bom.items():
+                str_tags = f" [TAGs: {', '.join(dados['tags'])}]" if dados['tags'] else ""
+                texto_bom += f"• {dados['qtd']} conj. - Cavalete para {equip_desc}{str_tags}, completo com válvulas de bloqueio, filtro Y, uniões/flanges e instrumentação periférica;\n"
                 
-            texto_bom += "\n**Serviços Inclusos:**\n• Montagem mecânica e acoplamento das tubulações;\n• Aplicação de isolamento térmico na malha."
+            texto_bom += "\n**Serviços Inclusos no Escopo:**\n"
+            texto_bom += "• Montagem mecânica e acoplamento das tubulações no local;\n"
+            texto_bom += "• Aplicação de isolamento térmico na malha montada, com acabamento adequado."
             
-            st.text_area("Texto Sugerido para Proposta Técnica:", value=texto_bom, height=200)
+            st.text_area("Copie o texto abaixo para utilizar no Gerador de Propostas:", value=texto_bom, height=250)
