@@ -2660,7 +2660,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             for idx, cav in enumerate(st.session_state.cavaletes_selecionados):
                 c_desc, c_tag, c_qtd, c_del = st.columns([4, 3, 2, 2])
                 c_desc.write(f"**{cav['equipamento']} ({cav['vias']})** - Ø {cav['bitola']}")
-                c_tag.write(f"TAG: `{cav['tag']}`")
+                c_tag.write(f"TAG: `{cav.get('tag', 'S/ TAG')}`")
                 c_qtd.write(f"Qtd: **{cav['quantidade']}**")
                 if c_del.button("🗑️ Remover", key=f"del_cav_{cav['id']}"):
                     st.session_state.cavaletes_selecionados.pop(idx)
