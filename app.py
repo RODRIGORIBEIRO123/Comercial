@@ -2780,7 +2780,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 total_mo_isolamento += isol_linha
                 
                 tabela_resumo.append({
-                   tabela_resumo.append({
                     "TAG": cav.get('tag', 'S/ TAG'),
                     "Equipamento": f"{cav['equipamento']} ({cav['vias']})",
                     "Equipamento": f"{cav['equipamento']} ({cav['vias']})",
