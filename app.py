@@ -2563,7 +2563,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     rev_proj = c_proj2.text_input("Revisão", value="R-00", key="hidro_rev_proj")
     st.markdown("---")
 
-    # 1. BANCO DE DADOS MATRIZ DE COMPONENTES DETALHADOS (Varredura Completa)
+    # 1. BANCO DE DADOS MATRIZ DE COMPONENTES DETALHADOS
     bitolas_projeto = ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "5\"", "6\"", "8\"", "10\"", "12\""]
     banco_padrao_componentes = []
     
@@ -2609,11 +2609,11 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         {"Item / Componente": "Mão de Obra de Isolamento Térmico (Por Polegada)", "Preço Unitário (R$)": 95.00, "Unidade": "pol"}
     ])
 
-    # Funções auxiliares de normalização
+    # 2. FUNÇÕES DE ENGENHARIA 
     def normalizar_string_busca(texto):
         return re.sub(r'[\s\-\"°Ø\’\']+', '', str(texto)).lower().strip()
 
-    def calcular_composicao_cavalete(bitola, vias, equipamento, incluir_motorizada=False, incluir_balanceamento=False):
+    def calcular_composicao_cavalete(bitola, vias, equipamento, inc_mot, inc_bal):
         num_vias = 3 if "3" in str(vias) else 2
         is_flangeado = bitola in ["2.1/2\"", "3\"", "4\"", "5\"", "6\"", "8\"", "10\"", "12\""]
         
@@ -2643,23 +2643,39 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             {"nome": "Termômetro industrial angular/reto, haste em latão , visor de vidro, com proteção em alumínio", "qtd": 2.0}
         ]
         
-        if num_vias == 3:
-            receita.append({"nome": nome_tee, "qtd": 1.0})
-        if not is_flangeado:
-            receita.append({"nome": nome_niple, "qtd": qtd_niple})
+        if num_vias == 3: receita.append({"nome": nome_tee, "qtd": 1.0})
+        if not is_flangeado: receita.append({"nome": nome_niple, "qtd": qtd_niple})
             
-        if incluir_motorizada:
-            receita.append({"nome": f"Válvula motorizada ON/OFF - Ø {bitola}", "qtd": 1.0})
-        if incluir_balanceamento:
-            receita.append({"nome": f"Válvula de balanceamento - Ø {bitola}", "qtd": 1.0})
+        if inc_mot: receita.append({"nome": f"Válvula motorizada ON/OFF - Ø {bitola}", "qtd": 1.0})
+        if inc_bal: receita.append({"nome": f"Válvula de balanceamento - Ø {bitola}", "qtd": 1.0})
             
         return receita
 
-    # Limpeza de Cache de Versão
-    if st.session_state.get('versao_banco_hidro') != 'v4':
+    def dimensionar_bitola_hazen_williams(vazao_m3h, perda_mmca_m):
+        """ Lógica de AVAC-R usando Hazen-Williams para aço carbono (C=130) """
+        q_m3s = vazao_m3h / 3600.0
+        hf_m_m = perda_mmca_m / 1000.0 # Conversão mmCA/m para m/m
+        if hf_m_m <= 0 or q_m3s <= 0: return "1/2\""
+        
+        # d = [ (10.67 * Q^1.85) / (C^1.85 * hf) ] ^ (1/4.87)
+        numerador = 10.67 * (q_m3s ** 1.85)
+        denominador = (130.0 ** 1.85) * hf_m_m
+        d_mm = ((numerador / denominador) ** (1 / 4.87)) * 1000.0
+        
+        tabela_int_aprox = [
+            (15.8, "1/2\""), (20.9, "3/4\""), (26.6, "1\""), (35.0, "1.1/4\""),
+            (40.9, "1.1/2\""), (52.5, "2\""), (62.7, "2.1/2\""), (77.9, "3\""),
+            (102.3, "4\""), (128.2, "5\""), (154.1, "6\""), (202.7, "8\""),
+            (254.5, "10\""), (303.2, "12\"")
+        ]
+        for int_mm, bit_nom in tabela_int_aprox:
+            if d_mm <= int_mm: return bit_nom
+        return "12\""
+
+    if st.session_state.get('versao_banco_hidro') != 'v5':
         st.session_state.banco_precos_hidraulica = banco_padrao_componentes.copy()
-        st.session_state.versao_banco_hidro = 'v4'
-        st.session_state.data_precos_hidro_itens = "Tabela Atualizada V4"
+        st.session_state.versao_banco_hidro = 'v5'
+        st.session_state.data_precos_hidro_itens = "Tabela Atualizada V5"
         try:
             sh_hidro = conectar_google_sheets()
             aba_h = sh_hidro.worksheet("Precos_Hidraulica_Itens").get_all_records()
@@ -2673,9 +2689,13 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     with aba_cadastro_hidro:
         st.subheader("Configuração Estrutural de Hidráulica")
         
+        # O pulo do gato: Seleção Aberto/Fechado reflete no dimensionamento E na proposta!
+        tipo_sistema = st.radio("Tipo de Sistema:", ["Fechado (Água Gelada/Quente)", "Aberto (Água de Condensação/Torre)"], horizontal=True)
+        st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+        
         metodo_dimensionamento = st.radio(
-            "Selecione o método de dimensionamento do projeto:",
-            ["📏 Definir diretamente por Bitola comercial", "🌊 Dimensionar automaticamente por Vazão de Água"],
+            "Método de Dimensionamento:",
+            ["📏 Definir diretamente por Bitola comercial", "🌊 Dimensionar automaticamente por Vazão (Hazen-Williams)"],
             horizontal=True
         )
         st.markdown("<br>", unsafe_allow_html=True)
@@ -2683,7 +2703,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         col1, col2, col3 = st.columns(3)
         tipo_equip = col1.selectbox("Tipo de Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"])
         
-        # TRAVA DE ENGENHARIA: Chiller e Bomba devem ser obrigatoriamente 2 Vias
+        # TRAVA: Chiller e Bomba devem ser obrigatóriamente 2 Vias
         if tipo_equip in ["Chiller", "Bomba"]:
             tipo_vias = col2.selectbox("Tipo de Cavalete (Válvula):", ["2 Vias"], disabled=True)
         else:
@@ -2692,30 +2712,30 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         bitola_final = "1/2\""
         vazao_calculada = 0.0
         
-        if "Bitola comercial" in metodo_dimensionamento:
+        if "Bitola" in metodo_dimensionamento:
             bitola_final = col3.selectbox("Selecione a Bitola comercial:", bitolas_projeto)
         else:
             vazao_m3 = col3.number_input("Insira a Vazão de Água do circuito (m³/h):", min_value=0.1, step=0.5, value=5.0)
-            vazao_m3_s = vazao_m3 / 3600.0
-            area_necessaria = vazao_m3_s / 1.2
-            diametro_mm = math.sqrt((4.0 * area_necessaria) / math.pi) * 1000.0
+            
+            tipo_aplicacao = st.radio(
+                "Nível de Exigência Acústica (Aplicação):", 
+                ["Escritório / Áreas Críticas", "Indústria / Áreas Técnicas"], 
+                horizontal=True,
+                help="Para áreas de escritório, a tubulação deve ser mais silenciosa, por isso a tubulação deve ter uma perda de carga menor, aumentando o diâmetro dos tubos e como consequência, o custo da instalação. Já para instalações industriais, o ruído não tende a ser problema, permitindo aplicar perdas de cargas maiores, o que reduz o custo da instalação."
+            )
+            
+            if "Escritório" in tipo_aplicacao:
+                perda_carga = st.slider("Perda de Carga Desejada (mmCA/m):", 10, 40, 25)
+            else:
+                if "Aberto" in tipo_sistema:
+                    perda_carga = st.slider("Perda de Carga Desejada (mmCA/m):", 41, 90, 70)
+                else:
+                    perda_carga = st.slider("Perda de Carga Desejada (mmCA/m):", 41, 100, 70)
+                    
             vazao_calculada = vazao_m3
-            
-            if diametro_mm <= 16.0: bitola_final = "1/2\""
-            elif diametro_mm <= 22.0: bitola_final = "3/4\""
-            elif diametro_mm <= 28.0: bitola_final = "1\""
-            elif diametro_mm <= 36.0: bitola_final = "1.1/4\""
-            elif diametro_mm <= 42.0: bitola_final = "1.1/2\""
-            elif diametro_mm <= 54.0: bitola_final = "2\""
-            elif diametro_mm <= 70.0: bitola_final = "2.1/2\""
-            elif diametro_mm <= 82.0: bitola_final = "3\""
-            elif diametro_mm <= 105.0: bitola_final = "4\""
-            elif diametro_mm <= 130.0: bitola_final = "5\""
-            elif diametro_mm <= 155.0: bitola_final = "6\""
-            elif diametro_mm <= 205.0: bitola_final = "8\""
-            elif diametro_mm <= 260.0: bitola_final = "10\""
-            else: bitola_final = "12\""
-            
+            bitola_final = dimensionar_bitola_hazen_williams(vazao_calculada, perda_carga)
+            st.info(f"📐 **Cálculo Hazen-Williams:** Para {vazao_calculada} m³/h com restrição de {perda_carga} mmCA/m, a bitola mínima recomendada é **{bitola_final}**.")
+                
         # ACESSÓRIOS CONDICIONAIS CHILLER
         inc_mot = False
         inc_bal = False
@@ -2729,7 +2749,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             
         col_q, col_t = st.columns([1, 2])
         qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
-        tag_equip = col_t.text_input("TAG identificadora do equipamento:", placeholder="Ex: UTA-01, CH-01...")
+        tag_equip = col_t.text_input("TAG identificadora do equipamento (Opcional):", placeholder="Ex: UTA-01, CH-01...")
         
         if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary"):
             try:
@@ -2752,21 +2772,25 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 custo_material_total_kit += (pr_u * comp["qtd"])
                 
             preco_mo_mont = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0)
-            preco_mo_isol = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0)
-            
             mo_mont_calculado = preco_mo_mont * pol_dec * 12.0
-            mo_isol_calculado = preco_mo_isol * pol_dec * 8.0
+            
+            # TRAVA DE ISOLAMENTO: Sistema Aberto ZERA o custo de MO e Material isolante!
+            if "Aberto" in tipo_sistema:
+                mo_isol_calculado = 0.0
+            else:
+                preco_mo_isol = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0)
+                mo_isol_calculado = preco_mo_isol * pol_dec * 8.0
             
             st.session_state.cavaletes_selecionados.append({
                 "id": str(uuid.uuid4()), "tag": tag_equip if tag_equip else "S/ TAG",
                 "equipamento": tipo_equip, "vias": tipo_vias, "bitola": bitola_final, "quantidade": qtd,
-                "vazao": vazao_calculada, "custo_mat_unit": custo_material_total_kit,
+                "vazao": vazao_calculada, "sistema": tipo_sistema, "custo_mat_unit": custo_material_total_kit,
                 "mo_mont_unit": mo_mont_calculado, "mo_isol_unit": mo_isol_calculado, "composicao": composicao_kit
             })
             st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
             st.rerun()
 
-        st.markdown("### 📋 Cavaletes Adicionados")
+        st.markdown("### 📋 Cavaletes Adicionados no Projeto")
         if not st.session_state.cavaletes_selecionados:
             st.info("Nenhum item adicionado no levantamento mecânico de hidráulica.")
         else:
@@ -2774,9 +2798,11 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 c_inf, c_tg, c_qt, c_rm = st.columns([4, 3, 2, 2])
                 vazao_memoria = cav.get('vazao', 0.0)
                 str_vaz = f" ({vazao_memoria} m³/h)" if vazao_memoria > 0 else ""
-                c_inf.write(f"**Cavalete {cav['equipamento']} ({cav['vias']})** - Ø {cav['bitola']}{str_vaz}")
+                sys_aberto = " [Aberto]" if "Aberto" in cav.get("sistema", "") else ""
+                
+                c_inf.write(f"**{cav['equipamento']} ({cav['vias']})** - Ø {cav['bitola']}{str_vaz}{sys_aberto}")
                 c_tg.write(f"TAG: `{cav.get('tag', 'S/ TAG')}`")
-                c_qt.write(f"Quantidade: **{cav['quantidade']} cjs**")
+                c_qt.write(f"Qtd: **{cav['quantidade']} cjs**")
                 if c_rm.button("🗑️", key=f"rm_h_cv_{cav['id']}"):
                     st.session_state.cavaletes_selecionados.pop(idx)
                     st.rerun()
@@ -2827,7 +2853,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                                     "Unidade": str(row_hi["Unidade"]).strip() if pd.notna(row_hi["Unidade"]) else "un"
                                 })
                         st.session_state.banco_precos_hidraulica = base_comp_nova
-                        st.session_state.versao_banco_hidro = 'v4'
+                        st.session_state.versao_banco_hidro = 'v5'
                         st.success("✅ Tabela atualizada na memória temporária!")
                 except Exception as e_hi: st.error(f"Erro ao processar arquivo: {e_hi}")
 
@@ -2866,7 +2892,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             total_hidro_isolamento = 0.0
             
             df_precos_lookup = pd.DataFrame(st.session_state.banco_precos_hidraulica)
-            
             dict_lookup_valores = {normalizar_string_busca(k): v for k, v in zip(df_precos_lookup["Item / Componente"], df_precos_lookup["Preço Unitário (R$)"])}
             dict_lookup_unidades = {normalizar_string_busca(k): v for k, v in zip(df_precos_lookup["Item / Componente"], df_precos_lookup["Unidade"])}
             dict_nomes_originais = {normalizar_string_busca(k): k for k in df_precos_lookup["Item / Componente"]}
@@ -2892,9 +2917,10 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         materiais_condensados_lista[nome_item_g_real] = 0.0
                     materiais_condensados_lista[nome_item_g_real] += qtd_tot_item_g
                     
+                sys_lbl = " [Aberto]" if "Aberto" in cav.get("sistema", "") else ""
                 resumo_financeiro_quadros.append({
                     "TAG": cav.get('tag', 'S/ TAG'),
-                    "Conjunto": f"Cavalete {cav.get('equipamento', '')} ({cav.get('vias', '')}) - Ø {cav.get('bitola', '')}",
+                    "Conjunto": f"Cavalete {cav.get('equipamento', '')} ({cav.get('vias', '')}) - Ø {cav.get('bitola', '')}{sys_lbl}",
                     "Qtd": cav["quantidade"],
                     "Materiais": m_sub,
                     "M.O. Montagem": mo_mont_sub,
@@ -2905,11 +2931,11 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             custo_total_geral_hidraulica = total_hidro_material + total_hidro_montagem + total_hidro_isolamento
             
             c1_h, c2_h, c3_h = st.columns(3)
-            c1_h.info(f"**Total de Materiais/Equipamentos:**\nR$ {total_hidro_material:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            c1_h.info(f"**Total de Materiais:**\nR$ {total_hidro_material:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             c2_h.warning(f"**Total Mão de Obra Combinada:**\nR$ {(total_hidro_montagem + total_hidro_isolamento):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-            c3_h.success(f"**TOTAL DO PROJETO HIDRÁULICO:**\nR$ {custo_total_geral_hidraulica:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            c3_h.success(f"**TOTAL GERAL HIDRÁULICA:**\nR$ {custo_total_geral_hidraulica:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             
-            st.markdown("### 📊 Detalhamento de Custo por TAG de Equipamento")
+            st.markdown("### 📊 Detalhamento de Custo por Instalação")
             df_res_quadros = pd.DataFrame(resumo_financeiro_quadros)
             df_res_quadros_disp = df_res_quadros.copy()
             for c_money in ["Materiais", "M.O. Montagem", "M.O. Isolamento", "Subtotal"]:
@@ -2937,7 +2963,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             df_bom_final_disp["Preço Total"] = df_bom_final_disp["Preço Total"].apply(lambda x: f"R$ {float(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             st.dataframe(df_bom_final_disp, use_container_width=True, hide_index=True)
             
-            # EXPORTAÇÃO EXCEL COMPLETA (BOM SÊNIOR)
+            # EXPORTAÇÃO EXCEL COMPLETA
             buf_excel_hidro = io.BytesIO()
             wb_export_h = openpyxl.Workbook()
             ws_f = wb_export_h.active; ws_f.title = "Resumo Comercial"
@@ -2988,8 +3014,13 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             texto_comercial_final += "O escopo desta proposta contempla a montagem mecânica e o fornecimento de materiais para os conjuntos hidráulicos descritos abaixo:\n"
             
             agrupado_comercial = {}
+            tem_sistema_fechado = False
+            
             for cav in st.session_state.cavaletes_selecionados:
-                chave_com = f"Cavalete para {cav.get('equipamento', 'EQ')} ({cav.get('vias', '2 Vias')}) - Diâmetro de Ø {cav.get('bitola', '1/2\"')}"
+                sys_lbl = " [Sistema Aberto]" if "Aberto" in cav.get("sistema", "") else ""
+                if not "Aberto" in cav.get("sistema", ""): tem_sistema_fechado = True
+                
+                chave_com = f"Cavalete para {cav.get('equipamento', 'EQ')} ({cav.get('vias', '2 Vias')}) - Diâmetro de Ø {cav.get('bitola', '1/2\"')}{sys_lbl}"
                 if chave_com not in agrupado_comercial: agrupado_comercial[chave_com] = {"qtd": 0, "tags": []}
                 agrupado_comercial[chave_com]["qtd"] += cav.get("quantidade", 1)
                 tag_limpa = cav.get('tag', 'S/ TAG')
@@ -2997,10 +3028,13 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     
             for desc_conj, dados_conj in agrupado_comercial.items():
                 str_tags_c = f" [Identificação / TAGs: {', '.join(dados_conj['tags'])}]" if dados_conj['tags'] else ""
-                texto_comercial_final += f"• {dados_conj['qtd']} conjunto(s) - {desc_conj}{str_tags_c}, completo com válvulas de bloqueio/esfera, curvas de aço SCH40, filtro Y para proteção da malha e conexões estruturais periféricas.\n"
+                texto_comercial_final += f"• {dados_conj['qtd']} conjunto(s) - {desc_conj}{str_tags_c}, completo com válvulas de bloqueio proporcional/esfera, curvas de aço SCH40, filtro Y para proteção da malha e conexões estruturais periféricas.\n"
                 
             texto_comercial_final += "\n**Serviços Especializados Inclusos:**\n"
             texto_comercial_final += "• Mão de obra qualificada para montagem mecânica, rosqueamento/soldagem e acoplamento das tubulações;\n"
-            texto_comercial_final += "• Fornecimento e aplicação de isolamento térmico em espuma elastomérica de alta densidade (espessura 25mm) com proteção mecânica e acabamento profissional contra condensação."
+            
+            # Lógica Condicional do Isolamento
+            if tem_sistema_fechado:
+                texto_comercial_final += "• Fornecimento e aplicação de isolamento térmico em espuma elastomérica de alta densidade (espessura 25mm) para os sistemas de água gelada/quente, com proteção mecânica e acabamento profissional contra condensação."
             
             st.text_area("Texto formatado para inserção direta na Proposta Comercial:", value=texto_comercial_final, height=250)
