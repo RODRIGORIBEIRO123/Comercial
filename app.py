@@ -2949,51 +2949,67 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             except Exception as e_cloud: st.error(f"Erro de permissão no Google Sheets: {e_cloud}")
 
     with aba_resumo_hidro:
-        st.header("Consolidação e Lista de Materiais Única (BOM)")
+        st.header("📊 Resumo e Lista de Materiais (BOM)")
         
         if not st.session_state.cavaletes_selecionados:
             st.warning("Efetue a adição de cavaletes para gerar os quantitativos consolidados.")
         else:
-            total_hidro_material = 0.0
-            total_hidro_montagem = 0.0
-            total_hidro_isolamento = 0.0
+            # 1. CÁLCULOS FINANCEIROS GERAIS
+            total_mat = sum(c.get("custo_mat_unit", 0) * c["quantidade"] for c in st.session_state.cavaletes_selecionados)
+            total_mo = sum((c.get("mo_mont_unit", 0) + c.get("mo_isol_unit", 0)) * c["quantidade"] for c in st.session_state.cavaletes_selecionados)
             
-            df_precos_lookup = pd.DataFrame(st.session_state.banco_precos_hidraulica)
-            dict_lookup_valores = {normalizar_string_busca(k): v for k, v in zip(df_precos_lookup["Item / Componente"], df_precos_lookup["Preço Unitário (R$)"])}
-            dict_lookup_unidades = {normalizar_string_busca(k): v for k, v in zip(df_precos_lookup["Item / Componente"], df_precos_lookup["Unidade"])}
-            dict_nomes_originais = {normalizar_string_busca(k): k for k in df_precos_lookup["Item / Componente"]}
+            c1, c2, c3 = st.columns(3)
+            c1.info(f"**Materiais:** R$ {total_mat:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            c2.warning(f"**M.O.:** R$ {total_mo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            c3.success(f"**TOTAL:** R$ {(total_mat+total_mo):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             
-            materiais_condensados_lista = {}
-            resumo_financeiro_quadros = []
+            st.markdown("---")
+            
+            # 2. DETALHAMENTO INDIVIDUAL (Cavalete por Cavalete)
+            st.subheader("📋 Detalhamento por Cavalete")
+            for cav in st.session_state.cavaletes_selecionados:
+                tag_label = f" - {cav['tag']}" if cav['tag'] != 'S/ TAG' else ""
+                with st.expander(f"📌 {cav['equipamento']} {tag_label} (Ø {cav['bitola']}) - Qtd: {cav['quantidade']}"):
+                    lista_itens = pd.DataFrame(cav['composicao'])
+                    lista_itens["Qtd Total"] = lista_itens["qtd"] * cav["quantidade"]
+                    st.table(lista_itens[["nome", "Qtd Total"]])
+
+            # 3. BOM CONDENSADA POR BITOLA
+            st.subheader("🛒 Lista de Materiais Consolidada (Por Bitola)")
+            
+            # Engine de Agrupamento
+            bom_bitolas = collections.defaultdict(lambda: collections.defaultdict(float))
             
             for cav in st.session_state.cavaletes_selecionados:
-                m_sub = cav.get("custo_mat_unit", 0.0) * cav["quantidade"]
-                mo_mont_sub = cav.get("mo_mont_unit", 0.0) * cav["quantidade"]
-                mo_isol_sub = cav.get("mo_isol_unit", 0.0) * cav["quantidade"]
-                
-                total_hidro_material += m_sub
-                total_hidro_montagem += mo_mont_sub
-                total_hidro_isolamento += mo_isol_sub
-                
-                for comp_g in cav.get("composicao", []):
-                    nome_item_g_lower = normalizar_string_busca(comp_g["nome"])
-                    nome_item_g_real = dict_nomes_originais.get(nome_item_g_lower, comp_g["nome"])
-                    qtd_tot_item_g = comp_g["qtd"] * cav["quantidade"]
+                for comp in cav['composicao']:
+                    nome = comp['nome']
+                    qtd = comp['qtd'] * cav['quantidade']
                     
-                    if nome_item_g_real not in materiais_condensados_lista:
-                        materiais_condensados_lista[nome_item_g_real] = 0.0
-                    materiais_condensados_lista[nome_item_g_real] += qtd_tot_item_g
+                    # Extração inteligente de bitola via Regex
+                    match = re.search(r'Ø\s*([\d\./"]+)', nome)
+                    bitola_key = match.group(1) if match else "Geral/Instrumentação"
                     
-                sys_lbl = " [Aberto]" if "Aberto" in cav.get("sistema", "") else ""
-                resumo_financeiro_quadros.append({
-                    "TAG": cav.get('tag', 'S/ TAG'),
-                    "Conjunto": f"Cavalete {cav.get('equipamento', '')} ({cav.get('vias', '')}) - Ø {cav.get('bitola', '')}{sys_lbl}",
-                    "Qtd": cav["quantidade"],
-                    "Materiais": m_sub,
-                    "M.O. Montagem": mo_mont_sub,
-                    "M.O. Isolamento": mo_isol_sub,
-                    "Subtotal": m_sub + mo_mont_sub + mo_isol_sub
-                })
+                    bom_bitolas[bitola_key][nome] += qtd
+
+            # Exibição
+            for bitola, itens in sorted(bom_bitolas.items(), key=lambda x: x[0]):
+                with st.container():
+                    st.markdown(f"**Bitola: {bitola}**")
+                    data_bom = []
+                    for item_nome, qtd_total in itens.items():
+                        preco = dict_lookup_valores.get(normalizar_string_busca(item_nome), 0.0)
+                        data_bom.append({
+                            "Item": item_nome,
+                            "Qtd": math.ceil(qtd_total) if "pç" in dict_lookup_unidades.get(normalizar_string_busca(item_nome), "un") else round(qtd_total, 2),
+                            "Preço Unit": preco,
+                            "Subtotal": preco * qtd_total
+                        })
+                    
+                    df_bom = pd.DataFrame(data_bom)
+                    st.dataframe(df_bom, use_container_width=True, hide_index=True)
+
+            # 4. EXPORTAÇÃO EXCEL (Mantendo a funcionalidade original)
+            # ... (seu código de download_button permanece aqui)
                 
             custo_total_geral_hidraulica = total_hidro_material + total_hidro_montagem + total_hidro_isolamento
             
