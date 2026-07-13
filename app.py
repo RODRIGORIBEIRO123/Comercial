@@ -2957,6 +2957,11 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         if not st.session_state.cavaletes_selecionados:
             st.warning("Efetue a adição de cavaletes para gerar os quantitativos consolidados.")
         else:
+            # ---> O PULO DO GATO QUE FALTAVA (Reconstruindo os dicionários de preços) <---
+            df_precos_lookup = pd.DataFrame(st.session_state.banco_precos_hidraulica)
+            dict_lookup_valores = {normalizar_string_busca(k): v for k, v in zip(df_precos_lookup["Item / Componente"], df_precos_lookup["Preço Unitário (R$)"])}
+            dict_lookup_unidades = {normalizar_string_busca(k): v for k, v in zip(df_precos_lookup["Item / Componente"], df_precos_lookup["Unidade"])}
+            
             # 1. CÁLCULOS FINANCEIROS GERAIS
             total_mat = sum(c.get("custo_mat_unit", 0) * c["quantidade"] for c in st.session_state.cavaletes_selecionados)
             total_mo = sum((c.get("mo_mont_unit", 0) + c.get("mo_isol_unit", 0)) * c["quantidade"] for c in st.session_state.cavaletes_selecionados)
@@ -2971,7 +2976,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             # 2. DETALHAMENTO INDIVIDUAL (Cavalete por Cavalete)
             st.subheader("📋 Detalhamento por Cavalete")
             for cav in st.session_state.cavaletes_selecionados:
-                tag_label = f" - {cav['tag']}" if cav['tag'] != 'S/ TAG' else ""
+                tag_label = f" - {cav['tag']}" if cav.get('tag', 'S/ TAG') != 'S/ TAG' else ""
                 with st.expander(f"📌 {cav['equipamento']} {tag_label} (Ø {cav['bitola']}) - Qtd: {cav['quantidade']}"):
                     lista_itens = pd.DataFrame(cav['composicao'])
                     lista_itens["Qtd Total"] = lista_itens["qtd"] * cav["quantidade"]
@@ -2997,19 +3002,24 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             # Exibição
             for bitola, itens in sorted(bom_bitolas.items(), key=lambda x: x[0]):
                 with st.container():
-                    st.markdown(f"**Bitola: {bitola}**")
+                    st.markdown(f"#### Bitola: Ø {bitola}")
                     data_bom = []
                     for item_nome, qtd_total in itens.items():
-                        preco = dict_lookup_valores.get(normalizar_string_busca(item_nome), 0.0)
+                        chave_busca = normalizar_string_busca(item_nome)
+                        preco = dict_lookup_valores.get(chave_busca, 0.0)
+                        unid = dict_lookup_unidades.get(chave_busca, "un")
+                        
                         data_bom.append({
-                            "Item": item_nome,
-                            "Qtd": math.ceil(qtd_total) if "pç" in dict_lookup_unidades.get(normalizar_string_busca(item_nome), "un") else round(qtd_total, 2),
-                            "Preço Unit": preco,
-                            "Subtotal": preco * qtd_total
+                            "Item / Componente": item_nome,
+                            "Qtd": math.ceil(qtd_total) if "pç" in unid else round(qtd_total, 2),
+                            "Unid": unid,
+                            "Preço Ref.": f"R$ {preco:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                            "Preço Total": f"R$ {(preco * qtd_total):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                         })
                     
                     df_bom = pd.DataFrame(data_bom)
                     st.dataframe(df_bom, use_container_width=True, hide_index=True)
+                    st.markdown("<br>", unsafe_allow_html=True)
 
             # 4. EXPORTAÇÃO EXCEL (Mantendo a funcionalidade original)
             # ... (seu código de download_button permanece aqui)
