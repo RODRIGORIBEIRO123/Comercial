@@ -2579,7 +2579,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     preco_base_kg_aco = 12.50
     dict_p_tubo = {b: round(PESOS_SCH40[b] * preco_base_kg_aco, 2) for b in todas_bitolas}
     
-    # Preços exatos extraídos da planilha do cliente
     dict_p_valv_gav = {"1/2\"": 126.40, "3/4\"": 154.78, "1\"": 189.93, "1.1/4\"": 250.00, "1.1/2\"": 360.29, "2\"": 450.00}
     dict_p_uniao = {"1/2\"": 33.15, "3/4\"": 45.00, "1\"": 49.15, "1.1/4\"": 75.00, "1.1/2\"": 92.27, "2\"": 120.00}
     dict_p_filtro = {"1/2\"": 70.02, "3/4\"": 90.00, "1\"": 114.39, "1.1/4\"": 160.00, "1.1/2\"": 220.89, "2\"": 350.00}
@@ -2592,7 +2591,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     dict_p_valv_flange = {"2.1/2\"": 750.00, "3\"": 920.00, "4\"": 1280.00, "5\"": 1600.00, "6\"": 1950.00, "8\"": 3100.00, "10\"": 4200.00, "12\"": 5800.00}
     dict_p_filtro_flange = {"2.1/2\"": 1150.00, "3\"": 1480.00, "4\"": 2350.00, "5\"": 3100.00, "6\"": 4100.00, "8\"": 6800.00, "10\"": 9500.00, "12\"": 13000.00}
 
-    # Geração dos itens com a Nomenclatura EXATA
     for b in todas_bitolas:
         banco_padrao_componentes.append({"Item / Componente": f"Tubo em aço carbono SCH40 sem costura - Ø {b}", "Preço Unitário (R$)": dict_p_tubo.get(b, 200.0), "Unidade": "m"})
         banco_padrao_componentes.append({"Item / Componente": f"Válvula motorizada ON/OFF - Ø {b}", "Preço Unitário (R$)": 1500.0, "Unidade": "pç"})
@@ -2620,7 +2618,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             {"Item / Componente": f"Conexão T 90° Aço carbono preto SCH40 - Ø {b}", "Preço Unitário (R$)": 200.0, "Unidade": "pç"}
         ])
 
-    # Acessórios de Instrumentação (Exatos)
     banco_padrao_componentes.extend([
         {"Item / Componente": "Poço para termômetro Latão haste = 38mm - Ø 1/2\"", "Preço Unitário (R$)": 72.66, "Unidade": "pç"},
         {"Item / Componente": "Termômetro tipo capela. Escala 0° a 40°C - - Ø 3/8\"", "Preço Unitário (R$)": 541.32, "Unidade": "pç"},
@@ -2630,7 +2627,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         {"Item / Componente": "Mão de Obra de Isolamento Térmico (Por Polegada)", "Preço Unitário (R$)": 95.00, "Unidade": "pol"}
     ])
 
-    # 2. FUNÇÕES DE ENGENHARIA E RECEITAS EXATAS
+    # 2. FUNÇÕES DE ENGENHARIA 
     def normalizar_string_busca(texto):
         return re.sub(r'[\s\-\"°Ø\’\']+', '', str(texto)).lower().strip()
 
@@ -2640,7 +2637,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         
         receita = []
         
-        # Amarração de nomes fiéis à planilha
         nome_tubo = f"Tubo em aço carbono SCH40 sem costura - Ø {bitola}"
         nome_isolamento = f"Isolamento Espuma elastomérica, espessura 25 mm - Ø {bitola}"
         nome_rechape = f"Rechapeamento chapa de alumínio liso, espessura 0,5 mm - Ø {bitola}"
@@ -2652,13 +2648,12 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         nome_tee = f"Conexão T 90° Ferro maleável galvanizado - Ø {bitola}" if is_roscado else f"Conexão T 90° Aço carbono preto SCH40 - Ø {bitola}"
         nome_niple = f"Niple duplo Ferro maleável galvanizado - Ø {bitola}"
         
-        # Quantidades consolidadas baseadas no detalhamento da planilha (Ex: UTA 1/2" soma todos os itens repetidos)
         qtd_tubo = 3.0 if "UTA" in equipamento.upper() or "CHILLER" in equipamento.upper() else 2.0
         qtd_curvas = 4.0
-        qtd_bloqueios = 4.0 if is_roscado else 2.0 # 2+2 na planilha roscada
-        qtd_unioes = 6.0 if is_roscado else 4.0    # 5+1 na planilha roscada
-        qtd_tee = 3.0 if is_roscado else 1.0       # 2+1 na planilha roscada
-        qtd_niple = 5.0 if is_roscado else 0.0     # 4+1 na planilha roscada
+        qtd_bloqueios = 4.0 if is_roscado else 2.0 
+        qtd_unioes = 6.0 if is_roscado else 4.0    
+        qtd_tee = 3.0 if is_roscado else 1.0       
+        qtd_niple = 5.0 if is_roscado else 0.0     
         
         if num_vias == 3:
             qtd_curvas += 2.0
@@ -2687,11 +2682,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         else:
             receita.append({"nome": nome_tee, "qtd": qtd_tee})
             
-        # Instrumentação condicional do Chiller
         if inc_mot: receita.append({"nome": f"Válvula motorizada ON/OFF - Ø {bitola}", "qtd": 1.0})
         if inc_bal: receita.append({"nome": f"Válvula balanceadora - - Ø {bitola}", "qtd": 1.0})
             
-        # Isolamento térmico excluido em sistemas Abertos
         if not sistema_aberto:
             receita.append({"nome": nome_isolamento, "qtd": qtd_tubo})
             receita.append({"nome": nome_rechape, "qtd": qtd_tubo})
@@ -2702,7 +2695,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         C = 130.0 if "Fechado" in tipo_sistema else 120.0
         q_m3s = vazao_m3h / 3600.0
         hf_m_m = perda_mmca_m / 1000.0
-        
         if hf_m_m <= 0 or q_m3s <= 0: return "1/2\""
         
         numerador = 10.67 * (q_m3s ** 1.852)
@@ -2721,19 +2713,27 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             if d_interno_calc_mm <= int_mm:
                 bitola_selecionada = bit_nom
                 break
-                
         return bitola_selecionada
 
-    # 3. TRAVA DE CACHE V8
-    if st.session_state.get('versao_banco_hidro') != 'v8':
-        st.session_state.banco_precos_hidraulica = banco_padrao_componentes.copy()
-        st.session_state.versao_banco_hidro = 'v8'
-        st.session_state.data_precos_hidro_itens = "Tabela Detalhada Planilha V8"
+    # 3. TRAVA DE CACHE E MESCLAGEM INTELIGENTE (V9)
+    if st.session_state.get('versao_banco_hidro') != 'v9':
+        banco_mesclado = banco_padrao_componentes.copy()
         try:
             sh_hidro = conectar_google_sheets()
             aba_h = sh_hidro.worksheet("Precos_Hidraulica_Itens").get_all_records()
-            if len(aba_h) > 0: st.session_state.banco_precos_hidraulica = aba_h
-        except: pass
+            if len(aba_h) > 0:
+                dict_nuvem = {normalizar_string_busca(row.get("Item / Componente", "")): row.get("Preço Unitário (R$)", 0.0) for row in aba_h}
+                # Substitui os valores dos itens novos mantendo a base completa
+                for item in banco_mesclado:
+                    chave_busca = normalizar_string_busca(item["Item / Componente"])
+                    if chave_busca in dict_nuvem:
+                        item["Preço Unitário (R$)"] = float(dict_nuvem[chave_busca])
+        except:
+            pass
+        
+        st.session_state.banco_precos_hidraulica = banco_mesclado
+        st.session_state.versao_banco_hidro = 'v9'
+        st.session_state.data_precos_hidro_itens = "Tabela V9 (Mesclada c/ Nuvem)"
 
     if 'cavaletes_selecionados' not in st.session_state: st.session_state.cavaletes_selecionados = []
 
@@ -2752,11 +2752,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         )
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # Interface reativa (sem formulário)
         col1, col2, col3 = st.columns(3)
         tipo_equip = col1.selectbox("Tipo de Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"])
         
-        # TRAVA: Chiller e Bomba forçam 2 vias
         if tipo_equip in ["Chiller", "Bomba"]:
             tipo_vias = col2.selectbox("Tipo de Cavalete (Válvula):", ["2 Vias"], disabled=True)
         else:
@@ -2787,10 +2785,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     
             vazao_calculada = vazao_m3
             bitola_final = dimensionar_bitola_pelo_abaco(vazao_calculada, perda_carga, tipo_sistema)
-            
             st.info(f"📈 **Leitura do Ábaco (Hazen-Williams):** Para a vazão de {vazao_calculada} m³/h cruzando a linha de {perda_carga} mmCA/m, a bitola comercial recomendada é **{bitola_final}**.")
             
-        # PERGUNTAS EXCLUSIVAS CHILLER
         inc_mot = False
         inc_bal = False
         if tipo_equip == "Chiller":
@@ -2868,7 +2864,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         st.header("Gestão Sênior de Preços (Componentes Abertos)")
         st.info(f"📅 **Última modificação da base de dados:** {st.session_state.data_precos_hidro_itens}")
         
-        # FERRAMENTA DE PRECIFICAÇÃO POR KG (CONVERSÃO AUTOMÁTICA)
         st.markdown("### ⚖️ Precificação Inteligente de Tubos (Por Kg)")
         st.caption("Tubos SCH40 são precificados por peso na indústria. Insira o valor do **kg do aço carbono** abaixo. O sistema usará a tabela de massa linear (ASME B36.10) para converter automaticamente e atualizar o preço por metro (R$/m) de todas as bitolas na tabela.")
         
@@ -2886,7 +2881,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.rerun()
             
         st.markdown("---")
-
         st.markdown("### 🔄 Sincronização em Lote")
         ch1, ch2 = st.columns(2)
         with ch1:
@@ -2926,7 +2920,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                                     "Unidade": str(row_hi["Unidade"]).strip() if pd.notna(row_hi["Unidade"]) else "un"
                                 })
                         st.session_state.banco_precos_hidraulica = base_comp_nova
-                        st.session_state.versao_banco_hidro = 'v8'
+                        st.session_state.versao_banco_hidro = 'v9'
                         st.success("✅ Tabela atualizada na memória temporária!")
                 except Exception as e_hi: st.error(f"Erro ao processar arquivo: {e_hi}")
 
