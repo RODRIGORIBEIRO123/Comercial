@@ -2563,16 +2563,29 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     rev_proj = c_proj2.text_input("Revisão", value="R-00", key="hidro_rev_proj")
     st.markdown("---")
 
-    # 1. BANCO DE DADOS DE MATERIAIS EXTRAÍDO FIELMENTE DA ABA "CAVALETES HIDRÁULICOS"
-    banco_padrao_componentes = []
+    # 1. TABELA DE PESOS NORMATIVOS E BANCO DE DADOS
+    # Tabela ASME B36.10 - Peso linear aproximado para tubos de aço carbono SCH40 (kg/m)
+    PESOS_SCH40 = {
+        "1/2\"": 1.27, "3/4\"": 1.69, "1\"": 2.50, "1.1/4\"": 3.39,
+        "1.1/2\"": 4.05, "2\"": 5.44, "2.1/2\"": 8.63, "3\"": 11.29,
+        "4\"": 16.07, "5\"": 21.77, "6\"": 28.26, "8\"": 42.55,
+        "10\"": 60.31, "12\"": 79.70
+    }
     
     bitolas_roscadas = ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\""]
     bitolas_soldadas = ["2.1/2\"", "3\"", "4\"", "5\"", "6\"", "8\"", "10\"", "12\""]
     todas_bitolas = bitolas_roscadas + bitolas_soldadas
+    banco_padrao_componentes = []
     
-    dict_p_tubo = {"1/2\"": 46.08, "3/4\"": 58.20, "1\"": 72.10, "1.1/4\"": 95.30, "1.1/2\"": 115.00, "2\"": 158.40, "2.1/2\"": 220.00, "3\"": 295.00, "4\"": 420.00, "5\"": 520.00, "6\"": 680.00, "8\"": 980.00, "10\"": 1250.00, "12\"": 1600.00}
+    # Preço base estimado do kg do aço para carga inicial (Pode ser alterado na UI)
+    preco_base_kg_aco = 12.50
+    dict_p_tubo = {b: round(PESOS_SCH40[b] * preco_base_kg_aco, 2) for b in todas_bitolas}
+    
     dict_p_valv = {"1/2\"": 343.10, "3/4\"": 450.00, "1\"": 580.00, "1.1/4\"": 750.00, "1.1/2\"": 750.00, "2\"": 920.00, "2.1/2\"": 750.00, "3\"": 920.00, "4\"": 1280.00, "5\"": 1600.00, "6\"": 1950.00, "8\"": 3100.00, "10\"": 4200.00, "12\"": 5800.00}
     dict_p_filtro = {"1/2\"": 120.00, "3/4\"": 175.00, "1\"": 260.00, "1.1/4\"": 340.00, "1.1/2\"": 580.00, "2\"": 790.00, "2.1/2\"": 1150.00, "3\"": 1480.00, "4\"": 2350.00, "5\"": 3100.00, "6\"": 4100.00, "8\"": 6800.00, "10\"": 9500.00, "12\"": 13000.00}
+    dict_p_curva = {"1/2\"": 18.50, "3/4\"": 24.00, "1\"": 32.50, "1.1/4\"": 42.00, "1.1/2\"": 48.00, "2\"": 65.00, "2.1/2\"": 98.00, "3\"": 142.00, "4\"": 235.00, "5\"": 340.00, "6\"": 490.00, "8\"": 840.00, "10\"": 1200.00, "12\"": 1800.00}
+    dict_p_uniao = {"1/2\"": 56.41, "3/4\"": 72.00, "1\"": 95.00, "1.1/4\"": 120.00, "1.1/2\"": 150.00, "2\"": 180.00, "2.1/2\"": 250.00, "3\"": 320.00, "4\"": 480.00, "5\"": 650.00, "6\"": 820.00, "8\"": 1150.00, "10\"": 1600.00, "12\"": 2200.00}
+    dict_p_niple = {"1/2\"": 4.61, "3/4\"": 6.20, "1\"": 9.80, "1.1/4\"": 15.00, "1.1/2\"": 18.00, "2\"": 28.00, "2.1/2\"": 35.00}
     
     for b in todas_bitolas:
         banco_padrao_componentes.append({"Item / Componente": f"Tubo em aço carbono SCH40 sem costura - Ø {b}", "Preço Unitário (R$)": dict_p_tubo.get(b, 200.0), "Unidade": "m"})
@@ -2610,7 +2623,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         {"Item / Componente": "Mão de Obra de Isolamento Térmico (Por Polegada)", "Preço Unitário (R$)": 95.00, "Unidade": "pol"}
     ])
 
-    # 2. INTELIGÊNCIA DE ENGENHARIA 
+    # 2. FUNÇÕES DE ENGENHARIA 
     def normalizar_string_busca(texto):
         return re.sub(r'[\s\-\"°Ø\’\']+', '', str(texto)).lower().strip()
 
@@ -2661,10 +2674,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         return receita
 
     def dimensionar_bitola_pelo_abaco(vazao_m3h, perda_mmca_m, tipo_sistema):
-        """ Lógica matemática do Ábaco (Fórmula de Hazen-Williams) """
         C = 130.0 if "Fechado" in tipo_sistema else 120.0
         q_m3s = vazao_m3h / 3600.0
-        hf_m_m = perda_mmca_m / 1000.0 # Conversão mmCA/m para m/m
+        hf_m_m = perda_mmca_m / 1000.0
         
         if hf_m_m <= 0 or q_m3s <= 0: return "1/2\""
         
@@ -2687,11 +2699,11 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 
         return bitola_selecionada
 
-    # 3. TRAVA DE CACHE 
-    if st.session_state.get('versao_banco_hidro') != 'v6':
+    # 3. TRAVA DE CACHE (Força a limpeza da memória e injeção do banco v7)
+    if st.session_state.get('versao_banco_hidro') != 'v7':
         st.session_state.banco_precos_hidraulica = banco_padrao_componentes.copy()
-        st.session_state.versao_banco_hidro = 'v6'
-        st.session_state.data_precos_hidro_itens = "Tabela Atualizada V6"
+        st.session_state.versao_banco_hidro = 'v7'
+        st.session_state.data_precos_hidro_itens = "Tabela Atualizada V7 (Peso Kg/m)"
         try:
             sh_hidro = conectar_google_sheets()
             aba_h = sh_hidro.worksheet("Precos_Hidraulica_Itens").get_all_records()
@@ -2705,7 +2717,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     with aba_cadastro_hidro:
         st.subheader("Configuração Estrutural de Hidráulica")
         
-        # PERGUNTA: TIPO DE SISTEMA (Muda o "C" do ábaco e o isolamento)
         tipo_sistema = st.radio("Tipo de Sistema da Instalação:", ["Fechado (Água Gelada/Quente)", "Aberto (Água de Condensação/Torre)"], horizontal=True)
         st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
         
@@ -2716,11 +2727,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         )
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # UI REATIVA (Sem st.form)
         col1, col2, col3 = st.columns(3)
         tipo_equip = col1.selectbox("Tipo de Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"])
         
-        # TRAVA DE ENGENHARIA: Chiller e Bomba = 2 Vias
         if tipo_equip in ["Chiller", "Bomba"]:
             tipo_vias = col2.selectbox("Tipo de Cavalete (Válvula):", ["2 Vias"], disabled=True)
         else:
@@ -2741,7 +2750,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 help="Para áreas de escritório, a tubulação deve ser mais silenciosa, por isso a tubulação deve ter uma perda de carga menor (max 40 mmCA/m), aumentando o diâmetro dos tubos e como consequência, o custo da instalação. Já para instalações industriais, o ruído não tende a ser problema, permitindo aplicar perdas de cargas maiores, o que reduz o custo da instalação."
             )
             
-            # SLIDER DINÂMICO DE MMCA/M
             if "Escritório" in tipo_aplicacao:
                 perda_carga = st.slider("Perda de Carga Desejada no Ábaco (mmCA/m):", 10, 40, 25)
             else:
@@ -2755,7 +2763,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             
             st.info(f"📈 **Leitura do Ábaco (Hazen-Williams):** Para a vazão de {vazao_calculada} m³/h cruzando a linha de {perda_carga} mmCA/m, a bitola comercial recomendada é **{bitola_final}**.")
             
-        # ACESSÓRIOS CONDICIONAIS CHILLER
         inc_mot = False
         inc_bal = False
         if tipo_equip == "Chiller":
@@ -2793,7 +2800,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             preco_mo_mont = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0)
             mo_mont_calculado = preco_mo_mont * pol_dec * 12.0
             
-            # LÓGICA DE ISOLAMENTO (Sistema Aberto não leva isolamento térmico)
             if "Aberto" in tipo_sistema:
                 mo_isol_calculado = 0.0
             else:
@@ -2833,6 +2839,26 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         st.header("Gestão Sênior de Preços (Componentes Abertos)")
         st.info(f"📅 **Última modificação da base de dados:** {st.session_state.data_precos_hidro_itens}")
         
+        # FERRAMENTA DE PRECIFICAÇÃO POR KG (CONVERSÃO AUTOMÁTICA)
+        st.markdown("### ⚖️ Precificação Inteligente de Tubos (Por Kg)")
+        st.caption("Tubos SCH40 são precificados por peso na indústria. Insira o valor do **kg do aço carbono** abaixo. O sistema usará a tabela de massa linear (ASME B36.10) para converter automaticamente e atualizar o preço por metro (R$/m) de todas as bitolas na tabela.")
+        
+        col_kg1, col_kg2 = st.columns([1, 2])
+        novo_preco_kg = col_kg1.number_input("Preço do Aço Carbono (R$/kg):", min_value=0.1, value=12.50, step=0.50)
+        
+        if col_kg2.button("🔄 Converter R$/kg para R$/m e Atualizar Tubos", type="secondary"):
+            for item in st.session_state.banco_precos_hidraulica:
+                if "Tubo em aço carbono SCH40 sem costura" in item["Item / Componente"]:
+                    # Extrai a bitola da string do nome do componente
+                    bitola_str = item["Item / Componente"].split("Ø ")[-1].strip()
+                    if bitola_str in PESOS_SCH40:
+                        peso_tabelado = PESOS_SCH40[bitola_str]
+                        item["Preço Unitário (R$)"] = round(peso_tabelado * novo_preco_kg, 2)
+            st.toast("✅ Preços convertidos de Kg para Metros com sucesso! (Salve no banco abaixo)", icon="👍")
+            st.rerun()
+            
+        st.markdown("---")
+
         st.markdown("### 🔄 Sincronização em Lote")
         ch1, ch2 = st.columns(2)
         with ch1:
@@ -2872,7 +2898,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                                     "Unidade": str(row_hi["Unidade"]).strip() if pd.notna(row_hi["Unidade"]) else "un"
                                 })
                         st.session_state.banco_precos_hidraulica = base_comp_nova
-                        st.session_state.versao_banco_hidro = 'v6'
+                        st.session_state.versao_banco_hidro = 'v7'
                         st.success("✅ Tabela atualizada na memória temporária!")
                 except Exception as e_hi: st.error(f"Erro ao processar arquivo: {e_hi}")
 
@@ -2952,7 +2978,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             c1_h, c2_h, c3_h = st.columns(3)
             c1_h.info(f"**Total de Materiais/Equipamentos:**\nR$ {total_hidro_material:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             c2_h.warning(f"**Total Mão de Obra Combinada:**\nR$ {(total_hidro_montagem + total_hidro_isolamento):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-            c3_h.success(f"**TOTAL DO PROJETO HIDRÁULICO:**\nR$ {custo_total_geral_hidraulica:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            c3_h.success(f"**TOTAL GERAL HIDRÁULICA:**\nR$ {custo_total_geral_hidraulica:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             
             st.markdown("### 📊 Detalhamento de Custo por Instalação")
             df_res_quadros = pd.DataFrame(resumo_financeiro_quadros)
@@ -2982,7 +3008,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             df_bom_final_disp["Preço Total"] = df_bom_final_disp["Preço Total"].apply(lambda x: f"R$ {float(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             st.dataframe(df_bom_final_disp, use_container_width=True, hide_index=True)
             
-            # EXPORTAÇÃO EXCEL COMPLETA (BOM SÊNIOR)
+            # EXPORTAÇÃO EXCEL COMPLETA
             buf_excel_hidro = io.BytesIO()
             wb_export_h = openpyxl.Workbook()
             ws_f = wb_export_h.active; ws_f.title = "Resumo Comercial"
