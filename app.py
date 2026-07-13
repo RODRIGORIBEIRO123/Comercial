@@ -3019,7 +3019,31 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.markdown("---")
             
             # =====================================================================
-            # VISÃO 1: LISTA EXPLODIDA POR EQUIPAMENTO
+            # VISÃO 1: TABELA RESUMO DE CUSTOS (GERENCIAL)
+            # =====================================================================
+            st.subheader("📊 Resumo de Custos por Cavalete")
+            st.caption("Visão gerencial consolidando os valores de materiais e mão de obra de cada máquina.")
+            
+            df_res_quadros = pd.DataFrame(resumo_financeiro_quadros)
+            df_res_quadros_disp = df_res_quadros.copy()
+            
+            # Unificando a mão de obra para a exibição na tela
+            df_res_quadros_disp["Mão de Obra (Total)"] = df_res_quadros_disp["M.O. Montagem"] + df_res_quadros_disp["M.O. Isolamento"]
+            
+            # Selecionando e ordenando as colunas conforme o seu pedido
+            colunas_exib = ["TAG", "Conjunto", "Qtd", "Materiais", "Mão de Obra (Total)", "Subtotal"]
+            df_res_quadros_disp = df_res_quadros_disp[colunas_exib]
+            
+            # Formatando valores para a moeda Real (R$)
+            for c_money in ["Materiais", "Mão de Obra (Total)", "Subtotal"]:
+                df_res_quadros_disp[c_money] = df_res_quadros_disp[c_money].apply(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            
+            st.dataframe(df_res_quadros_disp, use_container_width=True, hide_index=True)
+            
+            st.markdown("---")
+            
+            # =====================================================================
+            # VISÃO 2: LISTA EXPLODIDA POR EQUIPAMENTO
             # =====================================================================
             st.subheader("📋 Lista Explodida (Por Equipamento)")
             st.caption("Ideal para separação no almoxarifado e montagem em campo.")
@@ -3029,7 +3053,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 equip_exib = cav.get('equipamento', 'Equipamento')
                 bitola_exib = cav.get('bitola', '')
                 
-                # Subtítulo formatado: Ex: UTA-01 - 1.1/2"
                 st.markdown(f"#### {tag_exib} - {equip_exib} (Ø {bitola_exib})")
                 
                 lista_itens_cav = []
@@ -3046,7 +3069,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.markdown("---")
 
             # =====================================================================
-            # VISÃO 2: LISTA ÚNICA CONDENSADA (BOM DE SUPRIMENTOS)
+            # VISÃO 3: LISTA ÚNICA CONDENSADA (BOM DE SUPRIMENTOS)
             # =====================================================================
             st.subheader("🛒 Lista de Materiais Consolidada (Suprimentos / Compras)")
             st.caption("Todos os itens agrupados por bitola com a identificação de onde serão aplicados.")
@@ -3061,11 +3084,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 is_pc_bom = dict_lookup_unidades.get(nome_lower, "pç") == "pç"
                 unidade_str = dict_lookup_unidades.get(nome_lower, "un")
                 
-                # Captura a bitola via Expressão Regular para coluna de ordenação
                 match = re.search(r'Ø\s*([\d\./"]+)', item_nome_bom)
                 bitola_col = match.group(1) if match else "Geral"
                 
-                # Formata a string de TAGs (A, B, C...)
                 tags_str = ", ".join(sorted(dados_bom['tags'])) if dados_bom['tags'] else "Uso Geral"
                 
                 lista_bom_suprimentos.append({
@@ -3079,8 +3100,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 })
                 
             df_bom_final = pd.DataFrame(lista_bom_suprimentos)
-            
-            # Ordenação mágica: Primeiro por Bitola, depois ordem alfabética do Item
             df_bom_final = df_bom_final.sort_values(by=["Bitola", "Item / Componente"])
             
             st.dataframe(df_bom_final, use_container_width=True, hide_index=True)
@@ -3093,7 +3112,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             buf_excel_hidro = io.BytesIO()
             wb_export_h = openpyxl.Workbook()
             
-            # Planilha 1: Resumo Comercial
             ws_f = wb_export_h.active; ws_f.title = "Resumo Comercial"
             ws_f.views.sheetView[0].showGridLines = True
             ws_f.row_dimensions[1].height = 35
@@ -3105,8 +3123,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             font_head_ex = Font(name="Arial", size=11, bold=True, color="FFFFFF")
             b_thin = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
             
-            df_res_quadros = pd.DataFrame(resumo_financeiro_quadros)
-            for r_i, r_data in enumerate(dataframe_to_rows(df_res_quadros, index=False, header=True), start=3):
+            df_res_quadros_excel = pd.DataFrame(resumo_financeiro_quadros)
+            for r_i, r_data in enumerate(dataframe_to_rows(df_res_quadros_excel, index=False, header=True), start=3):
                 for c_i, val_cell in enumerate(r_data, start=1):
                     celula_ex = ws_f.cell(row=r_i, column=c_i, value=val_cell)
                     celula_ex.border = b_thin
@@ -3115,14 +3133,13 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     elif c_i >= 4: 
                         celula_ex.number_format = '"R$" #,##0.00'; celula_ex.alignment = Alignment(horizontal="right")
                             
-            linha_tot_f = len(df_res_quadros) + 4
+            linha_tot_f = len(df_res_quadros_excel) + 4
             ws_f.merge_cells(start_row=linha_tot_f, start_column=1, end_row=linha_tot_f, end_column=6)
             ws_f.cell(row=linha_tot_f, column=1, value="TOTAL CONSOLIDADO DO ESCOPO HIDRÁULICO:").font = Font(bold=True)
             ws_f.cell(row=linha_tot_f, column=1).alignment = Alignment(horizontal="right")
             ws_f_tot_val = ws_f.cell(row=linha_tot_f, column=7, value=custo_total_geral_hidraulica)
             ws_f_tot_val.font = Font(bold=True, size=11); ws_f_tot_val.number_format = '"R$" #,##0.00'; ws_f_tot_val.border = b_thin
             
-            # Planilha 2: Lista BOM de Suprimentos
             ws_b = wb_export_h.create_sheet(title="Lista de Materiais (BOM)")
             ws_b.views.sheetView[0].showGridLines = True
             for r_i, r_data in enumerate(dataframe_to_rows(df_bom_final, index=False, header=True), start=1):
@@ -3132,7 +3149,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     if r_i == 1: 
                         celula_ex.fill = f_head_ex; celula_ex.font = font_head_ex; celula_ex.alignment = Alignment(horizontal="center")
             
-            # Ajuste de largura das colunas do Excel
             for sheet_obj in [ws_f, ws_b]:
                 for col_obj in sheet_obj.columns:
                     max_len_val = max(len(str(c_val.value or '')) for c_val in col_obj if c_val.row <= 100)
@@ -3140,7 +3156,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     
             wb_export_h.save(buf_excel_hidro); buf_excel_hidro.seek(0)
             
-            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidraulica")
+            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidro_v9")
             
             # =====================================================================
             # DESCRITIVO COMERCIAL (PROPOSTA)
@@ -3165,81 +3181,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     
             for desc_conj, dados_conj in agrupado_comercial.items():
                 str_tags_c = f" [TAGs: {', '.join(dados_conj['tags'])}]" if dados_conj['tags'] else ""
-                texto_comercial_final += f"• {dados_conj['qtd']} conjunto(s) - {desc_conj}{str_tags_c}, completo com válvulas de bloqueio proporcional/esfera, curvas de aço SCH40, filtro Y para proteção da malha e conexões estruturais periféricas.\n"
-                
-            texto_comercial_final += "\n**Serviços Especializados Inclusos:**\n"
-            texto_comercial_final += "• Mão de obra qualificada para montagem mecânica, rosqueamento/soldagem e acoplamento das tubulações;\n"
-            
-            if tem_sistema_fechado:
-                texto_comercial_final += "• Fornecimento e aplicação de isolamento térmico em espuma elastomérica de alta densidade (espessura 25mm) para os sistemas de água gelada/quente, com proteção mecânica e acabamento profissional contra condensação."
-            
-            st.text_area("Texto formatado para inserção direta na Proposta Comercial:", value=texto_comercial_final, height=250)
-            
-            # EXPORTAÇÃO EXCEL COMPLETA
-            buf_excel_hidro = io.BytesIO()
-            wb_export_h = openpyxl.Workbook()
-            ws_f = wb_export_h.active; ws_f.title = "Resumo Comercial"
-            ws_f.views.sheetView[0].showGridLines = True
-            ws_f.row_dimensions[1].height = 35
-            ws_f.merge_cells("A1:G1")
-            ws_f.cell(row=1, column=1, value="PLANILHA DE FECHAMENTO DE CUSTOS - CAVALETES HIDRÁULICOS").font = Font(name="Arial", size=12, bold=True, color="1C8590")
-            ws_f.cell(row=1, column=1).alignment = Alignment(horizontal="center", vertical="center")
-            
-            f_head_ex = PatternFill(start_color="1C8590", end_color="1C8590", fill_type="solid")
-            font_head_ex = Font(name="Arial", size=11, bold=True, color="FFFFFF")
-            b_thin = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
-            
-            for r_i, r_data in enumerate(dataframe_to_rows(df_res_quadros, index=False, header=True), start=3):
-                for c_i, val_cell in enumerate(r_data, start=1):
-                    celula_ex = ws_f.cell(row=r_i, column=c_i, value=val_cell)
-                    celula_ex.border = b_thin
-                    if r_i == 3: celula_ex.fill = f_head_ex; celula_ex.font = font_head_ex; celula_ex.alignment = Alignment(horizontal="center")
-                    elif c_i >= 4: celula_ex.number_format = '"R$" #,##0.00'; celula_ex.alignment = Alignment(horizontal="right")
-                            
-            linha_tot_f = len(df_res_quadros) + 4
-            ws_f.merge_cells(start_row=linha_tot_f, start_column=1, end_row=linha_tot_f, end_column=6)
-            ws_f.cell(row=linha_tot_f, column=1, value="TOTAL CONSOLIDADO DO ESCOPO HIDRÁULICO:").font = Font(bold=True)
-            ws_f.cell(row=linha_tot_f, column=1).alignment = Alignment(horizontal="right")
-            ws_f_tot_val = ws_f.cell(row=linha_tot_f, column=7, value=custo_total_geral_hidraulica)
-            ws_f_tot_val.font = Font(bold=True, size=11); ws_f_tot_val.number_format = '"R$" #,##0.00'; ws_f_tot_val.border = b_thin
-            
-            ws_b = wb_export_h.create_sheet(title="Lista de Materiais (BOM)")
-            ws_b.views.sheetView[0].showGridLines = True
-            for r_i, r_data in enumerate(dataframe_to_rows(df_bom_final, index=False, header=True), start=1):
-                for c_i, val_cell in enumerate(r_data, start=1):
-                    celula_ex = ws_b.cell(row=r_i, column=c_i, value=val_cell)
-                    celula_ex.border = b_thin
-                    if r_i == 1: celula_ex.fill = f_head_ex; celula_ex.font = font_head_ex; celula_ex.alignment = Alignment(horizontal="center")
-                    elif c_i in [4, 5]: celula_ex.number_format = '"R$" #,##0.00'; celula_ex.alignment = Alignment(horizontal="right")
-                            
-            for sheet_obj in [ws_f, ws_b]:
-                for col_obj in sheet_obj.columns:
-                    max_len_val = max(len(str(c_val.value or '')) for c_val in col_obj if c_val.row <= 100)
-                    sheet_obj.column_dimensions[get_column_letter(col_obj[0].column)].width = max(max_len_val + 3, 12)
-                    
-            wb_export_h.save(buf_excel_hidro); buf_excel_hidro.seek(0)
-            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-            
-            st.markdown("---")
-            st.markdown("### 📝 Descritivo Comercial Automático")
-            texto_comercial_final = "FORNECIMENTO E MONTAGEM DE CAVALETES HIDRÁULICOS PARA SISTEMAS DE CLIMATIZAÇÃO\n\n"
-            texto_comercial_final += "O escopo desta proposta contempla a montagem mecânica e o fornecimento de materiais para os conjuntos hidráulicos descritos abaixo:\n"
-            
-            agrupado_comercial = {}
-            tem_sistema_fechado = False
-            
-            for cav in st.session_state.cavaletes_selecionados:
-                sys_lbl = " [Sistema Aberto]" if "Aberto" in cav.get("sistema", "") else ""
-                if not "Aberto" in cav.get("sistema", ""): tem_sistema_fechado = True
-                
-                chave_com = f"Cavalete para {cav.get('equipamento', 'EQ')} ({cav.get('vias', '2 Vias')}) - Diâmetro de Ø {cav.get('bitola', '1/2\"')}{sys_lbl}"
-                if chave_com not in agrupado_comercial: agrupado_comercial[chave_com] = {"qtd": 0, "tags": []}
-                agrupado_comercial[chave_com]["qtd"] += cav.get("quantidade", 1)
-                tag_limpa = cav.get('tag', 'S/ TAG')
-                if tag_limpa != "S/ TAG": agrupado_comercial[chave_com]["tags"].append(tag_limpa)
-                    
-            for desc_conj, dados_conj in agrupado_comercial.items():
-                str_tags_c = f" [Identificação / TAGs: {', '.join(dados_conj['tags'])}]" if dados_conj['tags'] else ""
                 texto_comercial_final += f"• {dados_conj['qtd']} conjunto(s) - {desc_conj}{str_tags_c}, completo com válvulas de bloqueio proporcional/esfera, curvas de aço SCH40, filtro Y para proteção da malha e conexões estruturais periféricas.\n"
                 
             texto_comercial_final += "\n**Serviços Especializados Inclusos:**\n"
