@@ -2951,7 +2951,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 st.rerun()
             except Exception as e_cloud: st.error(f"Erro de permissão no Google Sheets: {e_cloud}")
 
-    wiwith aba_resumo_hidro:
+    with aba_resumo_hidro:
         st.header("📊 Resumo e Listas de Materiais (BOM)")
         
         if not st.session_state.cavaletes_selecionados:
