@@ -3140,7 +3140,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     
             wb_export_h.save(buf_excel_hidro); buf_excel_hidro.seek(0)
             
-            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidraulica")
             
             # =====================================================================
             # DESCRITIVO COMERCIAL (PROPOSTA)
