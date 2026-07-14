@@ -2631,9 +2631,18 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         st.session_state.matriz_templates = gerar_templates_matriz()
         st.session_state.versao_mat_rec = 'v15'
 
+    def obter_bitola_menor(bitola_atual):
+        lista = ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "5\"", "6\"", "8\"", "10\"", "12\""]
+        if bitola_atual in lista:
+            idx = lista.index(bitola_atual)
+            return lista[idx - 1] if idx > 0 else lista[0]
+        return bitola_atual
+
     def construir_nome_peca(item_base, medida, bitola_cavalete):
         if medida == "Nenhum": return item_base
-        medida_final = medida.replace("Variável {b}", bitola_cavalete)
+        bitola_menor = obter_bitola_menor(bitola_cavalete)
+        medida_final = medida.replace("Variável {b-1}", bitola_menor)
+        medida_final = medida_final.replace("Variável {b}", bitola_cavalete)
         return f"{item_base} - Ø {medida_final}"
 
     # 2. SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS
@@ -2784,7 +2793,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             column_config={
                 "Grupo": st.column_config.SelectboxColumn("Grupo do Kit", options=["Kit Dinâmico", "Kit Fixo"], required=True),
                 "Item Base": st.column_config.TextColumn("Descrição Base (sem o diâmetro)", required=True),
-                "Medida": st.column_config.SelectboxColumn("Medida (Bitola)", options=["Variável {b}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"], required=True),
+                "Medida": st.column_config.SelectboxColumn("Medida (Bitola)", options=["Variável {b}", "Variável {b-1}", "Variável {b} x {b-1}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"], required=True),
                 "Qtd": st.column_config.NumberColumn("Quantidade", min_value=0.0, format="%.2f")
             },
             num_rows="dynamic", use_container_width=True, key="grid_templates"
@@ -2819,7 +2828,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 add_novo = c_a3.text_input("2. OU Digite um Nome Novo")
                 
                 c_a4, c_a5, c_a6 = st.columns(3)
-                add_med = c_a4.selectbox("Medida", ["Variável {b}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"])
+                add_med = c_a4.selectbox("Medida", ["Variável {b}", "Variável {b-1}", "Variável {b} x {b-1}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"])
                 add_qtd = c_a5.number_input("Quantidade", min_value=0.01, value=1.0)
                 
                 if st.form_submit_button("Inserir na Receita Atual"):
