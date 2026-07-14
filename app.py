@@ -2998,6 +2998,60 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 mo_mont_sub = mo_m_u * cav["quantidade"]
                 mo_isol_sub = mo_i_u * cav["quantidade"]
                 
+                total_hidro_material, total_hidro_montagem, total_hidro_isolamento = 0.0, 0.0, 0.0
+            resumo_financeiro_quadros = []
+            materiais_condensados_lista = {} 
+            
+            # Puxa os valores ATUAIS da tabela de preços
+            preco_base_mont = dict_lookup_valores.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0)
+            preco_base_isol = dict_lookup_valores.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0)
+            dict_pol = {"1/4\"": 0.25, "3/8\"": 0.375, "1/2\"": 0.5, "3/4\"": 0.75, "1\"": 1.0, "1.1/4\"": 1.25, "1.1/2\"": 1.5, "2\"": 2.0, "2.1/2\"": 2.5, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0}
+            
+            for cav in st.session_state.cavaletes_selecionados:
+                pol_dec = dict_pol.get(cav["bitola"], 1.0)
+                is_aberto = "Aberto" in cav.get("sistema", "")
+                
+                # 1. Recálculo Dinâmico dos Materiais
+                m_sub_unit = 0.0
+                qtd_tubos = 0.0; qtd_conexoes = 0.0; qtd_valvulas = 0.0
+                
+                for comp_g in cav.get("composicao", []):
+                    n_busca = normalizar_string_busca(comp_g["nome"])
+                    pr_u = dict_lookup_valores.get(n_busca, 0.0)
+                    m_sub_unit += pr_u * comp_g["qtd"]
+                    
+                    # Agrupamento da BOM
+                    n_real = dict_nomes_originais.get(n_busca, comp_g["nome"])
+                    qtd_tot = comp_g["qtd"] * cav["quantidade"]
+                    if n_real not in materiais_condensados_lista: 
+                        materiais_condensados_lista[n_real] = {'qtd': 0.0, 'tags': set()}
+                    materiais_condensados_lista[n_real]['qtd'] += qtd_tot
+                    if cav.get('tag', 'S/ TAG') != 'S/ TAG': 
+                        materiais_condensados_lista[n_real]['tags'].add(cav.get('tag', 'S/ TAG'))
+                    
+                    # Varredura para Isolamento
+                    nome_low = comp_g["nome"].lower()
+                    if "tubo" in nome_low: qtd_tubos += comp_g["qtd"]
+                    elif "curva" in nome_low or "conexão t" in nome_low or "redução" in nome_low or "cotovelo" in nome_low: qtd_conexoes += comp_g["qtd"]
+                    elif "válvula" in nome_low or "filtro" in nome_low: qtd_valvulas += comp_g["qtd"]
+                
+                # 2. Recálculo Dinâmico da Mão de Obra
+                mo_m_u = preco_base_mont * pol_dec * 12.0
+                if is_aberto:
+                    mo_i_u = 0.0
+                else:
+                    metragem_equivalente = qtd_tubos + (qtd_conexoes * 1.5) + (qtd_valvulas * 2.0)
+                    mo_i_u = preco_base_isol * pol_dec * metragem_equivalente
+                
+                # Atualiza na memória para as tabelas abaixo usarem o novo valor
+                cav["mo_mont_unit"] = mo_m_u
+                cav["mo_isol_unit"] = mo_i_u
+                
+                # Soma Total
+                m_sub = m_sub_unit * cav["quantidade"]
+                mo_mont_sub = mo_m_u * cav["quantidade"]
+                mo_isol_sub = mo_i_u * cav["quantidade"]
+                
                 total_hidro_material += m_sub
                 total_hidro_montagem += mo_mont_sub
                 total_hidro_isolamento += mo_isol_sub
@@ -3005,9 +3059,14 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 sys_lbl = " [Aberto]" if "Aberto" in cav.get("sistema", "") else ""
                 
                 resumo_financeiro_quadros.append({
-                    "TAG": tag_atual, "Conjunto": f"{cav.get('equipamento', '')} ({cav.get('vias', '')}) - Ø {cav.get('bitola', '')}{sys_lbl}",
-                    "Qtd": cav["quantidade"], "Materiais": m_sub, "M.O. Montagem": mo_mont_sub, "M.O. Isolamento": mo_isol_sub, "Subtotal": m_sub + mo_mont_sub + mo_isol_sub
-                }))
+                    "TAG": tag_atual, 
+                    "Conjunto": f"{cav.get('equipamento', '')} ({cav.get('vias', '')}) - Ø {cav.get('bitola', '')}{sys_lbl}",
+                    "Qtd": cav["quantidade"], 
+                    "Materiais": m_sub, 
+                    "M.O. Montagem": mo_mont_sub, 
+                    "M.O. Isolamento": mo_isol_sub, 
+                    "Subtotal": m_sub + mo_mont_sub + mo_isol_sub
+                })
                         
             c1_h, c2_h, c3_h = st.columns(3)
             c1_h.info(f"**Materiais:**\nR$ {total_hidro_material:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
