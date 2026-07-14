@@ -2583,13 +2583,16 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     bitolas_soldadas = ["2.1/2\"", "3\"", "4\"", "5\"", "6\"", "8\"", "10\"", "12\""]
     todas_bitolas = bitolas_roscadas + bitolas_soldadas
 
+    # ---> CORREÇÃO: Variável do Tubo Restaurada <---
+    preco_base_kg_aco = 12.50
+    dict_p_tubo = {b: round(PESOS_SCH40[b] * preco_base_kg_aco, 2) for b in todas_bitolas}
+
     def normalizar_string_busca(texto):
         return re.sub(r'[\s\-\"°Ø\’\']+', '', str(texto)).lower().strip()
 
     # ==============================================================================
     # 2. PADRÕES DE ENGENHARIA (TEMPLATES EM LOTE INSPIRADOS NO EXCEL DO CLIENTE)
     # ==============================================================================
-    # O {b} atua como um curinga. O sistema troca {b} pela bitola selecionada.
     DEFAULT_DINAMICO_ROSCADO = [
         {"Item / Componente": "Tubo em aço carbono Aço carbono preto - Ø {b}", "Quantidade": 2.0},
         {"Item / Componente": "Isolamento Espuma elastomérica, espessura 25 mm - Ø {b}", "Quantidade": 2.0},
@@ -2601,7 +2604,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         {"Item / Componente": "Válvula balanceadora - - Ø {b}", "Quantidade": 1.0},
         {"Item / Componente": "Niple duplo Ferro maleável galvanizado - Ø {b}", "Quantidade": 4.0},
         {"Item / Componente": "Luva de redução - solda/rosca Aço carbono preto - Ø {b} x 1/2\"", "Quantidade": 2.0},
-        {"Item / Componente": "Conexão T 90° de redução Ferro maleável galvanizado - Ø {b} x 1/2\"", "Quantidade": 4.0}, # (2 + 2 no excel)
+        {"Item / Componente": "Conexão T 90° de redução Ferro maleável galvanizado - Ø {b} x 1/2\"", "Quantidade": 4.0},
         {"Item / Componente": "Redução concêntrica Ferro maleável galvanizado - Ø {b} x 1/2\"", "Quantidade": 2.0},
         {"Item / Componente": "Suporte - - Ø {b}", "Quantidade": 1.0},
     ]
@@ -2646,12 +2649,11 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     if 'template_flangeado' not in st.session_state: st.session_state.template_flangeado = DEFAULT_DINAMICO_FLANGEADO
     if 'template_fixo' not in st.session_state: st.session_state.template_fixo = DEFAULT_KIT_FIXO
 
-    # 3. GERAÇÃO DINÂMICA DO BANCO DE PREÇOS (BASEADO NOS TEMPLATES)
-    if st.session_state.get('versao_banco_hidro') != 'v12':
+    # 3. GERAÇÃO DINÂMICA DO BANCO DE PREÇOS
+    if st.session_state.get('versao_banco_hidro') != 'v13':
         banco_temp = []
         todas_pecas_geradas = set()
         
-        # Simula as substituições para criar o banco mestre de preços
         for b in todas_bitolas:
             banco_temp.append({"Item / Componente": f"Tubo em aço carbono SCH40 sem costura - Ø {b}", "Preço Unitário (R$)": dict_p_tubo.get(b, 200.0), "Unidade": "m"})
             
@@ -2685,7 +2687,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         except: pass
         
         st.session_state.banco_precos_hidraulica = banco_temp
-        st.session_state.versao_banco_hidro = 'v12'
+        st.session_state.versao_banco_hidro = 'v13'
 
     if 'cavaletes_selecionados' not in st.session_state: st.session_state.cavaletes_selecionados = []
 
@@ -2787,7 +2789,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 if item["Quantidade"] > 0:
                     composicao_kit.append({"nome": item["Item / Componente"], "qtd": item["Quantidade"]})
                     
-            # Adicionais Estruturais
+            # Adicionais Estruturais (3 Vias)
             if "3 Vias" in tipo_vias:
                 if is_roscado:
                     composicao_kit.append({"nome": f"Conexão T 90° Ferro maleável galvanizado - Ø {bitola_final}", "qtd": 1.0})
@@ -2982,4 +2984,5 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             ws_b = wb_export_h.create_sheet(title="Lista de Materiais (BOM)"); ws_b.views.sheetView[0].showGridLines = True
             wb_export_h.save(buf_excel_hidro); buf_excel_hidro.seek(0)
             
-            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidro_v12")
+            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidro_v13")
+
