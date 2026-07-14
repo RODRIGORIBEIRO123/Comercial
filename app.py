@@ -2992,27 +2992,3 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             for cav in st.session_state.cavaletes_selecionados:
                 st.markdown(f"#### {cav.get('tag', 'S/ TAG')} - {cav.get('equipamento', '')} (Ø {cav.get('bitola', '')})")
                 st.dataframe(pd.DataFrame([{"Componente": c["nome"], "Qtd Unit": c["qtd"], f"Qtd Total ({cav['quantidade']} conj.)": c["qtd"] * cav["quantidade"]} for c in cav['composicao']]), use_container_width=True, hide_index=True)
-                
-            st.markdown("---")
-            st.subheader("🛒 Lista de Materiais Consolidada (BOM Única)")
-            lista_bom = []
-            for nome, dados in materiais_condensados_lista.items():
-                pr_u = dict_lookup_valores.get(normalizar_string_busca(nome), 0.0)
-                is_pc = dict_lookup_unidades.get(normalizar_string_busca(nome), "pç") == "pç"
-                match = re.search(r'Ø\s*([\d\./"]+)', nome)
-                lista_bom.append({
-                    "Bitola": match.group(1) if match else "Geral", "Item / Componente": nome,
-                    "Aplicação (TAGs)": ", ".join(sorted(dados['tags'])) if dados['tags'] else "Uso Geral",
-                    "Qtd Total": math.ceil(dados['qtd']) if is_pc else round(dados['qtd'], 2),
-                    "Unid": dict_lookup_unidades.get(normalizar_string_busca(nome), "un"),
-                    "Preço Ref.": f"R$ {pr_u:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-                    "Preço Total": f"R$ {(pr_u * dados['qtd']):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                })
-                
-            st.dataframe(pd.DataFrame(lista_bom).sort_values(by=["Bitola", "Item / Componente"]), use_container_width=True, hide_index=True)
-            
-            buf_excel_hidro = io.BytesIO(); wb_export_h = openpyxl.Workbook()
-            ws_f = wb_export_h.active; ws_f.title = "Resumo Comercial"; ws_f.views.sheetView[0].showGridLines = True
-            ws_b = wb_export_h.create_sheet(title="Lista de Materiais (BOM)"); ws_b.views.sheetView[0].showGridLines = True
-            wb_export_h.save(buf_excel_hidro); buf_excel_hidro.seek(0)
-            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidro_v15")
