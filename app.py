@@ -2747,7 +2747,30 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             custo_material_total_kit = sum(dict_precos_memoria.get(normalizar_string_busca(comp["nome"]), 0.0) * comp["qtd"] for comp in composicao_kit)
             
             mo_mont_calculado = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0) * pol_dec * 12.0
-            mo_isol_calculado = 0.0 if is_aberto else (dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0) * pol_dec * 8.0)
+            
+            # --- NOVO MOTOR DE M.O. DE ISOLAMENTO (COMPRIMENTO EQUIVALENTE) ---
+            if is_aberto:
+                mo_isol_calculado = 0.0
+            else:
+                preco_base_isol_metro = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0) * pol_dec
+                
+                qtd_tubos_linear = 0.0
+                qtd_conexoes = 0.0
+                qtd_valvulas = 0.0
+                
+                for comp in composicao_kit:
+                    nome_low = comp["nome"].lower()
+                    qtd_c = comp["qtd"]
+                    if "tubo" in nome_low:
+                        qtd_tubos_linear += qtd_c
+                    elif "curva" in nome_low or "conexão t" in nome_low or "redução" in nome_low or "cotovelo" in nome_low:
+                        qtd_conexoes += qtd_c
+                    elif "válvula" in nome_low or "filtro" in nome_low:
+                        qtd_valvulas += qtd_c
+                
+                # Fator 1.0 para tubos, 1.5 para conexões/curvas, 2.0 para caixas de válvulas/filtros
+                metragem_equivalente = qtd_tubos_linear + (qtd_conexoes * 1.5) + (qtd_valvulas * 2.0)
+                mo_isol_calculado = preco_base_isol_metro * metragem_equivalente
             
             st.session_state.cavaletes_selecionados.append({
                 "id": str(uuid.uuid4()), "tag": tag_equip if tag_equip else "S/ TAG",
@@ -2879,6 +2902,26 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.rerun()
             
         st.markdown("---")
+        st.markdown("### 🔄 Sincronização em Lote (Excel)")
+        ch1, ch2 = st.columns(2)
+        with ch1:
+            def gerar_planilha_itens_hidro(com_precos):
+                buf = io.BytesIO(); wb = openpyxl.Workbook(); ws = wb.active
+                ws.append(["Item / Componente", "Preço Unitário (R$)", "Unidade"])
+                for r in st.session_state.banco_precos_hidraulica:
+                    ws.append([r["Item / Componente"], r["Preço Unitário (R$)"] if com_precos else "", r["Unidade"]])
+                wb.save(buf); buf.seek(0); return buf
+            st.download_button("📥 Baixar Planilha para Cotar", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
+        with ch2:
+            upl_hidro = st.file_uploader("📂 Devolver Planilha Cotada", type=["xlsx", "xls"], label_visibility="collapsed")
+            if upl_hidro:
+                df_up = pd.read_excel(upl_hidro)
+                st.session_state.banco_precos_hidraulica = df_up.to_dict('records')
+                st.success("Tabela atualizada na memória!")
+                st.rerun()
+
+        st.markdown("---")
+        st.markdown("### Edição Manual Rápida")
         df_grid_hidro = pd.DataFrame(st.session_state.banco_precos_hidraulica)
         df_grid_hidro_editado = st.data_editor(df_grid_hidro, use_container_width=True, num_rows="dynamic", hide_index=True)
         
