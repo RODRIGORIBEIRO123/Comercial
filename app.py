@@ -2721,7 +2721,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
         tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: UTA-01, CH-01...")
         
-        iif st.button("➕ Adicionar Cavalete ao Levantamento", type="primary"):
+        if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary"):
             # Lógica exata para não confundir 2.1/2" com 1/2"
             dict_pol = {"1/4\"": 0.25, "3/8\"": 0.375, "1/2\"": 0.5, "3/4\"": 0.75, "1\"": 1.0, "1.1/4\"": 1.25, "1.1/2\"": 1.5, "2\"": 2.0, "2.1/2\"": 2.5, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0}
             pol_dec = dict_pol.get(bitola_final, 1.0)
