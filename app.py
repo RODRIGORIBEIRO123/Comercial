@@ -2596,7 +2596,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 if eq in ["Chiller", "Bomba"] and vias == "3 Vias": continue
                 for ligacao in ["Roscado", "Flangeado"]:
                     
-                    # KIT DINÂMICO (LINHA) - Variável em função do Diâmetro
+                    # KIT DINÂMICO (LINHA)
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Tubo em aço carbono Aço carbono preto", "Medida": "Variável {b}", "Qtd": 3.0 if eq in ["UTA", "Chiller"] else 2.0})
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Isolamento Espuma elastomérica, espessura 25 mm", "Medida": "Variável {b}", "Qtd": 2.0})
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Rechapeamento chapa de alumínio liso, espessura 0,5 mm", "Medida": "Variável {b}", "Qtd": 2.0})
@@ -2618,7 +2618,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Filtro Y Flangeado Ferro Fundido", "Medida": "Variável {b}", "Qtd": 1.0})
                         templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Conexão T 90° Aço carbono preto SCH40", "Medida": "Variável {b}", "Qtd": 2.0 if vias == "3 Vias" else 1.0})
 
-                    # KIT FIXO (INSTRUMENTAÇÃO E DRENOS) - Diâmetros fixos
+                    # KIT FIXO
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Fixo", "Item Base": "Poço para termômetro Latão haste = 38mm", "Medida": "1/2\"", "Qtd": 2.0})
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Fixo", "Item Base": "Termômetro tipo capela. Escala 0° a 40°C", "Medida": "3/8\"", "Qtd": 2.0})
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Fixo", "Item Base": "Robinete com alivio para manômetro Latão", "Medida": "1/2\"", "Qtd": 1.0})
@@ -2627,20 +2627,18 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Fixo", "Item Base": "Niple duplo Ferro maleável galvanizado", "Medida": "1/4\"", "Qtd": 2.0})
         return templates
 
-    if 'matriz_templates' not in st.session_state or st.session_state.get('versao_mat_rec') != 'v14':
+    if 'matriz_templates' not in st.session_state or st.session_state.get('versao_mat_rec') != 'v15':
         st.session_state.matriz_templates = gerar_templates_matriz()
-        st.session_state.versao_mat_rec = 'v14'
+        st.session_state.versao_mat_rec = 'v15'
 
-    # Função para converter Item Base + Medida = Nome Final
     def construir_nome_peca(item_base, medida, bitola_cavalete):
         if medida == "Nenhum": return item_base
         medida_final = medida.replace("Variável {b}", bitola_cavalete)
         return f"{item_base} - Ø {medida_final}"
 
     # 2. SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS
-    if st.session_state.get('versao_banco_hidro') != 'v14':
+    if st.session_state.get('versao_banco_hidro') != 'v15':
         banco_temp = {}
-        # Gera todas as variações possíveis para povoar a tabela de preços
         for template in st.session_state.matriz_templates:
             bitolas_alvo = bitolas_roscadas if template["Ligação"] == "Roscado" else bitolas_soldadas
             for b in bitolas_alvo:
@@ -2658,14 +2656,13 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             aba_h = sh_hidro.worksheet("Precos_Hidraulica_Itens").get_all_records()
             for row in aba_h:
                 chave = normalizar_string_busca(row.get("Item / Componente", ""))
-                # Se o item existe na nuvem, atualiza o preço na memória
                 for key_banco in banco_temp.keys():
                     if normalizar_string_busca(key_banco) == chave:
                         banco_temp[key_banco]["Preço Unitário (R$)"] = float(row.get("Preço Unitário (R$)", 0.0))
         except: pass
         
         st.session_state.banco_precos_hidraulica = list(banco_temp.values())
-        st.session_state.versao_banco_hidro = 'v14'
+        st.session_state.versao_banco_hidro = 'v15'
 
     if 'cavaletes_selecionados' not in st.session_state: st.session_state.cavaletes_selecionados = []
 
@@ -2685,7 +2682,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
 
     # AS 4 ABAS DO APLICATIVO
     aba_cadastro_hidro, aba_precos_hidro, aba_padroes_hidro, aba_resumo_hidro = st.tabs([
-        "🔧 Dimensionamento", "💲 Tabela de Preços", "📝 Regras e Padrões (Templates)", "📊 Resumos / BOM"
+        "🔧 Dimensionamento", "💲 Tabela de Preços", "📝 Central de Padrões (Templates)", "📊 Resumos / BOM"
     ])
 
     with aba_cadastro_hidro:
@@ -2728,10 +2725,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             is_aberto = "Aberto" in tipo_sistema
             ligacao = "Roscado" if bitola_final in bitolas_roscadas else "Flangeado"
             
-            # --- MOTOR SÊNIOR: Monta o cavalete lendo as Regras da Aba de Templates ---
             composicao_kit = []
-            
-            # Busca as regras para este equipamento específico
             regras_ativas = [t for t in st.session_state.matriz_templates if t["Equipamento"] == tipo_equip and t["Vias"] == tipo_vias and t["Ligação"] == ligacao]
             
             for regra in regras_ativas:
@@ -2780,11 +2774,11 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         
         st.markdown(f"#### Editando Receita: **{sel_eq} | {sel_vi} | {sel_li}**")
         
-        # Filtra a base para mostrar apenas o template selecionado
         df_templates = pd.DataFrame(st.session_state.matriz_templates)
         filtro = (df_templates["Equipamento"] == sel_eq) & (df_templates["Vias"] == sel_vi) & (df_templates["Ligação"] == sel_li)
         df_editavel = df_templates[filtro][["Grupo", "Item Base", "Medida", "Qtd"]].copy()
         
+        # A TABELA DE EDIÇÃO
         df_editado = st.data_editor(
             df_editavel,
             column_config={
@@ -2796,21 +2790,49 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             num_rows="dynamic", use_container_width=True, key="grid_templates"
         )
         
-        col_btn1, col_btn2 = st.columns([1, 1])
-        if col_btn1.button("💾 Salvar Este Padrão", type="primary"):
+        if st.button("💾 Salvar Esta Tabela", type="primary"):
             nova_matriz = [row for row in st.session_state.matriz_templates if not (row["Equipamento"] == sel_eq and row["Vias"] == sel_vi and row["Ligação"] == sel_li)]
             for _, row in df_editado.iterrows():
                 if pd.notna(row["Item Base"]) and str(row["Item Base"]).strip() != "":
-                    nova_matriz.append({
-                        "Equipamento": sel_eq, "Vias": sel_vi, "Ligação": sel_li,
-                        "Grupo": row["Grupo"], "Item Base": str(row["Item Base"]).strip(),
-                        "Medida": row["Medida"], "Qtd": float(row["Qtd"]) if pd.notna(row["Qtd"]) else 1.0
-                    })
+                    nova_matriz.append({"Equipamento": sel_eq, "Vias": sel_vi, "Ligação": sel_li, "Grupo": row["Grupo"], "Item Base": str(row["Item Base"]).strip(), "Medida": row["Medida"], "Qtd": float(row["Qtd"]) if pd.notna(row["Qtd"]) else 1.0})
             st.session_state.matriz_templates = nova_matriz
-            # Limpa cache do banco de preços para forçar recálculo dos nomes
             st.session_state.versao_banco_hidro = 'forcar_recalculo'
             st.success("✅ Padrão salvo com sucesso!")
             
+        # ==============================================================================
+        # NOVO MÓDULO: ADICIONAR ITEM COM BUSCA NO BANCO OU NOME NOVO
+        # ==============================================================================
+        st.markdown("---")
+        with st.expander("➕ Inserir Novo Item nesta Receita", expanded=False):
+            # Varre o banco para pegar os nomes base (sem o Ø) para facilitar a seleção
+            nomes_base_existentes = set()
+            for item in st.session_state.banco_precos_hidraulica:
+                nome_bruto = item["Item / Componente"]
+                base = nome_bruto.split("- Ø")[0].strip() if "- Ø" in nome_bruto else nome_bruto
+                nomes_base_existentes.add(base)
+            nomes_base_existentes = sorted(list(nomes_base_existentes))
+
+            with st.form("form_add_item_template"):
+                c_a1, c_a2, c_a3 = st.columns(3)
+                add_grp = c_a1.selectbox("Grupo", ["Kit Dinâmico", "Kit Fixo"], help="Kit Dinâmico para peças que mudam a bitola. Fixo para peças estáticas.")
+                add_base = c_a2.selectbox("1. Selecionar Existente", ["-- Selecione --"] + nomes_base_existentes)
+                add_novo = c_a3.text_input("2. OU Digite um Nome Novo")
+                
+                c_a4, c_a5, c_a6 = st.columns(3)
+                add_med = c_a4.selectbox("Medida", ["Variável {b}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"])
+                add_qtd = c_a5.number_input("Quantidade", min_value=0.01, value=1.0)
+                
+                if st.form_submit_button("Inserir na Receita Atual"):
+                    nome_escolhido = add_novo if add_novo.strip() != "" else (add_base if add_base != "-- Selecione --" else "")
+                    if nome_escolhido != "":
+                        # Insere diretamente na matriz mestre e recarrega
+                        st.session_state.matriz_templates.append({"Equipamento": sel_eq, "Vias": sel_vi, "Ligação": sel_li, "Grupo": add_grp, "Item Base": nome_escolhido, "Medida": add_med, "Qtd": add_qtd})
+                        st.session_state.versao_banco_hidro = 'forcar_recalculo'
+                        st.toast(f"Item inserido na receita do(a) {sel_eq}!", icon="✅")
+                        st.rerun()
+                    else:
+                        st.error("Selecione um item do banco ou digite um nome novo.")
+
         st.markdown("---")
         st.markdown("#### 🔄 Clonar Padrão")
         st.caption("Gostou de como ficou essa receita? Copie-a idêntica para outro equipamento para não ter que refazer tudo.")
@@ -2933,5 +2955,4 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             ws_f = wb_export_h.active; ws_f.title = "Resumo Comercial"; ws_f.views.sheetView[0].showGridLines = True
             ws_b = wb_export_h.create_sheet(title="Lista de Materiais (BOM)"); ws_b.views.sheetView[0].showGridLines = True
             wb_export_h.save(buf_excel_hidro); buf_excel_hidro.seek(0)
-            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidro_v14")
-
+            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidro_v15")
