@@ -2979,6 +2979,23 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             c2_h.warning(f"**Mão de Obra:**\nR$ {(total_hidro_montagem + total_hidro_isolamento):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             c3_h.success(f"**TOTAL:**\nR$ {(total_hidro_material + total_hidro_montagem + total_hidro_isolamento):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             
+            # --- MEMORIAL DE CÁLCULO DE MÃO DE OBRA ---
+            with st.expander("ℹ️ Entenda como a Mão de Obra é calculada pelo sistema"):
+                st.markdown("""
+                A Mão de Obra é parametrizada com base no indexador industrial de **"Polegada Equivalente"**.
+                
+                **1. Montagem Hidráulica:**
+                O tempo e esforço de rosqueamento/soldagem crescem proporcionalmente ao diâmetro do tubo. O cálculo considera a média de pontos de acoplamento dentro de um cavalete.
+                *Fórmula:* `Preço Base da Polegada x Diâmetro Nominal (decimal) x Fator de Montagem (12.0)`
+                
+                **2. Isolamento Térmico (Rechapeamento):**
+                Aplicamos a técnica Sênior de **Metragem Equivalente**. Isolar um tubo reto é simples, mas fabricar caixas de válvulas consome muito mais tempo e material.
+                O sistema varre a receita do cavalete e aplica os seguintes multiplicadores de esforço sobre o metro linear da polegada:
+                *   Tubo Reto = `1.0x`
+                *   Curvas, Tês e Reduções = `1.5x` (50% a mais de esforço)
+                *   Válvulas e Filtros Y = `2.0x` (O dobro de esforço para caixas artesanais)
+                """)
+
             st.markdown("---")
             st.subheader("📊 Resumo de Custos por Cavalete")
             df_res_quadros_disp = pd.DataFrame(resumo_financeiro_quadros)
@@ -2989,7 +3006,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             
             st.markdown("---")
             # ==============================================================================
-            # LISTA EXPLODIDA (COM VALORES UNITÁRIOS, TOTAIS E MÃO DE OBRA)
+            # LISTA EXPLODIDA COM UNIDADES
             # ==============================================================================
             st.subheader("📋 Lista Explodida (Por Equipamento)")
             for cav in st.session_state.cavaletes_selecionados:
@@ -2999,11 +3016,14 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 qtd_conjuntos = cav['quantidade']
                 
                 for comp in cav['composicao']:
-                    pr_u = dict_lookup_valores.get(normalizar_string_busca(comp["nome"]), 0.0)
+                    n_busca = normalizar_string_busca(comp["nome"])
+                    pr_u = dict_lookup_valores.get(n_busca, 0.0)
                     pr_t = pr_u * comp["qtd"] * qtd_conjuntos
+                    unidade_item = dict_lookup_unidades.get(n_busca, "un")
                     
                     lista_itens_cav.append({
                         "Componente": comp["nome"],
+                        "Unid": unidade_item,
                         "Qtd Unit": comp["qtd"],
                         f"Qtd Total ({qtd_conjuntos} conj.)": comp["qtd"] * qtd_conjuntos,
                         "Valor Unit": f"R$ {pr_u:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
@@ -3014,6 +3034,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     mo_m_u = cav["mo_mont_unit"]
                     lista_itens_cav.append({
                         "Componente": "🔧 SERVIÇO: Mão de Obra de Montagem Hidráulica (Por Conjunto)",
+                        "Unid": "sv",
                         "Qtd Unit": 1.0,
                         f"Qtd Total ({qtd_conjuntos} conj.)": 1.0 * qtd_conjuntos,
                         "Valor Unit": f"R$ {mo_m_u:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
@@ -3024,6 +3045,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     mo_i_u = cav["mo_isol_unit"]
                     lista_itens_cav.append({
                         "Componente": "🔧 SERVIÇO: Mão de Obra de Isolamento Térmico e Rechapeamento (Por Conjunto)",
+                        "Unid": "sv",
                         "Qtd Unit": 1.0,
                         f"Qtd Total ({qtd_conjuntos} conj.)": 1.0 * qtd_conjuntos,
                         "Valor Unit": f"R$ {mo_i_u:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
@@ -3102,7 +3124,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     sheet_obj.column_dimensions[get_column_letter(col_obj[0].column)].width = max(max_len_val + 3, 12)
                     
             wb_export_h.save(buf_excel_hidro); buf_excel_hidro.seek(0)
-            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidro_v16")
+            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidro_v17")
             
             # ==============================================================================
             # DESCRITIVO COMERCIAL RESTAURADO
