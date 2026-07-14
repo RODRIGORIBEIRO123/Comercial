@@ -2844,16 +2844,24 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
 
         st.markdown("---")
         st.markdown("#### 🔄 Clonar Padrão")
-        st.caption("Gostou de como ficou essa receita? Copie-a idêntica para outro equipamento para não ter que refazer tudo.")
-        c_clon1, c_clon2 = st.columns(2)
-        clon_eq = c_clon1.selectbox("Copiar PARA Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"], key="clon_eq")
-        if c_clon2.button("📋 Executar Clonagem", type="secondary"):
-            matriz_sem_alvo = [row for row in st.session_state.matriz_templates if not (row["Equipamento"] == clon_eq and row["Vias"] == sel_vi and row["Ligação"] == sel_li)]
-            for _, row in df_editado.iterrows():
-                matriz_sem_alvo.append({"Equipamento": clon_eq, "Vias": sel_vi, "Ligação": sel_li, "Grupo": row["Grupo"], "Item Base": row["Item Base"], "Medida": row["Medida"], "Qtd": row["Qtd"]})
-            st.session_state.matriz_templates = matriz_sem_alvo
-            st.toast(f"Receita clonada para {clon_eq}!", icon="📋")
-            st.rerun()
+        st.caption("Gostou de como ficou essa receita? Copie-a idêntica para outro cenário para não ter que refazer tudo.")
+        
+        c_clon1, c_clon2, c_clon3 = st.columns(3)
+        # Já puxa selecionado o que você está editando no momento
+        clon_eq = c_clon1.selectbox("Copiar PARA Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"], index=["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"].index(sel_eq), key="clon_eq")
+        clon_vi = c_clon2.selectbox("Copiar PARA Vias:", ["2 Vias", "3 Vias"], index=["2 Vias", "3 Vias"].index(sel_vi) if sel_vi in ["2 Vias", "3 Vias"] else 0, key="clon_vi")
+        clon_li = c_clon3.selectbox("Copiar PARA Ligação:", ["Roscado", "Flangeado"], index=["Roscado", "Flangeado"].index(sel_li), key="clon_li")
+        
+        if st.button("📋 Executar Clonagem", type="secondary"):
+            if clon_eq in ["Chiller", "Bomba"] and clon_vi == "3 Vias":
+                st.error("⚠️ Atenção: Chiller e Bomba só trabalham com configuração de 2 Vias no sistema.")
+            else:
+                matriz_sem_alvo = [row for row in st.session_state.matriz_templates if not (row["Equipamento"] == clon_eq and row["Vias"] == clon_vi and row["Ligação"] == clon_li)]
+                for _, row in df_editado.iterrows():
+                    matriz_sem_alvo.append({"Equipamento": clon_eq, "Vias": clon_vi, "Ligação": clon_li, "Grupo": row["Grupo"], "Item Base": row["Item Base"], "Medida": row["Medida"], "Qtd": row["Qtd"]})
+                st.session_state.matriz_templates = matriz_sem_alvo
+                st.toast(f"Receita clonada com sucesso para {clon_eq} | {clon_vi} | {clon_li}!", icon="📋")
+                st.rerun()
 
     with aba_precos_hidro:
         st.header("Gestão Sênior de Preços (Componentes Abertos)")
