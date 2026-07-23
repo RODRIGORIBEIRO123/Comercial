@@ -2907,7 +2907,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     ws.append([r["Item / Componente"], r["Preço Unitário (R$)"] if com_precos else "", r["Unidade"]])
                 wb.save(buf); buf.seek(0); return buf
             st.download_button("📥 Baixar Planilha para Cotar", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
-        wwith ch2:
+        with ch2:
             with st.form("form_upload_planilha", clear_on_submit=True):
                 upl_hidro = st.file_uploader("📂 Devolver Planilha Cotada", type=["xlsx", "xls"])
                 submitted = st.form_submit_button("✅ Confirmar Upload e Salvar na Nuvem", type="primary", use_container_width=True)
