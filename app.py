@@ -2909,34 +2909,32 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.download_button("📥 Baixar Planilha para Cotar", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
         with ch2:
             st.markdown("#### 📂 Devolver Planilha Cotada")
-            upl_hidro = st.file_uploader("Selecione o arquivo Excel atualizado:", type=["xlsx", "xls"], label_visibility="collapsed")
+            upl_hidro = st.file_uploader("Arraste o arquivo aqui (Upload Automático):", type=["xlsx", "xls"], label_visibility="collapsed")
             
+            # Se tiver arquivo e ele for diferente do último que subimos
             if upl_hidro is not None:
-                if st.button("🚀 Processar e Atualizar Sistema", type="primary", use_container_width=True):
-                    with st.spinner("Lendo e sincronizando com a Nuvem..."):
+                arquivo_id = upl_hidro.name + str(upl_hidro.size)
+                
+                if st.session_state.get("ultimo_upload_hidro") != arquivo_id:
+                    with st.spinner("🔄 Lendo e Sincronizando com a Nuvem..."):
                         try:
-                            # 1. Leitura do arquivo
-                            upl_hidro.seek(0)
+                            # 1. Leitura
                             df_up = pd.read_excel(upl_hidro)
-                            
-                            # 2. Limpeza de colunas (tira espaços extras que o Excel possa ter criado)
                             df_up.rename(columns=lambda x: str(x).strip(), inplace=True)
                             
-                            # Verifica se as colunas certas existem
-                            if "Item / Componente" not in df_up.columns or "Preço Unitário (R$)" not in df_up.columns:
-                                st.error("⚠️ As colunas 'Item / Componente' e 'Preço Unitário (R$)' não foram encontradas. Verifique o cabeçalho.")
-                            else:
+                            # 2. Validação
+                            if "Item / Componente" in df_up.columns:
                                 df_up = df_up.dropna(subset=["Item / Componente"])
-                                
-                                # 3. Conversão segura de preços (evita erro se alguém digitar "R$ 10,00" na célula)
                                 nova_lista = []
+                                
                                 for _, row in df_up.iterrows():
                                     preco = row.get("Preço Unitário (R$)", 0.0)
+                                    # Limpa caracteres se o usuário digitou 'R$' sem querer na célula
                                     if isinstance(preco, str):
                                         preco = preco.replace("R$", "").replace(".", "").replace(",", ".").strip()
-                                    try:
+                                    try: 
                                         preco = float(preco)
-                                    except:
+                                    except: 
                                         preco = 0.0
                                         
                                     nova_lista.append({
@@ -2945,21 +2943,28 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                                         "Unidade": str(row.get("Unidade", "un"))
                                     })
                                 
-                                # 4. Atualiza a memória
+                                # 3. Salva na Memória
                                 st.session_state.banco_precos_hidraulica = nova_lista
                                 
-                                # 5. Gravação forçada na nuvem
+                                # 4. Salva na Nuvem do Google
                                 sh_cloud = conectar_google_sheets()
                                 ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
                                 ws_ci.clear()
-                                
-                                linhas = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + \
-                                         [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in nova_lista]
+                                linhas = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in nova_lista]
                                 ws_ci.append_rows(linhas)
                                 
-                                st.success("✅ Base atualizada com sucesso! A tabela abaixo já contém os novos valores.")
+                                # Registra que este arquivo já foi lido para não rodar em loop infinito
+                                st.session_state["ultimo_upload_hidro"] = arquivo_id
+                                
+                                st.success("✅ Valores atualizados com sucesso no sistema e na nuvem!")
+                                import time
+                                time.sleep(1.5) # Dá 1,5 segundo para você ler a mensagem verde
+                                st.rerun() # Atualiza a tabela abaixo na hora
+                                
+                            else:
+                                st.error("⚠️ Coluna 'Item / Componente' não encontrada na planilha.")
                         except Exception as e:
-                            st.error(f"⚠️ Erro crítico ao salvar: {e}")
+                            st.error(f"⚠️ Falha na comunicação com a nuvem: {e}")
 
         st.markdown("---")
         st.markdown("### Edição Manual Rápida")
