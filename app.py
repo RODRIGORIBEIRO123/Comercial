@@ -2909,62 +2909,53 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.download_button("📥 Baixar Planilha para Cotar", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
         with ch2:
             st.markdown("#### 📂 Devolver Planilha Cotada")
-            upl_hidro = st.file_uploader("Arraste o arquivo aqui (Upload Automático):", type=["xlsx", "xls"], label_visibility="collapsed")
+            upl_hidro = st.file_uploader("Arraste a planilha revisada (Upload Automático):", type=["xlsx", "xls"], label_visibility="collapsed", key="uploader_precos_hidro")
             
-            # Se tiver arquivo e ele for diferente do último que subimos
             if upl_hidro is not None:
                 arquivo_id = upl_hidro.name + str(upl_hidro.size)
                 
                 if st.session_state.get("ultimo_upload_hidro") != arquivo_id:
-                    with st.spinner("🔄 Lendo e Sincronizando com a Nuvem..."):
+                    with st.spinner("🔄 Processando... Limpando Cache e Atualizando Nuvem..."):
                         try:
-                            # 1. Leitura
+                            # 1. Leitura forçada
                             df_up = pd.read_excel(upl_hidro)
                             df_up.rename(columns=lambda x: str(x).strip(), inplace=True)
                             
-                            # 2. Validação
-                            if "Item / Componente" in df_up.columns:
-                                df_up = df_up.dropna(subset=["Item / Componente"])
-                                nova_lista = []
-                                
-                                for _, row in df_up.iterrows():
-                                    preco = row.get("Preço Unitário (R$)", 0.0)
-                                    # Limpa caracteres se o usuário digitou 'R$' sem querer na célula
-                                    if isinstance(preco, str):
-                                        preco = preco.replace("R$", "").replace(".", "").replace(",", ".").strip()
-                                    try: 
-                                        preco = float(preco)
-                                    except: 
-                                        preco = 0.0
-                                        
-                                    nova_lista.append({
-                                        "Item / Componente": str(row.get("Item / Componente", "")),
-                                        "Preço Unitário (R$)": preco,
-                                        "Unidade": str(row.get("Unidade", "un"))
-                                    })
-                                
-                                # 3. Salva na Memória
-                                st.session_state.banco_precos_hidraulica = nova_lista
-                                
-                                # 4. Salva na Nuvem do Google
-                                sh_cloud = conectar_google_sheets()
-                                ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
-                                ws_ci.clear()
-                                linhas = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in nova_lista]
-                                ws_ci.append_rows(linhas)
-                                
-                                # Registra que este arquivo já foi lido para não rodar em loop infinito
-                                st.session_state["ultimo_upload_hidro"] = arquivo_id
-                                
-                                st.success("✅ Valores atualizados com sucesso no sistema e na nuvem!")
-                                import time
-                                time.sleep(1.5) # Dá 1,5 segundo para você ler a mensagem verde
-                                st.rerun() # Atualiza a tabela abaixo na hora
-                                
-                            else:
-                                st.error("⚠️ Coluna 'Item / Componente' não encontrada na planilha.")
+                            # 2. Conversão e Limpeza de Segurança
+                            df_up = df_up.dropna(subset=["Item / Componente"])
+                            nova_lista = []
+                            for _, row in df_up.iterrows():
+                                preco = row.get("Preço Unitário (R$)", 0.0)
+                                if isinstance(preco, str):
+                                    preco = preco.replace("R$", "").replace(".", "").replace(",", ".").strip()
+                                try: preco = float(preco)
+                                except: preco = 0.0
+                                    
+                                nova_lista.append({
+                                    "Item / Componente": str(row.get("Item / Componente", "")),
+                                    "Preço Unitário (R$)": preco,
+                                    "Unidade": str(row.get("Unidade", "un"))
+                                })
+                            
+                            # 3. Gravação na Nuvem (Direta)
+                            sh_cloud = conectar_google_sheets()
+                            ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
+                            ws_ci.clear()
+                            linhas = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in nova_lista]
+                            ws_ci.append_rows(linhas)
+                            
+                            # 4. A CORREÇÃO DE OURO: Matar o Cache e Atualizar a Sessão!
+                            st.session_state.banco_precos_hidraulica = nova_lista
+                            st.session_state["ultimo_upload_hidro"] = arquivo_id
+                            st.cache_data.clear() # <- ESSA LINHA RESOLVE O PROBLEMA
+                            
+                            st.success("✅ Base sincronizada e Cache Limpo!")
+                            import time
+                            time.sleep(1)
+                            st.rerun()
+                            
                         except Exception as e:
-                            st.error(f"⚠️ Falha na comunicação com a nuvem: {e}")
+                            st.error(f"Erro Crítico: {e}")
 
         st.markdown("---")
         st.markdown("### Edição Manual Rápida")
