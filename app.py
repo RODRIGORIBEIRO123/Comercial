@@ -2907,7 +2907,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     ws.append([r["Item / Componente"], r["Preço Unitário (R$)"] if com_precos else "", r["Unidade"]])
                 wb.save(buf); buf.seek(0); return buf
             st.download_button("📥 Baixar Planilha para Cotar", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
-        wwith ch2:
+        with ch2:
             st.markdown("#### 📂 Atualização Instantânea de Preços")
             
             # 1. Upload Direto (Sem Botões). O sistema reage no exato instante em que o arquivo é solto.
