@@ -2909,54 +2909,54 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.download_button("📥 Baixar Planilha para Cotar", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
         with ch2:
             st.markdown("#### 📂 Devolver Planilha Cotada")
-            # Carregador normal e visível
-            upl_hidro = st.file_uploader("Selecione o arquivo Excel atualizado:", type=["xlsx", "xls"])
             
-            # O botão SÓ aparece quando o arquivo é colocado na caixa
-            if upl_hidro is not None:
-                if st.button("✅ Atualizar Valores no Sistema", type="primary", use_container_width=True):
-                    with st.spinner("Gravando no Banco de Dados..."):
-                        try:
-                            # 1. Leitura
-                            df_up = pd.read_excel(upl_hidro)
-                            df_up.rename(columns=lambda x: str(x).strip(), inplace=True)
-                            df_up = df_up.dropna(subset=["Item / Componente"])
-                            
-                            # 2. Varredura e Limpeza de texto
-                            nova_lista = []
-                            for _, row in df_up.iterrows():
-                                preco = row.get("Preço Unitário (R$)", 0.0)
-                                if isinstance(preco, str):
-                                    preco = preco.replace("R$", "").replace(".", "").replace(",", ".").strip()
-                                try: preco = float(preco)
-                                except: preco = 0.0
-                                    
-                                nova_lista.append({
-                                    "Item / Componente": str(row.get("Item / Componente", "")),
-                                    "Preço Unitário (R$)": preco,
-                                    "Unidade": str(row.get("Unidade", "un"))
-                                })
-                            
-                            # 3. Injeta a lista nova DESTRUINDO a memória velha
-                            st.session_state.banco_precos_hidraulica = nova_lista
-                            
-                            # 4. Grava na Nuvem
-                            sh_cloud = conectar_google_sheets()
-                            ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
-                            ws_ci.clear()
-                            linhas = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in nova_lista]
-                            ws_ci.append_rows(linhas)
-                            
-                            # 5. O SEGREDO: Limpa o cache que "congela" a tabela visual
-                            st.cache_data.clear()
-                            
-                            st.success("Tudo certo! Valores gravados e atualizados.")
-                            import time
-                            time.sleep(1.5)
-                            st.rerun()
-                            
-                        except Exception as e:
-                            st.error(f"Erro na gravação: {e}")
+            # O st.form é a única blindagem real contra o "bug do clique"
+            with st.form("form_upload_precos_hidro"):
+                upl_hidro = st.file_uploader("Selecione a planilha revisada:", type=["xlsx", "xls"])
+                btn_salvar = st.form_submit_button("✅ Atualizar Valores no Sistema", type="primary", use_container_width=True)
+                
+                if btn_salvar:
+                    if upl_hidro is not None:
+                        with st.spinner("Lendo e gravando na Nuvem..."):
+                            try:
+                                # 1. Leitura
+                                df_up = pd.read_excel(upl_hidro)
+                                df_up.rename(columns=lambda x: str(x).strip(), inplace=True)
+                                df_up = df_up.dropna(subset=["Item / Componente"])
+                                
+                                # 2. Conversão e blindagem contra erros de digitação (ex: R$)
+                                nova_lista = []
+                                for _, row in df_up.iterrows():
+                                    preco = row.get("Preço Unitário (R$)", 0.0)
+                                    if isinstance(preco, str):
+                                        preco = preco.replace("R$", "").replace(".", "").replace(",", ".").strip()
+                                    try: preco = float(preco)
+                                    except: preco = 0.0
+                                        
+                                    nova_lista.append({
+                                        "Item / Componente": str(row.get("Item / Componente", "")),
+                                        "Preço Unitário (R$)": preco,
+                                        "Unidade": str(row.get("Unidade", "un"))
+                                    })
+                                
+                                # 3. Substitui a memória ANTES da tabela lá debaixo ser desenhada
+                                st.session_state.banco_precos_hidraulica = nova_lista
+                                
+                                # 4. Grava na Nuvem do Google
+                                sh_cloud = conectar_google_sheets()
+                                ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
+                                ws_ci.clear()
+                                linhas = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in nova_lista]
+                                ws_ci.append_rows(linhas)
+                                
+                                # Limpa o cache para não travar leituras futuras
+                                st.cache_data.clear()
+                                st.success("✅ Base atualizada com sucesso! Os valores na tabela abaixo já foram alterados.")
+                                
+                            except Exception as e:
+                                st.error(f"Erro ao salvar na nuvem: {e}")
+                    else:
+                        st.warning("⚠️ Por favor, arraste a planilha para a caixa antes de clicar em Atualizar.")
 
         st.markdown("---")
         st.subheader("📚 Itens Cadastrados no Banco de Dados Central (Google Sheets)")
