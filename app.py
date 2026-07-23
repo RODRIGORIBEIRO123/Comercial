@@ -2910,30 +2910,43 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.download_button("📥 Baixar Planilha para Cotar", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
             
         with ch2:
-            upl_hidro = st.file_uploader("📂 Devolver Planilha Cotada", type=["xlsx", "xls"], label_visibility="collapsed")
-            
-            # A ÚNICA MUDANÇA: Uma trava para o sistema ler a planilha apenas 1 vez e não entrar em loop
-            if upl_hidro is not None:
-                if st.session_state.get("planilha_carregada") != upl_hidro.name:
-                    
-                    df_up = pd.read_excel(upl_hidro)
-                    st.session_state.banco_precos_hidraulica = df_up.to_dict('records')
-                    
-                    # Salva no Google Sheets silenciosamente
-                    try:
-                        sh_cloud = conectar_google_sheets()
-                        ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
-                        ws_ci.clear()
-                        linhas = [df_up.columns.tolist()] + df_up.values.tolist()
-                        ws_ci.append_rows(linhas)
-                    except:
-                        pass
+            # Usando um formulário para garantir que o botão e o upload não sumam
+            with st.form("form_upload_precos", clear_on_submit=True):
+                st.markdown("#### 📂 Devolver Planilha Cotada")
+                upl_hidro = st.file_uploader("Selecione o arquivo Excel:", type=["xlsx", "xls"], label_visibility="collapsed")
+                
+                # O botão SEMPRE estará visível na interface agora
+                btn_processar = st.form_submit_button("✅ Atualizar Sistema", type="primary", use_container_width=True)
+                
+                if btn_processar:
+                    if upl_hidro is not None:
+                        try:
+                            # 1. Lê a planilha na mesma hora
+                            df_up = pd.read_excel(upl_hidro)
+                            # Limpeza básica e proteção de erros do Excel
+                            df_up.rename(columns=lambda x: str(x).strip(), inplace=True)
+                            df_up = df_up.dropna(subset=["Item / Componente"])
+                            
+                            # 2. Injeta na memória principal do aplicativo
+                            st.session_state.banco_precos_hidraulica = df_up.to_dict('records')
+                            
+                            # 3. Salva no Google Sheets (Nuvem)
+                            st.info("Sincronizando com a nuvem...")
+                            sh_cloud = conectar_google_sheets()
+                            ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
+                            ws_ci.clear()
+                            linhas = [df_up.columns.tolist()] + df_up.values.tolist()
+                            ws_ci.append_rows(linhas)
+                            
+                            st.success("Tudo certo! A tabela abaixo já está atualizada com os novos valores.")
+                        except Exception as e:
+                            st.error(f"Erro ao processar arquivo: {e}")
+                    else:
+                        st.warning("⚠️ Anexe o arquivo antes de clicar no botão.")
 
-                    # Aciona a trava e atualiza a tela
-                    st.session_state["planilha_carregada"] = upl_hidro.name
-                    st.success("Tabela atualizada na memória e no Google Sheets!")
-                    st.rerun()
-
+        # ====================================================================
+        # TABELA DE VISUALIZAÇÃO
+        # ====================================================================
         st.markdown("---")
         st.subheader("📚 Itens Cadastrados no Banco de Dados Central (Google Sheets)")
         
@@ -2946,7 +2959,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         df_display_hidro = df_view_hidro.copy()
         
         if not df_display_hidro.empty and "Preço Unitário (R$)" in df_display_hidro.columns:
-            # Proteção simples caso o Excel venha com texto no lugar de número
             def formatar_moeda(val):
                 try: 
                     return f"R$ {float(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
