@@ -2909,20 +2909,20 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.download_button("📥 Baixar Planilha para Cotar", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
         with ch2:
             st.markdown("#### 📂 Devolver Planilha Cotada")
-            upl_hidro = st.file_uploader("Arraste a planilha revisada (Upload Automático):", type=["xlsx", "xls"], label_visibility="collapsed", key="uploader_precos_hidro")
+            # Carregador normal e visível
+            upl_hidro = st.file_uploader("Selecione o arquivo Excel atualizado:", type=["xlsx", "xls"])
             
+            # O botão SÓ aparece quando o arquivo é colocado na caixa
             if upl_hidro is not None:
-                arquivo_id = upl_hidro.name + str(upl_hidro.size)
-                
-                if st.session_state.get("ultimo_upload_hidro") != arquivo_id:
-                    with st.spinner("🔄 Processando... Limpando Cache e Atualizando Nuvem..."):
+                if st.button("✅ Atualizar Valores no Sistema", type="primary", use_container_width=True):
+                    with st.spinner("Gravando no Banco de Dados..."):
                         try:
-                            # 1. Leitura forçada
+                            # 1. Leitura
                             df_up = pd.read_excel(upl_hidro)
                             df_up.rename(columns=lambda x: str(x).strip(), inplace=True)
-                            
-                            # 2. Conversão e Limpeza de Segurança
                             df_up = df_up.dropna(subset=["Item / Componente"])
+                            
+                            # 2. Varredura e Limpeza de texto
                             nova_lista = []
                             for _, row in df_up.iterrows():
                                 preco = row.get("Preço Unitário (R$)", 0.0)
@@ -2937,25 +2937,26 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                                     "Unidade": str(row.get("Unidade", "un"))
                                 })
                             
-                            # 3. Gravação na Nuvem (Direta)
+                            # 3. Injeta a lista nova DESTRUINDO a memória velha
+                            st.session_state.banco_precos_hidraulica = nova_lista
+                            
+                            # 4. Grava na Nuvem
                             sh_cloud = conectar_google_sheets()
                             ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
                             ws_ci.clear()
                             linhas = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in nova_lista]
                             ws_ci.append_rows(linhas)
                             
-                            # 4. A CORREÇÃO DE OURO: Matar o Cache e Atualizar a Sessão!
-                            st.session_state.banco_precos_hidraulica = nova_lista
-                            st.session_state["ultimo_upload_hidro"] = arquivo_id
-                            st.cache_data.clear() # <- ESSA LINHA RESOLVE O PROBLEMA
+                            # 5. O SEGREDO: Limpa o cache que "congela" a tabela visual
+                            st.cache_data.clear()
                             
-                            st.success("✅ Base sincronizada e Cache Limpo!")
+                            st.success("Tudo certo! Valores gravados e atualizados.")
                             import time
-                            time.sleep(1)
+                            time.sleep(1.5)
                             st.rerun()
                             
                         except Exception as e:
-                            st.error(f"Erro Crítico: {e}")
+                            st.error(f"Erro na gravação: {e}")
 
         st.markdown("---")
         st.subheader("📚 Itens Cadastrados no Banco de Dados Central (Google Sheets)")
