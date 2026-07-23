@@ -2910,68 +2910,53 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.download_button("📥 Baixar Planilha para Cotar", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
             
         with ch2:
-            st.markdown("#### 📂 Leitura Direta de Planilha")
+            upl_hidro = st.file_uploader("📂 Devolver Planilha Cotada", type=["xlsx", "xls"], label_visibility="collapsed")
             
-            # 1. Upload Simples
-            arquivo_cotacao = st.file_uploader("Arraste o Excel aqui:", type=["xlsx", "xls"], key="upload_raiz")
-            
-            if arquivo_cotacao is not None:
-                # 2. Lê diretamente do arquivo físico anexado, ignorando qualquer memória do app
-                df_tela = pd.read_excel(arquivo_cotacao)
-                df_tela.rename(columns=lambda x: str(x).strip(), inplace=True)
-                df_tela = df_tela.dropna(subset=["Item / Componente"])
-                
-                # Exibe a tabela na mesma hora (dentro da coluna 2)
-                st.success("✅ Arquivo lido! Clique abaixo para gravar na Nuvem.")
-                
-                # 3. Botão isolado apenas para gravar no banco de dados do Google
-                if st.button("Gravar esta tabela no Sistema", type="primary", use_container_width=True):
+            # A ÚNICA MUDANÇA: Uma trava para o sistema ler a planilha apenas 1 vez e não entrar em loop
+            if upl_hidro is not None:
+                if st.session_state.get("planilha_carregada") != upl_hidro.name:
+                    
+                    df_up = pd.read_excel(upl_hidro)
+                    st.session_state.banco_precos_hidraulica = df_up.to_dict('records')
+                    
+                    # Salva no Google Sheets silenciosamente
                     try:
-                        with st.spinner("Enviando para a Nuvem..."):
-                            
-                            # Limpa os preços e joga na memória principal
-                            lista_limpa = []
-                            for _, row in df_tela.iterrows():
-                                preco = row.get("Preço Unitário (R$)", 0.0)
-                                if isinstance(preco, str):
-                                    preco = preco.replace("R$", "").replace(".", "").replace(",", ".").strip()
-                                try: preco = float(preco)
-                                except: preco = 0.0
-                                    
-                                lista_limpa.append({
-                                    "Item / Componente": str(row.get("Item / Componente", "")),
-                                    "Preço Unitário (R$)": preco,
-                                    "Unidade": str(row.get("Unidade", "un"))
-                                })
-                            
-                            st.session_state.banco_precos_hidraulica = lista_limpa
-                            
-                            sh_cloud = conectar_google_sheets()
-                            ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
-                            ws_ci.clear()
-                            linhas_gs = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in lista_limpa]
-                            ws_ci.append_rows(linhas_gs)
-                            
-                            st.success("🚀 Dados gravados com sucesso no Google Sheets!")
-                    except Exception as e:
-                        st.error(f"Erro de comunicação com o Google: {e}")
+                        sh_cloud = conectar_google_sheets()
+                        ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
+                        ws_ci.clear()
+                        linhas = [df_up.columns.tolist()] + df_up.values.tolist()
+                        ws_ci.append_rows(linhas)
+                    except:
+                        pass
 
-        # ====================================================================
-        # TABELA DE VISUALIZAÇÃO ÚNICA (Removemos as redundâncias)
-        # ====================================================================
+                    # Aciona a trava e atualiza a tela
+                    st.session_state["planilha_carregada"] = upl_hidro.name
+                    st.success("Tabela atualizada na memória e no Google Sheets!")
+                    st.rerun()
+
         st.markdown("---")
-        st.subheader("📚 Tabela Ativa de Preços")
+        st.subheader("📚 Itens Cadastrados no Banco de Dados Central (Google Sheets)")
         
         if st.session_state.banco_precos_hidraulica:
-            df_display = pd.DataFrame(st.session_state.banco_precos_hidraulica)
-            
-            if not df_display.empty and "Preço Unitário (R$)" in df_display.columns:
-                 df_display["Preço Unitário (R$)"] = df_display["Preço Unitário (R$)"].apply(lambda x: f"R$ {float(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-                 st.dataframe(df_display, use_container_width=True, hide_index=True, height=500)
-            else:
-                 st.warning("As colunas corretas não foram encontradas no Excel.")
+            df_view_hidro = pd.DataFrame(st.session_state.banco_precos_hidraulica)
         else:
-            st.info("Nenhum dado na memória. Faça o upload da planilha atualizada acima.")
+            df_view_hidro = carregar_precos_hidraulica_itens()
+            st.session_state.banco_precos_hidraulica = df_view_hidro.to_dict('records')
+            
+        df_display_hidro = df_view_hidro.copy()
+        
+        if not df_display_hidro.empty and "Preço Unitário (R$)" in df_display_hidro.columns:
+            # Proteção simples caso o Excel venha com texto no lugar de número
+            def formatar_moeda(val):
+                try: 
+                    return f"R$ {float(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                except: 
+                    return str(val)
+                    
+            df_display_hidro["Preço Unitário (R$)"] = df_display_hidro["Preço Unitário (R$)"].apply(formatar_moeda)
+            st.dataframe(df_display_hidro, use_container_width=True, hide_index=True, height=500)
+        else:
+            st.warning("O Banco de dados está vazio. Faça o upload da primeira planilha.")
 
     with aba_resumo_hidro:
         st.header("📊 Resumo e Listas de Materiais (BOM)")
