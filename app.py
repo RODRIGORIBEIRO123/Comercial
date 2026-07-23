@@ -2907,80 +2907,80 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     ws.append([r["Item / Componente"], r["Preço Unitário (R$)"] if com_precos else "", r["Unidade"]])
                 wb.save(buf); buf.seek(0); return buf
             st.download_button("📥 Baixar Planilha para Cotar", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
-        with ch2:
-            st.markdown("#### 📂 Atualização Direta de Preços")
-            st.markdown("Use esta opção se o upload automático estiver falhando.")
+        wwith ch2:
+            st.markdown("#### 📂 Atualização Instantânea de Preços")
             
-            # 1. Componente de Upload Simples, fora de formulários
-            uploaded_file = st.file_uploader("Selecione o arquivo Excel (.xlsx)", type=["xlsx", "xls"], key="precos_upload_direto")
-
-            # 2. Botão independente
-            if uploaded_file is not None:
-                if st.button("Aplicar Preços e Salvar", type="primary", use_container_width=True):
-                    with st.spinner("Processando..."):
+            # 1. Upload Direto (Sem Botões). O sistema reage no exato instante em que o arquivo é solto.
+            upl_hidro = st.file_uploader("Arraste a planilha revisada aqui:", type=["xlsx", "xls"], key="up_direto_hidro")
+            
+            if upl_hidro is not None:
+                # Cria uma "assinatura" do arquivo para não ler duas vezes seguidas
+                assinatura_arq = f"{upl_hidro.name}_{upl_hidro.size}"
+                
+                if st.session_state.get("assinatura_ultimo_arquivo") != assinatura_arq:
+                    with st.spinner("Gravando novos preços na memória..."):
                         try:
-                            # Tenta ler o arquivo diretamente do objeto na memória
-                            uploaded_file.seek(0) 
-                            df_novo = pd.read_excel(uploaded_file)
-                            df_novo.rename(columns=lambda x: str(x).strip(), inplace=True)
+                            # Força a leitura do ponteiro zero
+                            upl_hidro.seek(0)
+                            df_novo = pd.read_excel(upl_hidro)
                             
-                            # Validação Básica
-                            if "Item / Componente" not in df_novo.columns or "Preço Unitário (R$)" not in df_novo.columns:
-                                st.error("Erro: Colunas 'Item / Componente' e 'Preço Unitário (R$)' não encontradas.")
-                            else:
-                                df_novo = df_novo.dropna(subset=["Item / Componente"])
+                            # Limpeza agressiva das colunas
+                            df_novo.rename(columns=lambda x: str(x).strip(), inplace=True)
+                            df_novo = df_novo.dropna(subset=["Item / Componente"])
+                            
+                            lista_limpa = []
+                            for _, row in df_novo.iterrows():
+                                preco = row.get("Preço Unitário (R$)", 0.0)
+                                if isinstance(preco, str):
+                                    preco = preco.replace("R$", "").replace(".", "").replace(",", ".").strip()
+                                try: preco = float(preco)
+                                except: preco = 0.0
+                                    
+                                lista_limpa.append({
+                                    "Item / Componente": str(row.get("Item / Componente", "")),
+                                    "Preço Unitário (R$)": preco,
+                                    "Unidade": str(row.get("Unidade", "un"))
+                                })
+                            
+                            # 2. Injeta os dados limpos diretamente na veia do aplicativo
+                            st.session_state.banco_precos_hidraulica = lista_limpa
+                            st.session_state["assinatura_ultimo_arquivo"] = assinatura_arq
+                            
+                            # Limpa os caches internos para destruir rastros de planilhas velhas
+                            st.cache_data.clear()
+                            
+                            # 3. Tenta mandar para o Google Sheets (silencioso, não trava a tela se a rede piscar)
+                            try:
+                                sh_cloud = conectar_google_sheets()
+                                ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
+                                ws_ci.clear()
+                                linhas_gs = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in lista_limpa]
+                                ws_ci.append_rows(linhas_gs)
+                            except:
+                                pass 
                                 
-                                # Limpeza dos preços
-                                lista_limpa = []
-                                for _, row in df_novo.iterrows():
-                                    preco_bruto = row.get("Preço Unitário (R$)", 0.0)
-                                    try:
-                                        if isinstance(preco_bruto, str):
-                                            preco_limpo = float(preco_bruto.replace("R$", "").replace(".", "").replace(",", ".").strip())
-                                        else:
-                                            preco_limpo = float(preco_bruto)
-                                    except:
-                                        preco_limpo = 0.0
-                                        
-                                    lista_limpa.append({
-                                        "Item / Componente": str(row.get("Item / Componente", "")),
-                                        "Preço Unitário (R$)": preco_limpo,
-                                        "Unidade": str(row.get("Unidade", "un"))
-                                    })
-                                
-                                # 3. Salva na sessão e limpa cache (Crucial)
-                                st.session_state.banco_precos_hidraulica = lista_limpa
-                                st.cache_data.clear()
-                                
-                                # 4. Tenta salvar na nuvem silenciosamente (se falhar, ao menos atualizou a tela)
-                                try:
-                                    sh_cloud = conectar_google_sheets()
-                                    ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
-                                    ws_ci.clear()
-                                    linhas_gs = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in lista_limpa]
-                                    ws_ci.append_rows(linhas_gs)
-                                except Exception as e_gs:
-                                    st.warning(f"Aviso: Valores atualizados na tela, mas não foi possível sincronizar com o Google Sheets no momento. Erro: {e_gs}")
-                                
-                                st.success("✅ Valores atualizados! A tabela abaixo reflete os novos preços.")
-                                
+                            st.success("✅ Valores sobrepostos com sucesso! A tabela abaixo é a versão nova.")
+                            
                         except Exception as e:
-                            st.error(f"Erro na leitura do arquivo: {e}")
+                            st.error(f"Erro estrutural na planilha: {e}")
 
-        # --- A TABELA DE VISUALIZAÇÃO ---
+        # ====================================================================
+        # TABELA DE VISUALIZAÇÃO FORÇADA
+        # ====================================================================
         st.markdown("---")
-        st.subheader("📚 Itens Cadastrados Atualmente (Memória Local)")
+        st.subheader("📚 Tabela Ativa de Preços")
         
-        # Garante que SEMPRE puxa do session_state se existir
+        # A tabela agora é OBRIGADA a ler da memória volátil que acabamos de abastecer
         if 'banco_precos_hidraulica' in st.session_state and st.session_state.banco_precos_hidraulica:
             df_display = pd.DataFrame(st.session_state.banco_precos_hidraulica)
             
-            # Formatação visual
             if not df_display.empty and "Preço Unitário (R$)" in df_display.columns:
                  df_display["Preço Unitário (R$)"] = df_display["Preço Unitário (R$)"].apply(lambda x: f"R$ {float(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
                  st.dataframe(df_display, use_container_width=True, hide_index=True, height=600)
+            else:
+                 st.warning("As colunas corretas não foram encontradas no Excel.")
         else:
-            st.warning("Banco de dados local vazio. Faça o upload da planilha atualizada.")
+            st.info("Nenhum dado na memória. Faça o upload da planilha atualizada acima.")
 
         st.markdown("---")
         st.subheader("📚 Itens Cadastrados no Banco de Dados Central (Google Sheets)")
