@@ -2907,25 +2907,34 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     ws.append([r["Item / Componente"], r["Preço Unitário (R$)"] if com_precos else "", r["Unidade"]])
                 wb.save(buf); buf.seek(0); return buf
             st.download_button("📥 Baixar Planilha para Cotar", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
-        with ch2:
-            upl_hidro = st.file_uploader("📂 Devolver Planilha Cotada", type=["xlsx", "xls"], label_visibility="collapsed")
-            if upl_hidro is not None:
-                if st.button("✅ Confirmar Upload e Salvar na Nuvem", type="primary", use_container_width=True):
+        wwith ch2:
+            with st.form("form_upload_planilha", clear_on_submit=True):
+                upl_hidro = st.file_uploader("📂 Devolver Planilha Cotada", type=["xlsx", "xls"])
+                submitted = st.form_submit_button("✅ Confirmar Upload e Salvar na Nuvem", type="primary", use_container_width=True)
+                
+                if submitted and upl_hidro is not None:
                     try:
+                        # Reinicia o ponteiro de leitura do arquivo por segurança
+                        upl_hidro.seek(0)
                         df_up = pd.read_excel(upl_hidro)
+                        
+                        # Limpeza de segurança: remove linhas vazias e trata valores nulos
+                        df_up = df_up.dropna(subset=["Item / Componente"])
+                        df_up = df_up.fillna(0)
+                        
                         st.session_state.banco_precos_hidraulica = df_up.to_dict('records')
                         
-                        # Força o salvamento na nuvem imediato
+                        # Gravação forçada na nuvem
                         sh_cloud = conectar_google_sheets()
                         ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
                         ws_ci.clear()
-                        linhas = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in st.session_state.banco_precos_hidraulica]
+                        linhas = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r.get("Item / Componente", ""), r.get("Preço Unitário (R$)", 0), r.get("Unidade", "un")] for r in st.session_state.banco_precos_hidraulica]
                         ws_ci.append_rows(linhas)
                         
-                        st.success("Planilha lida e salva na Nuvem com sucesso! Recarregando...")
+                        st.success("Planilha processada e salva na nuvem com sucesso!")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Erro ao processar: {e}")
+                        st.error(f"Erro ao processar a planilha: {e}")
 
         st.markdown("---")
         st.markdown("### Edição Manual Rápida")
