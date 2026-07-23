@@ -2899,6 +2899,28 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         st.markdown("---")
         st.markdown("### 🔄 Sincronização em Lote (Excel)")
         
+        # 1. O MOTOR BLINDADO (Callback): Ele roda isolado no servidor ANTES da tela piscar
+        def gravar_dados_nuvem_callback():
+            if 'cofre_planilha_pronta' in st.session_state:
+                try:
+                    df_final = st.session_state['cofre_planilha_pronta']
+                    
+                    # Faz o trabalho pesado com o Google Sheets
+                    sh_cloud = conectar_google_sheets()
+                    ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
+                    ws_ci.clear()
+                    linhas = [df_final.columns.tolist()] + df_final.values.tolist()
+                    ws_ci.append_rows(linhas)
+                    
+                    # Atualiza a tabela do aplicativo
+                    st.session_state.banco_precos_hidraulica = df_final.to_dict('records')
+                    
+                    # Limpa os temporários e ativa a bandeira de sucesso
+                    del st.session_state['cofre_planilha_pronta']
+                    st.session_state['aviso_sucesso_gravacao'] = True
+                except Exception as e:
+                    st.session_state['aviso_erro_gravacao'] = str(e)
+
         ch1, ch2 = st.columns(2)
         
         with ch1:
@@ -2914,10 +2936,14 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         with ch2:
             st.markdown("#### 📂 Devolver Planilha Cotada")
             
-            # 1. Faz o upload solto (sem amarrar a botões ou formulários que bugam na nuvem)
+            # Exibe os avisos de sucesso ou erro gerados pelo Callback
+            if st.session_state.pop('aviso_sucesso_gravacao', False):
+                st.success("✅ SUCESSO! Valores gravados no Google Sheets. A tabela já está atualizada.")
+            if 'aviso_erro_gravacao' in st.session_state:
+                st.error(f"Erro na gravação: {st.session_state.pop('aviso_erro_gravacao')}")
+            
             upl_hidro = st.file_uploader("Arraste a planilha revisada aqui:", type=["xlsx", "xls"], label_visibility="collapsed")
             
-            # 2. Guarda os dados no "Cofre" instantaneamente (Sobrevive ao recarregamento da nuvem)
             if upl_hidro is not None:
                 try:
                     df_up = pd.read_excel(upl_hidro)
@@ -2932,38 +2958,16 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         
                     df_up['Preço Unitário (R$)'] = df_up['Preço Unitário (R$)'].apply(limpar_preco)
                     
-                    # Salva no cofre da memória
+                    # Guarda a planilha limpa no cofre
                     st.session_state['cofre_planilha_pronta'] = df_up
-                    st.success("Planilha lida e aprovada! Clique abaixo para gravar.")
+                    st.info("Planilha lida! O botão de gravação está liberado abaixo.")
                 except Exception as e:
-                    st.error(f"Erro na leitura: {e}")
+                    st.error(f"Erro estrutural na planilha: {e}")
             
-            # 3. O Botão que lê do Cofre, e não do arquivo
-            if 'cofre_planilha_pronta' in st.session_state:
-                if st.button("🚀 Confirmar e Gravar no Google Sheets", type="primary", use_container_width=True):
-                    with st.spinner("Gravando no Banco de Dados..."):
-                        try:
-                            # Puxa os dados que trancamos lá atrás
-                            df_final = st.session_state['cofre_planilha_pronta']
-                            
-                            # Grava na Nuvem do Google
-                            sh_cloud = conectar_google_sheets()
-                            ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
-                            ws_ci.clear()
-                            linhas = [df_final.columns.tolist()] + df_final.values.tolist()
-                            ws_ci.append_rows(linhas)
-                            
-                            # Atualiza a tabela na tela
-                            st.session_state.banco_precos_hidraulica = df_final.to_dict('records')
-                            
-                            # Destrói o cofre para fechar o ciclo
-                            del st.session_state['cofre_planilha_pronta']
-                            
-                            st.success("✅ SUCESSO ABSOLUTO! Pode seguir com as cotações.")
-                            st.rerun()
-                            
-                        except Exception as e:
-                            st.error(f"Erro de conexão com o Google Sheets: {e}")
+            # O botão só aparece se a planilha estiver guardada com segurança
+            if 'cofre_planilha_pronta' in st.session_state and upl_hidro is not None:
+                # O SEGREDO ESTÁ AQUI: "on_click=" impede que o processo seja interrompido
+                st.button("🚀 Confirmar e Gravar no Google Sheets", type="primary", use_container_width=True, on_click=gravar_dados_nuvem_callback)
 
         # ====================================================================
         # TABELA DE VISUALIZAÇÃO ATIVA
@@ -2971,7 +2975,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         st.markdown("---")
         st.subheader("📚 Itens Cadastrados no Banco de Dados Central (Google Sheets)")
         
-        # Leitura sempre fresca
         if not st.session_state.banco_precos_hidraulica:
              try:
                  df_view_hidro = carregar_precos_hidraulica_itens()
