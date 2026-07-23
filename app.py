@@ -2913,100 +2913,85 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             
         with ch2:
             st.markdown("#### 📂 Devolver Planilha Cotada")
-            st.info("💡 Modo de Segurança Ativado (Nuvem)")
             
-            # 1. Upload
-            upl_hidro = st.file_uploader("Selecione a planilha:", type=["xlsx", "xls"], label_visibility="collapsed")
-            
-            # 2. Captura os bytes imediatamente para fugir do reset do servidor
-            if upl_hidro is not None:
-                st.session_state['arquivo_bytes_salvo'] = upl_hidro.getvalue()
-                st.success("✅ Arquivo fixado na memória. Clique abaixo para gravar.")
-                
-            # 3. O botão lê da MEMÓRIA BLINDADA, não do componente visual
-            if 'arquivo_bytes_salvo' in st.session_state:
-                if st.button("🚀 Gravar no Sistema e Nuvem", type="primary", use_container_width=True):
-                    with st.spinner("Processando..."):
-                        try:
-                            df_up = pd.read_excel(io.BytesIO(st.session_state['arquivo_bytes_salvo']))
-                            df_up.rename(columns=lambda x: str(x).strip(), inplace=True)
-                            df_up = df_up.dropna(subset=["Item / Componente"])
+            # GATILHO AUTOMÁTICO: Roda nos bastidores no exato momento que o upload termina
+            def processar_planilha_automatica():
+                arquivo = st.session_state.get('meu_arquivo_upload')
+                if arquivo is not None:
+                    try:
+                        df = pd.read_excel(arquivo)
+                        df.rename(columns=lambda x: str(x).strip(), inplace=True)
+                        
+                        if "Item / Componente" in df.columns and "Preço Unitário (R$)" in df.columns:
+                            df = df.dropna(subset=["Item / Componente"])
                             
-                            def limpar_preco(val):
+                            def limpar(val):
                                 if isinstance(val, str):
                                     try: return float(val.replace("R$", "").replace(".", "").replace(",", ".").strip())
                                     except: return 0.0
                                 return float(val) if pd.notnull(val) else 0.0
                                 
-                            df_up['Preço Unitário (R$)'] = df_up['Preço Unitário (R$)'].apply(limpar_preco)
-                            lista_nova = df_up.to_dict('records')
+                            df['Preço Unitário (R$)'] = df['Preço Unitário (R$)'].apply(limpar)
                             
-                            # SALVA NA SESSÃO E CRIA A TRAVA DE SOBRESSCRITA
-                            st.session_state.banco_precos_hidraulica = lista_nova
-                            st.session_state['override_precos_hidro'] = lista_nova 
+                            # A SALVAÇÃO: Substitui o 'NaN' (que trava o Google) por vazio
+                            df = df.fillna("")
                             
-                            # TENTA GOOGLE SHEETS
-                            sucesso_gs = False
+                            st.session_state.banco_precos_hidraulica = df.to_dict('records')
+                            
+                            # Grava na nuvem
                             try:
                                 sh_cloud = conectar_google_sheets()
                                 ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
                                 ws_ci.clear()
-                                linhas = [df_up.columns.tolist()] + df_up.values.tolist()
+                                linhas = [df.columns.tolist()] + df.values.tolist()
                                 ws_ci.append_rows(linhas)
-                                sucesso_gs = True
-                            except Exception as e_gs:
-                                st.session_state['erro_gs_motivo'] = str(e_gs)
+                            except:
+                                pass # Se o Google falhar, a tela não trava e a tabela atualiza igual
                                 
-                            if sucesso_gs:
-                                st.session_state['msg_sucesso'] = "✅ Preços atualizados na memória e no Google Sheets!"
-                            else:
-                                st.session_state['msg_sucesso'] = "⚠️ Preços injetados para você fazer o orçamento, mas falhou ao salvar no Google Sheets."
-                                
-                            # Limpa os bytes consumidos
-                            del st.session_state['arquivo_bytes_salvo']
-                            st.rerun()
-                            
-                        except Exception as e:
-                            st.error(f"Erro fatal na conversão dos dados: {e}")
+                            st.session_state['aviso_sucesso_upload'] = True
+                    except Exception as e:
+                        st.session_state['aviso_erro_upload'] = str(e)
 
-            # Exibe as mensagens logo após o recarregamento da tela
-            if 'msg_sucesso' in st.session_state:
-                if "⚠️" in st.session_state['msg_sucesso']:
-                    st.warning(st.session_state.pop('msg_sucesso'))
-                    if 'erro_gs_motivo' in st.session_state:
-                        st.code(st.session_state.pop('erro_gs_motivo'))
-                else:
-                    st.success(st.session_state.pop('msg_sucesso'))
+            st.file_uploader(
+                "Arraste a planilha e solte (Processamento Automático):", 
+                type=["xlsx", "xls"], 
+                key="meu_arquivo_upload", 
+                on_change=processar_planilha_automatica,
+                label_visibility="collapsed"
+            )
+            
+            if st.session_state.pop('aviso_sucesso_upload', False):
+                st.success("✅ Valores atualizados na memória e na nuvem!")
+            if 'aviso_erro_upload' in st.session_state:
+                st.error(f"Erro ao ler arquivo: {st.session_state.pop('aviso_erro_upload')}")
 
         # ====================================================================
-        # TABELA DE VISUALIZAÇÃO FORÇADA
+        # TABELA DE VISUALIZAÇÃO
         # ====================================================================
         st.markdown("---")
         st.subheader("📚 Itens Cadastrados no Banco de Dados Central (Google Sheets)")
         
-        # Leitura blindada: puxa da trava se existir, senão da sessão normal, senão do sheets
-        if 'override_precos_hidro' in st.session_state:
-             df_view_hidro = pd.DataFrame(st.session_state['override_precos_hidro'])
-             st.session_state.banco_precos_hidraulica = st.session_state['override_precos_hidro']
-        elif st.session_state.get('banco_precos_hidraulica'):
-             df_view_hidro = pd.DataFrame(st.session_state.banco_precos_hidraulica)
-        else:
+        if not st.session_state.get('banco_precos_hidraulica'):
              try:
                  df_view_hidro = carregar_precos_hidraulica_itens()
                  st.session_state.banco_precos_hidraulica = df_view_hidro.to_dict('records')
              except:
-                 df_view_hidro = pd.DataFrame()
+                 st.session_state.banco_precos_hidraulica = []
 
-        if not df_view_hidro.empty and "Preço Unitário (R$)" in df_view_hidro.columns:
-            def formatar_moeda(val):
-                try: return f"R$ {float(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                except: return str(val)
-                
-            df_display = df_view_hidro.copy()
-            df_display["Preço Unitário (R$)"] = df_display["Preço Unitário (R$)"].apply(formatar_moeda)
-            st.dataframe(df_display, use_container_width=True, hide_index=True, height=500)
+        if st.session_state.get('banco_precos_hidraulica'):
+            df_display = pd.DataFrame(st.session_state.banco_precos_hidraulica)
+            
+            if not df_display.empty and "Preço Unitário (R$)" in df_display.columns:
+                def formatar_moeda(val):
+                    try: return f"R$ {float(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    except: return str(val)
+                        
+                df_display["Preço Unitário (R$)"] = df_display["Preço Unitário (R$)"].apply(formatar_moeda)
+                st.dataframe(df_display, use_container_width=True, hide_index=True, height=500)
+            else:
+                st.warning("Colunas 'Item / Componente' ou 'Preço Unitário (R$)' não encontradas.")
         else:
-            st.warning("Banco de dados vazio ou colunas incorretas.")
+            st.warning("Banco de dados vazio.")
 
     with aba_resumo_hidro:
         st.header("📊 Resumo e Listas de Materiais (BOM)")
