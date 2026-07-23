@@ -2914,63 +2914,64 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         with ch2:
             st.markdown("#### 📂 Devolver Planilha Cotada")
             
-            # GATILHO AUTOMÁTICO: Roda nos bastidores no exato momento que o upload termina
-            def processar_planilha_automatica():
-                arquivo = st.session_state.get('meu_arquivo_upload')
-                if arquivo is not None:
+            # Uploader padrão, sem truques.
+            upl_hidro = st.file_uploader("Selecione a planilha:", type=["xlsx", "xls"], label_visibility="collapsed")
+            
+            # O BOTÃO VOLTOU: Fixo e sob seu controle
+            if st.button("💾 Salvar Planilha no Banco", type="primary", use_container_width=True):
+                if upl_hidro is not None:
                     try:
-                        df = pd.read_excel(arquivo)
-                        df.rename(columns=lambda x: str(x).strip(), inplace=True)
+                        df_up = pd.read_excel(upl_hidro)
+                        df_up.rename(columns=lambda x: str(x).strip(), inplace=True)
                         
-                        if "Item / Componente" in df.columns and "Preço Unitário (R$)" in df.columns:
-                            df = df.dropna(subset=["Item / Componente"])
+                        if "Item / Componente" in df_up.columns:
+                            df_up = df_up.dropna(subset=["Item / Componente"])
                             
-                            def limpar(val):
+                            def limpar_preco(val):
                                 if isinstance(val, str):
                                     try: return float(val.replace("R$", "").replace(".", "").replace(",", ".").strip())
                                     except: return 0.0
                                 return float(val) if pd.notnull(val) else 0.0
                                 
-                            df['Preço Unitário (R$)'] = df['Preço Unitário (R$)'].apply(limpar)
+                            df_up['Preço Unitário (R$)'] = df_up['Preço Unitário (R$)'].apply(limpar_preco)
+                            df_up = df_up.fillna("")
                             
-                            # A SALVAÇÃO: Substitui o 'NaN' (que trava o Google) por vazio
-                            df = df.fillna("")
+                            # Salva na memória
+                            st.session_state.banco_precos_hidraulica = df_up.to_dict('records')
                             
-                            st.session_state.banco_precos_hidraulica = df.to_dict('records')
+                            # Registra a Data e Hora
+                            import datetime
+                            st.session_state['data_ultima_atualizacao'] = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
                             
-                            # Grava na nuvem
+                            # Salva na Nuvem
                             try:
                                 sh_cloud = conectar_google_sheets()
                                 ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
                                 ws_ci.clear()
-                                linhas = [df.columns.tolist()] + df.values.tolist()
+                                linhas = [df_up.columns.tolist()] + df_up.values.tolist()
                                 ws_ci.append_rows(linhas)
-                            except:
-                                pass # Se o Google falhar, a tela não trava e a tabela atualiza igual
+                                st.success("✅ Valores gravados com sucesso na Nuvem!")
+                            except Exception as e:
+                                st.warning(f"⚠️ Valores atualizados na tela, mas falha ao sincronizar com o Google: {e}")
                                 
-                            st.session_state['aviso_sucesso_upload'] = True
                     except Exception as e:
-                        st.session_state['aviso_erro_upload'] = str(e)
-
-            st.file_uploader(
-                "Arraste a planilha e solte (Processamento Automático):", 
-                type=["xlsx", "xls"], 
-                key="meu_arquivo_upload", 
-                on_change=processar_planilha_automatica,
-                label_visibility="collapsed"
-            )
-            
-            if st.session_state.pop('aviso_sucesso_upload', False):
-                st.success("✅ Valores atualizados na memória e na nuvem!")
-            if 'aviso_erro_upload' in st.session_state:
-                st.error(f"Erro ao ler arquivo: {st.session_state.pop('aviso_erro_upload')}")
+                        st.error(f"Erro na leitura do arquivo: {e}")
+                else:
+                    st.warning("⚠️ Anexe um arquivo antes de salvar.")
 
         # ====================================================================
-        # TABELA DE VISUALIZAÇÃO
+        # TABELA DE VISUALIZAÇÃO COM EDIÇÃO MANUAL DIRETA
         # ====================================================================
         st.markdown("---")
-        st.subheader("📚 Itens Cadastrados no Banco de Dados Central (Google Sheets)")
+        st.subheader("📚 Itens Cadastrados no Banco de Dados")
         
+        # 1. DATA DA ÚLTIMA ATUALIZAÇÃO
+        if 'data_ultima_atualizacao' in st.session_state:
+            st.caption(f"🕒 **Última atualização:** {st.session_state['data_ultima_atualizacao']}")
+        else:
+            st.caption("🕒 **Última atualização:** Não registrada nesta sessão")
+            
+        # 2. CARREGAMENTO DOS DADOS
         if not st.session_state.get('banco_precos_hidraulica'):
              try:
                  df_view_hidro = carregar_precos_hidraulica_itens()
@@ -2982,12 +2983,44 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             df_display = pd.DataFrame(st.session_state.banco_precos_hidraulica)
             
             if not df_display.empty and "Preço Unitário (R$)" in df_display.columns:
-                def formatar_moeda(val):
-                    try: return f"R$ {float(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    except: return str(val)
-                        
-                df_display["Preço Unitário (R$)"] = df_display["Preço Unitário (R$)"].apply(formatar_moeda)
-                st.dataframe(df_display, use_container_width=True, hide_index=True, height=500)
+                
+                # 3. EDIÇÃO MANUAL (st.data_editor)
+                st.info("💡 Você pode editar os preços dando dois cliques nos valores da tabela abaixo!")
+                df_editado = st.data_editor(
+                    df_display, 
+                    use_container_width=True, 
+                    hide_index=True, 
+                    height=500,
+                    column_config={
+                        "Preço Unitário (R$)": st.column_config.NumberColumn(
+                            "Preço Unitário (R$)",
+                            help="Edite o preço aqui",
+                            format="R$ %.2f", # Formata bonito na tela, mas mantém como número para o cálculo
+                            step=0.01
+                        ),
+                        "Item / Componente": st.column_config.TextColumn(disabled=True),
+                        "Unidade": st.column_config.TextColumn(disabled=True)
+                    },
+                    key="editor_manual_precos"
+                )
+                
+                # Botão Exclusivo para Salvar Edições Manuais
+                if st.button("💾 Salvar Edições Manuais", type="secondary"):
+                    st.session_state.banco_precos_hidraulica = df_editado.to_dict('records')
+                    
+                    import datetime
+                    st.session_state['data_ultima_atualizacao'] = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
+                    
+                    try:
+                        sh_cloud = conectar_google_sheets()
+                        ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
+                        ws_ci.clear()
+                        linhas = [df_editado.columns.tolist()] + df_editado.values.tolist()
+                        ws_ci.append_rows(linhas)
+                        st.success("✅ Edições manuais gravadas no sistema!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao salvar na nuvem: {e}")
             else:
                 st.warning("Colunas 'Item / Componente' ou 'Preço Unitário (R$)' não encontradas.")
         else:
