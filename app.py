@@ -2976,8 +2976,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.dataframe(df_display_hidro, use_container_width=True, hide_index=True, height=500)
         else:
             st.warning("O Banco de dados está vazio. Faça o upload da primeira planilha.")
-            except Exception as e: st.error(f"Erro: {e}")
-
+            
     with aba_resumo_hidro:
         st.header("📊 Resumo e Listas de Materiais (BOM)")
         if not st.session_state.cavaletes_selecionados:
