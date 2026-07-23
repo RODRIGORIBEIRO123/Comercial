@@ -2896,9 +2896,10 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.toast("✅ Preços convertidos com sucesso!", icon="👍")
             st.rerun()
             
-        st.markdown("---")
+       st.markdown("---")
         st.markdown("### 🔄 Sincronização em Lote (Excel)")
         ch1, ch2 = st.columns(2)
+        
         with ch1:
             def gerar_planilha_itens_hidro(com_precos):
                 buf = io.BytesIO(); wb = openpyxl.Workbook(); ws = wb.active
@@ -2907,29 +2908,30 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     ws.append([r["Item / Componente"], r["Preço Unitário (R$)"] if com_precos else "", r["Unidade"]])
                 wb.save(buf); buf.seek(0); return buf
             st.download_button("📥 Baixar Planilha para Cotar", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
+            
         with ch2:
-            st.markdown("#### 📂 Atualização Instantânea de Preços")
+            st.markdown("#### 📂 Leitura Direta de Planilha")
             
-            # 1. Upload Direto (Sem Botões). O sistema reage no exato instante em que o arquivo é solto.
-            upl_hidro = st.file_uploader("Arraste a planilha revisada aqui:", type=["xlsx", "xls"], key="up_direto_hidro")
+            # 1. Upload Simples
+            arquivo_cotacao = st.file_uploader("Arraste o Excel aqui:", type=["xlsx", "xls"], key="upload_raiz")
             
-            if upl_hidro is not None:
-                # Cria uma "assinatura" do arquivo para não ler duas vezes seguidas
-                assinatura_arq = f"{upl_hidro.name}_{upl_hidro.size}"
+            if arquivo_cotacao is not None:
+                # 2. Lê diretamente do arquivo físico anexado, ignorando qualquer memória do app
+                df_tela = pd.read_excel(arquivo_cotacao)
+                df_tela.rename(columns=lambda x: str(x).strip(), inplace=True)
+                df_tela = df_tela.dropna(subset=["Item / Componente"])
                 
-                if st.session_state.get("assinatura_ultimo_arquivo") != assinatura_arq:
-                    with st.spinner("Gravando novos preços na memória..."):
-                        try:
-                            # Força a leitura do ponteiro zero
-                            upl_hidro.seek(0)
-                            df_novo = pd.read_excel(upl_hidro)
+                # Exibe a tabela na mesma hora (dentro da coluna 2)
+                st.success("✅ Arquivo lido! Clique abaixo para gravar na Nuvem.")
+                
+                # 3. Botão isolado apenas para gravar no banco de dados do Google
+                if st.button("Gravar esta tabela no Sistema", type="primary", use_container_width=True):
+                    try:
+                        with st.spinner("Enviando para a Nuvem..."):
                             
-                            # Limpeza agressiva das colunas
-                            df_novo.rename(columns=lambda x: str(x).strip(), inplace=True)
-                            df_novo = df_novo.dropna(subset=["Item / Componente"])
-                            
+                            # Limpa os preços e joga na memória principal
                             lista_limpa = []
-                            for _, row in df_novo.iterrows():
+                            for _, row in df_tela.iterrows():
                                 preco = row.get("Preço Unitário (R$)", 0.0)
                                 if isinstance(preco, str):
                                     preco = preco.replace("R$", "").replace(".", "").replace(",", ".").strip()
@@ -2942,66 +2944,35 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                                     "Unidade": str(row.get("Unidade", "un"))
                                 })
                             
-                            # 2. Injeta os dados limpos diretamente na veia do aplicativo
                             st.session_state.banco_precos_hidraulica = lista_limpa
-                            st.session_state["assinatura_ultimo_arquivo"] = assinatura_arq
                             
-                            # Limpa os caches internos para destruir rastros de planilhas velhas
-                            st.cache_data.clear()
+                            sh_cloud = conectar_google_sheets()
+                            ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
+                            ws_ci.clear()
+                            linhas_gs = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in lista_limpa]
+                            ws_ci.append_rows(linhas_gs)
                             
-                            # 3. Tenta mandar para o Google Sheets (silencioso, não trava a tela se a rede piscar)
-                            try:
-                                sh_cloud = conectar_google_sheets()
-                                ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
-                                ws_ci.clear()
-                                linhas_gs = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in lista_limpa]
-                                ws_ci.append_rows(linhas_gs)
-                            except:
-                                pass 
-                                
-                            st.success("✅ Valores sobrepostos com sucesso! A tabela abaixo é a versão nova.")
-                            
-                        except Exception as e:
-                            st.error(f"Erro estrutural na planilha: {e}")
+                            st.success("🚀 Dados gravados com sucesso no Google Sheets!")
+                    except Exception as e:
+                        st.error(f"Erro de comunicação com o Google: {e}")
 
         # ====================================================================
-        # TABELA DE VISUALIZAÇÃO FORÇADA
+        # TABELA DE VISUALIZAÇÃO ÚNICA (Removemos as redundâncias)
         # ====================================================================
         st.markdown("---")
         st.subheader("📚 Tabela Ativa de Preços")
         
-        # A tabela agora é OBRIGADA a ler da memória volátil que acabamos de abastecer
-        if 'banco_precos_hidraulica' in st.session_state and st.session_state.banco_precos_hidraulica:
+        if st.session_state.banco_precos_hidraulica:
             df_display = pd.DataFrame(st.session_state.banco_precos_hidraulica)
             
             if not df_display.empty and "Preço Unitário (R$)" in df_display.columns:
                  df_display["Preço Unitário (R$)"] = df_display["Preço Unitário (R$)"].apply(lambda x: f"R$ {float(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-                 st.dataframe(df_display, use_container_width=True, hide_index=True, height=600)
+                 st.dataframe(df_display, use_container_width=True, hide_index=True, height=500)
             else:
                  st.warning("As colunas corretas não foram encontradas no Excel.")
         else:
             st.info("Nenhum dado na memória. Faça o upload da planilha atualizada acima.")
 
-        st.markdown("---")
-        st.subheader("📚 Itens Cadastrados no Banco de Dados Central (Google Sheets)")
-        
-        # O sistema SEMPRE lê da memória fresca que o Upload atualizou
-        if st.session_state.banco_precos_hidraulica:
-            df_view_hidro = pd.DataFrame(st.session_state.banco_precos_hidraulica)
-        else:
-            # Só se for a primeira vez que você abre o site no dia, ele puxa do Google
-            df_view_hidro = carregar_precos_hidraulica_itens()
-            st.session_state.banco_precos_hidraulica = df_view_hidro.to_dict('records')
-            
-        df_display_hidro = df_view_hidro.copy()
-        
-        # Formatação Visual 
-        if not df_display_hidro.empty and "Preço Unitário (R$)" in df_display_hidro.columns:
-            df_display_hidro["Preço Unitário (R$)"] = df_display_hidro["Preço Unitário (R$)"].apply(lambda x: f"R$ {float(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-            st.dataframe(df_display_hidro, use_container_width=True, hide_index=True, height=500)
-        else:
-            st.warning("O Banco de dados está vazio. Faça o upload da primeira planilha.")
-            
     with aba_resumo_hidro:
         st.header("📊 Resumo e Listas de Materiais (BOM)")
         if not st.session_state.cavaletes_selecionados:
@@ -3013,62 +2984,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             dict_nomes_originais = {normalizar_string_busca(k): k for k in df_precos_lookup["Item / Componente"]}
             
             total_hidro_material, total_hidro_montagem, total_hidro_isolamento = 0.0, 0.0, 0.0
-            resumo_financeiro_quadros = []
-            materiais_condensados_lista = {} 
-            
-            ftotal_hidro_material, total_hidro_montagem, total_hidro_isolamento = 0.0, 0.0, 0.0
-            resumo_financeiro_quadros = []
-            materiais_condensados_lista = {} 
-            
-            # Puxa os valores ATUAIS da tabela de preços
-            preco_base_mont = dict_lookup_valores.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0)
-            preco_base_isol = dict_lookup_valores.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0)
-            dict_pol = {"1/4\"": 0.25, "3/8\"": 0.375, "1/2\"": 0.5, "3/4\"": 0.75, "1\"": 1.0, "1.1/4\"": 1.25, "1.1/2\"": 1.5, "2\"": 2.0, "2.1/2\"": 2.5, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0}
-            
-            for cav in st.session_state.cavaletes_selecionados:
-                pol_dec = dict_pol.get(cav["bitola"], 1.0)
-                is_aberto = "Aberto" in cav.get("sistema", "")
-                
-                # 1. Recálculo Dinâmico dos Materiais
-                m_sub_unit = 0.0
-                qtd_tubos = 0.0; qtd_conexoes = 0.0; qtd_valvulas = 0.0
-                
-                for comp_g in cav.get("composicao", []):
-                    n_busca = normalizar_string_busca(comp_g["nome"])
-                    pr_u = dict_lookup_valores.get(n_busca, 0.0)
-                    m_sub_unit += pr_u * comp_g["qtd"]
-                    
-                    # Agrupamento da BOM
-                    n_real = dict_nomes_originais.get(n_busca, comp_g["nome"])
-                    qtd_tot = comp_g["qtd"] * cav["quantidade"]
-                    if n_real not in materiais_condensados_lista: materiais_condensados_lista[n_real] = {'qtd': 0.0, 'tags': set()}
-                    materiais_condensados_lista[n_real]['qtd'] += qtd_tot
-                    if cav.get('tag', 'S/ TAG') != 'S/ TAG': materiais_condensados_lista[n_real]['tags'].add(cav.get('tag', 'S/ TAG'))
-                    
-                    # Varredura para Isolamento
-                    nome_low = comp_g["nome"].lower()
-                    if "tubo" in nome_low: qtd_tubos += comp_g["qtd"]
-                    elif "curva" in nome_low or "conexão t" in nome_low or "redução" in nome_low or "cotovelo" in nome_low: qtd_conexoes += comp_g["qtd"]
-                    elif "válvula" in nome_low or "filtro" in nome_low: qtd_valvulas += comp_g["qtd"]
-                
-                # 2. Recálculo Dinâmico da Mão de Obra
-                mo_m_u = preco_base_mont * pol_dec * 12.0
-                if is_aberto:
-                    mo_i_u = 0.0
-                else:
-                    metragem_equivalente = qtd_tubos + (qtd_conexoes * 1.5) + (qtd_valvulas * 2.0)
-                    mo_i_u = preco_base_isol * pol_dec * metragem_equivalente
-                
-                # Atualiza na memória para as tabelas abaixo usarem o novo valor
-                cav["mo_mont_unit"] = mo_m_u
-                cav["mo_isol_unit"] = mo_i_u
-                
-                # Soma Total
-                m_sub = m_sub_unit * cav["quantidade"]
-                mo_mont_sub = mo_m_u * cav["quantidade"]
-                mo_isol_sub = mo_i_u * cav["quantidade"]
-                
-                total_hidro_material, total_hidro_montagem, total_hidro_isolamento = 0.0, 0.0, 0.0
             resumo_financeiro_quadros = []
             materiais_condensados_lista = {} 
             
@@ -3142,7 +3057,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             c1_h.info(f"**Materiais:**\nR$ {total_hidro_material:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             c2_h.warning(f"**Mão de Obra:**\nR$ {(total_hidro_montagem + total_hidro_isolamento):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             c3_h.success(f"**TOTAL:**\nR$ {(total_hidro_material + total_hidro_montagem + total_hidro_isolamento):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-            
             # --- MEMORIAL DE CÁLCULO DE MÃO DE OBRA ---
             with st.expander("ℹ️ Entenda como a Mão de Obra é calculada pelo sistema"):
                 st.markdown("""
