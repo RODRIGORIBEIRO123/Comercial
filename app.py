@@ -2958,20 +2958,24 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                             st.error(f"Erro Crítico: {e}")
 
         st.markdown("---")
-        st.markdown("### Edição Manual Rápida")
-        df_grid_hidro = pd.DataFrame(st.session_state.banco_precos_hidraulica)
-        df_grid_hidro_editado = st.data_editor(df_grid_hidro, use_container_width=True, num_rows="dynamic", hide_index=True)
+        st.subheader("📚 Itens Cadastrados no Banco de Dados Central (Google Sheets)")
         
-        if st.button("💾 Salvar Componentes no Banco Cloud", type="primary"):
-            st.session_state.banco_precos_hidraulica = df_grid_hidro_editado.to_dict('records')
-            try:
-                sh_cloud = conectar_google_sheets()
-                ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
-                ws_ci.clear()
-                linhas = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in st.session_state.banco_precos_hidraulica]
-                ws_ci.append_rows(linhas)
-                st.toast("✅ Base Cloud Sincronizada!", icon="💾")
-                st.rerun()
+        # O sistema SEMPRE lê da memória fresca que o Upload atualizou
+        if st.session_state.banco_precos_hidraulica:
+            df_view_hidro = pd.DataFrame(st.session_state.banco_precos_hidraulica)
+        else:
+            # Só se for a primeira vez que você abre o site no dia, ele puxa do Google
+            df_view_hidro = carregar_precos_hidraulica_itens()
+            st.session_state.banco_precos_hidraulica = df_view_hidro.to_dict('records')
+            
+        df_display_hidro = df_view_hidro.copy()
+        
+        # Formatação Visual 
+        if not df_display_hidro.empty and "Preço Unitário (R$)" in df_display_hidro.columns:
+            df_display_hidro["Preço Unitário (R$)"] = df_display_hidro["Preço Unitário (R$)"].apply(lambda x: f"R$ {float(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            st.dataframe(df_display_hidro, use_container_width=True, hide_index=True, height=500)
+        else:
+            st.warning("O Banco de dados está vazio. Faça o upload da primeira planilha.")
             except Exception as e: st.error(f"Erro: {e}")
 
     with aba_resumo_hidro:
