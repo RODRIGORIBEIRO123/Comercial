@@ -2898,75 +2898,90 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             
         st.markdown("---")
         st.markdown("### 🔄 Sincronização em Lote (Excel)")
+        
+        # Estrutura limpa de 2 colunas para Download e Upload
         ch1, ch2 = st.columns(2)
         
         with ch1:
+            st.markdown("#### 📥 Exportar para Cotar")
             def gerar_planilha_itens_hidro(com_precos):
-                buf = io.BytesIO(); wb = openpyxl.Workbook(); ws = wb.active
+                buf = io.BytesIO()
+                wb = openpyxl.Workbook()
+                ws = wb.active
                 ws.append(["Item / Componente", "Preço Unitário (R$)", "Unidade"])
                 for r in st.session_state.banco_precos_hidraulica:
                     ws.append([r["Item / Componente"], r["Preço Unitário (R$)"] if com_precos else "", r["Unidade"]])
-                wb.save(buf); buf.seek(0); return buf
-            st.download_button("📥 Baixar Planilha para Cotar", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
+                wb.save(buf)
+                buf.seek(0)
+                return buf
+                
+            st.download_button("Baixar Planilha (Excel)", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
             
         with ch2:
-            # Usando um formulário para garantir que o botão e o upload não sumam
-            with st.form("form_upload_precos", clear_on_submit=True):
-                st.markdown("#### 📂 Devolver Planilha Cotada")
-                upl_hidro = st.file_uploader("Selecione o arquivo Excel:", type=["xlsx", "xls"], label_visibility="collapsed")
-                
-                # O botão SEMPRE estará visível na interface agora
-                btn_processar = st.form_submit_button("✅ Atualizar Sistema", type="primary", use_container_width=True)
-                
-                if btn_processar:
-                    if upl_hidro is not None:
-                        try:
-                            # 1. Lê a planilha na mesma hora
-                            df_up = pd.read_excel(upl_hidro)
-                            # Limpeza básica e proteção de erros do Excel
-                            df_up.rename(columns=lambda x: str(x).strip(), inplace=True)
-                            df_up = df_up.dropna(subset=["Item / Componente"])
-                            
-                            # 2. Injeta na memória principal do aplicativo
-                            st.session_state.banco_precos_hidraulica = df_up.to_dict('records')
-                            
-                            # 3. Salva no Google Sheets (Nuvem)
-                            st.info("Sincronizando com a nuvem...")
-                            sh_cloud = conectar_google_sheets()
-                            ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
-                            ws_ci.clear()
-                            linhas = [df_up.columns.tolist()] + df_up.values.tolist()
-                            ws_ci.append_rows(linhas)
-                            
-                            st.success("Tudo certo! A tabela abaixo já está atualizada com os novos valores.")
-                        except Exception as e:
-                            st.error(f"Erro ao processar arquivo: {e}")
-                    else:
-                        st.warning("⚠️ Anexe o arquivo antes de clicar no botão.")
+            st.markdown("#### 📂 Devolver Planilha Cotada")
+            # Um uploader SIMPLES, sem form. O st.form é que estava congelando a tela.
+            upl_hidro = st.file_uploader("Selecione o arquivo:", type=["xlsx", "xls"], label_visibility="collapsed")
+            
+            # Cria um espaço vazio para colocar o botão, assim ele nunca some.
+            container_botao = st.empty()
+            
+            if upl_hidro is not None:
+                # O botão só é desenhado SE houver um arquivo na caixa
+                if container_botao.button("✅ Confirmar e Atualizar Sistema", type="primary", use_container_width=True):
+                    try:
+                        # 1. Lê a planilha da memória
+                        df_up = pd.read_excel(upl_hidro)
+                        df_up.rename(columns=lambda x: str(x).strip(), inplace=True)
+                        df_up = df_up.dropna(subset=["Item / Componente"])
+                        
+                        # Tratamento para garantir que preço seja número
+                        df_up['Preço Unitário (R$)'] = pd.to_numeric(df_up['Preço Unitário (R$)'], errors='coerce').fillna(0)
+                        
+                        # 2. Grava na nuvem (Google Sheets)
+                        st.toast("Salvando na Nuvem...", icon="☁️")
+                        sh_cloud = conectar_google_sheets()
+                        ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
+                        ws_ci.clear()
+                        linhas = [df_up.columns.tolist()] + df_up.values.tolist()
+                        ws_ci.append_rows(linhas)
+                        
+                        # 3. Atualiza a memória principal do app
+                        st.session_state.banco_precos_hidraulica = df_up.to_dict('records')
+                        
+                        st.success("Tudo certo! Valores gravados com sucesso.")
+                        
+                    except Exception as e:
+                        st.error(f"Erro na leitura ou gravação: {e}")
 
         # ====================================================================
-        # TABELA DE VISUALIZAÇÃO
+        # TABELA DE VISUALIZAÇÃO ATIVA E BLINDADA
         # ====================================================================
         st.markdown("---")
         st.subheader("📚 Itens Cadastrados no Banco de Dados Central (Google Sheets)")
         
+        # Garante que a tabela SEMPRE puxa os dados mais frescos da sessão
+        if not st.session_state.banco_precos_hidraulica:
+             # Se a sessão estiver vazia (ex: acabou de abrir o app), busca do Google Sheets
+             try:
+                 df_view_hidro = carregar_precos_hidraulica_itens()
+                 st.session_state.banco_precos_hidraulica = df_view_hidro.to_dict('records')
+             except:
+                 st.session_state.banco_precos_hidraulica = []
+
         if st.session_state.banco_precos_hidraulica:
-            df_view_hidro = pd.DataFrame(st.session_state.banco_precos_hidraulica)
-        else:
-            df_view_hidro = carregar_precos_hidraulica_itens()
-            st.session_state.banco_precos_hidraulica = df_view_hidro.to_dict('records')
+            df_display_hidro = pd.DataFrame(st.session_state.banco_precos_hidraulica)
             
-        df_display_hidro = df_view_hidro.copy()
-        
-        if not df_display_hidro.empty and "Preço Unitário (R$)" in df_display_hidro.columns:
-            def formatar_moeda(val):
-                try: 
-                    return f"R$ {float(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                except: 
-                    return str(val)
-                    
-            df_display_hidro["Preço Unitário (R$)"] = df_display_hidro["Preço Unitário (R$)"].apply(formatar_moeda)
-            st.dataframe(df_display_hidro, use_container_width=True, hide_index=True, height=500)
+            if not df_display_hidro.empty and "Preço Unitário (R$)" in df_display_hidro.columns:
+                def formatar_moeda(val):
+                    try: 
+                        return f"R$ {float(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    except: 
+                        return str(val)
+                        
+                df_display_hidro["Preço Unitário (R$)"] = df_display_hidro["Preço Unitário (R$)"].apply(formatar_moeda)
+                st.dataframe(df_display_hidro, use_container_width=True, hide_index=True, height=500)
+            else:
+                st.warning("As colunas 'Item / Componente' e 'Preço Unitário (R$)' não foram encontradas na base.")
         else:
             st.warning("O Banco de dados está vazio. Faça o upload da primeira planilha.")
 
