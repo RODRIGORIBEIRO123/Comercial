@@ -2896,7 +2896,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.toast("✅ Preços convertidos com sucesso!", icon="👍")
             st.rerun()
             
-       st.markdown("---")
+        st.markdown("---")
         st.markdown("### 🔄 Sincronização em Lote (Excel)")
         ch1, ch2 = st.columns(2)
         
