@@ -2909,11 +2909,23 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.download_button("📥 Baixar Planilha para Cotar", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
         with ch2:
             upl_hidro = st.file_uploader("📂 Devolver Planilha Cotada", type=["xlsx", "xls"], label_visibility="collapsed")
-            if upl_hidro:
-                df_up = pd.read_excel(upl_hidro)
-                st.session_state.banco_precos_hidraulica = df_up.to_dict('records')
-                st.success("Tabela atualizada na memória!")
-                st.rerun()
+            if upl_hidro is not None:
+                if st.button("✅ Confirmar Upload e Salvar na Nuvem", type="primary", use_container_width=True):
+                    try:
+                        df_up = pd.read_excel(upl_hidro)
+                        st.session_state.banco_precos_hidraulica = df_up.to_dict('records')
+                        
+                        # Força o salvamento na nuvem imediato
+                        sh_cloud = conectar_google_sheets()
+                        ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
+                        ws_ci.clear()
+                        linhas = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]] + [[r["Item / Componente"], r["Preço Unitário (R$)"], r["Unidade"]] for r in st.session_state.banco_precos_hidraulica]
+                        ws_ci.append_rows(linhas)
+                        
+                        st.success("Planilha lida e salva na Nuvem com sucesso! Recarregando...")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao processar: {e}")
 
         st.markdown("---")
         st.markdown("### Edição Manual Rápida")
