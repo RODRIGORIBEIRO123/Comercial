@@ -2778,6 +2778,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     # ==============================================================================
     # MOTOR GERADOR DE TEMPLATES INICIAIS (LEGADO)
     # ==============================================================================
+    # ==============================================================================
+    # MOTOR GERADOR DE TEMPLATES INICIAIS (LEGADO)
+    # ==============================================================================
     def gerar_templates_matriz():
         templates = []
         for eq in ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"]:
@@ -2816,9 +2819,38 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Fixo", "Item Base": "Niple duplo Ferro maleável galvanizado", "Medida": "1/4\"", "Qtd": 2.0})
         return templates
 
-    if 'matriz_templates' not in st.session_state or st.session_state.get('versao_mat_rec') != 'v15':
-        st.session_state.matriz_templates = gerar_templates_matriz()
-        st.session_state.versao_mat_rec = 'v15'
+    # --- PONTES COM O GOOGLE SHEETS PARA OS TEMPLATES ---
+    def carregar_templates_do_banco():
+        try:
+            sh = conectar_google_sheets()
+            try:
+                ws = sh.worksheet("Templates_Hidraulica")
+                dados = ws.get_all_records()
+                if len(dados) > 0:
+                    return dados
+            except: pass # Se a aba não existe, cai no fallback
+        except: pass
+        return gerar_templates_matriz() # Fallback seguro
+
+    def salvar_templates_no_banco(matriz):
+        try:
+            sh = conectar_google_sheets()
+            try:
+                ws = sh.worksheet("Templates_Hidraulica")
+            except:
+                ws = sh.add_worksheet(title="Templates_Hidraulica", rows="2000", cols="10")
+            
+            ws.clear()
+            if matriz:
+                df = pd.DataFrame(matriz)
+                ws.append_rows([df.columns.tolist()] + df.values.tolist())
+        except Exception as e:
+            st.warning(f"⚠️ Padrão salvo na memória, mas falhou ao gravar no Google: {e}")
+
+    # Inicialização blindada: Lê da nuvem na primeira carga
+    if 'matriz_templates' not in st.session_state or st.session_state.get('versao_mat_rec') != 'v16_DB':
+        st.session_state.matriz_templates = carregar_templates_do_banco()
+        st.session_state.versao_mat_rec = 'v16_DB'
 
     def obter_bitola_menor(bitola_atual):
         lista = ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "5\"", "6\"", "8\"", "10\"", "12\""]
@@ -2978,7 +3010,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
 
     with aba_padroes_hidro:
         st.header("⚙️ Central de Padrões e Receitas (Templates)")
-        st.caption("Selecione o equipamento e a variação que deseja editar. Todas as peças na tabela formarão a receita padrão desse tipo de cavalete.")
+        st.caption("Selecione o equipamento e a variação que deseja editar. Suas alterações serão gravadas na nuvem (Google Sheets).")
         
         f_eq, f_vi, f_li = st.columns(3)
         sel_eq = f_eq.selectbox("1. Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"], key="tpl_eq")
@@ -3002,14 +3034,19 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             num_rows="dynamic", use_container_width=True, key="grid_templates"
         )
         
-        if st.button("💾 Salvar Esta Tabela", type="primary"):
+        if st.button("💾 Salvar Esta Tabela na Nuvem", type="primary"):
             nova_matriz = [row for row in st.session_state.matriz_templates if not (row["Equipamento"] == sel_eq and row["Vias"] == sel_vi and row["Ligação"] == sel_li)]
             for _, row in df_editado.iterrows():
                 if pd.notna(row["Item Base"]) and str(row["Item Base"]).strip() != "":
                     nova_matriz.append({"Equipamento": sel_eq, "Vias": sel_vi, "Ligação": sel_li, "Grupo": row["Grupo"], "Item Base": str(row["Item Base"]).strip(), "Medida": row["Medida"], "Qtd": float(row["Qtd"]) if pd.notna(row["Qtd"]) else 1.0})
+            
+            # Salva na memória e empurra pro Banco de Dados
             st.session_state.matriz_templates = nova_matriz
             st.session_state.versao_banco_hidro = 'forcar_recalculo'
-            st.success("✅ Padrão salvo com sucesso!")
+            
+            with st.spinner("Gravando no Google Sheets..."):
+                salvar_templates_no_banco(nova_matriz)
+                st.success("✅ Padrão salvo com sucesso no Banco de Dados!")
             
         st.markdown("---")
         with st.expander("➕ Inserir Novo Item nesta Receita", expanded=False):
@@ -3035,7 +3072,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     if nome_escolhido != "":
                         st.session_state.matriz_templates.append({"Equipamento": sel_eq, "Vias": sel_vi, "Ligação": sel_li, "Grupo": add_grp, "Item Base": nome_escolhido, "Medida": add_med, "Qtd": add_qtd})
                         st.session_state.versao_banco_hidro = 'forcar_recalculo'
-                        st.toast(f"Item inserido na receita do(a) {sel_eq}!", icon="✅")
+                        
+                        salvar_templates_no_banco(st.session_state.matriz_templates)
+                        st.toast(f"Item inserido e salvo na nuvem!", icon="✅")
                         st.rerun()
                     else:
                         st.error("Selecione um item do banco ou digite um nome novo.")
@@ -3049,16 +3088,19 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         clon_vi = c_clon2.selectbox("Copiar PARA Vias:", ["2 Vias", "3 Vias"], index=["2 Vias", "3 Vias"].index(sel_vi) if sel_vi in ["2 Vias", "3 Vias"] else 0, key="clon_vi")
         clon_li = c_clon3.selectbox("Copiar PARA Ligação:", ["Roscado", "Flangeado"], index=["Roscado", "Flangeado"].index(sel_li), key="clon_li")
         
-        if st.button("📋 Executar Clonagem", type="secondary"):
+        if st.button("📋 Executar Clonagem e Salvar na Nuvem", type="secondary"):
             if clon_eq in ["Chiller", "Bomba"] and clon_vi == "3 Vias":
                 st.error("⚠️ Atenção: Chiller e Bomba só trabalham com configuração de 2 Vias no sistema.")
             else:
                 matriz_sem_alvo = [row for row in st.session_state.matriz_templates if not (row["Equipamento"] == clon_eq and row["Vias"] == clon_vi and row["Ligação"] == clon_li)]
                 for _, row in df_editado.iterrows():
                     matriz_sem_alvo.append({"Equipamento": clon_eq, "Vias": clon_vi, "Ligação": clon_li, "Grupo": row["Grupo"], "Item Base": row["Item Base"], "Medida": row["Medida"], "Qtd": row["Qtd"]})
+                
                 st.session_state.matriz_templates = matriz_sem_alvo
-                st.toast(f"Receita clonada com sucesso para {clon_eq} | {clon_vi} | {clon_li}!", icon="📋")
-                st.rerun()
+                with st.spinner("Clonando no Google Sheets..."):
+                    salvar_templates_no_banco(matriz_sem_alvo)
+                    st.toast(f"Receita clonada com sucesso para {clon_eq} | {clon_vi} | {clon_li}!", icon="📋")
+                    st.rerun()
 
     with aba_precos_hidro:
         st.header("Gestão Sênior de Preços (Componentes Abertos)")
