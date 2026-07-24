@@ -2665,7 +2665,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     from openpyxl.utils.dataframe import dataframe_to_rows
     from openpyxl.utils import get_column_letter
     from datetime import datetime
-    
+
     st.markdown("""<style>[data-testid="stVerticalBlockBorderWrapper"] { border-radius: 8px; border-left: 4px solid #1C8590 !important; background-color: rgba(28, 133, 144, 0.03); }</style>""", unsafe_allow_html=True)
     st.title("💧 Engenharia e Custos - Cavaletes Hidráulicos")
     
@@ -2683,7 +2683,102 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     todas_bitolas = bitolas_roscadas + bitolas_soldadas
 
     # ==============================================================================
-    # 1. MOTOR GERADOR DE TEMPLATES INICIAIS
+    # MOTOR GERADOR DE CAVALETES PARAMÉTRICOS (INJETADO AQUI PARA SEGURANÇA)
+    # ==============================================================================
+    def gerar_composicao_cavalete(equipamento, vias, bitola, tipo_montagem):
+        composicao = []
+        if equipamento == "UTA/FANCOIL":
+            composicao.extend([
+                {"nome": "Cotovelo 90º em ferro maleável galvanizado - Ø 1/2\"", "qtd": 1},
+                {"nome": "Ponta de rosca em ferro maleável galvanizado - Ø 1/2\"", "qtd": 3},
+                {"nome": "Meia luva soldada de aço carbono - Ø 1/2\"", "qtd": 2},
+                {"nome": "União com assento cônico em ferro maleável galvanizado - Ø 1/2\"", "qtd": 2},
+                {"nome": "Poço para termômetro em latão haste - Ø 1/2\"", "qtd": 2},
+                {"nome": "Termômetro tipo capela escala 0º a 40ºC - Ø 1/2\"", "qtd": 2},
+                {"nome": "Válvula de bloqueio tipo esfera em latão cromado - Ø 1/2\"", "qtd": 2},
+                {"nome": "Robinete com alívio para manômetro em latão - Ø 1/2\"", "qtd": 1},
+                {"nome": "Manômetro dial circular glicerinado - Ø 1/2\"", "qtd": 1},
+                {"nome": "Tubo em aço carbono galvanizado SCH 40 - Ø 1/2\"", "qtd": 1.0},
+                {"nome": "Ponta de rosca em ferro maleável galvanizado - Ø 3/4\"", "qtd": 1},
+                {"nome": "Válvula de bloqueio tipo esfera em latão cromado - Ø 3/4\"", "qtd": 1},
+            ])
+            if tipo_montagem == "Flangeado":
+                qtd_flanges = 12 if vias == "2 Vias" else 14
+                composicao.extend([
+                    {"nome": f"Flange sobreposto tipo Slip-On de aço forjado - Ø {bitola}", "qtd": qtd_flanges},
+                    {"nome": f"Cotovelo 90º soldado - Ø {bitola}", "qtd": 4},
+                    {"nome": f"Tubo em aço carbono galvanizado SCH 40 - Ø {bitola}", "qtd": 4.0},
+                    {"nome": f"Redução concêntrica - Ø {bitola}", "qtd": 2},
+                    {"nome": f"Válvula de bloqueio tipo borboleta - Ø {bitola}", "qtd": 2},
+                    {"nome": f"Válvula balanceadora - Ø {bitola}", "qtd": 1},
+                    {"nome": f"Filtro Y - Ø {bitola}", "qtd": 1},
+                ])
+            elif tipo_montagem == "Roscado":
+                qtd_unioes = 4 if vias == "2 Vias" else 6
+                composicao.extend([
+                    {"nome": f"União com assento cônico - Ø {bitola}", "qtd": qtd_unioes},
+                    {"nome": f"Cotovelo 90º em ferro maleável galvanizado - Ø {bitola}", "qtd": 4},
+                    {"nome": f"Tubo em aço carbono galvanizado SCH 40 - Ø {bitola}", "qtd": 4.0},
+                    {"nome": f"Redução concêntrica - Ø {bitola}", "qtd": 2},
+                    {"nome": f"Válvula de bloqueio tipo gaveta - Ø {bitola}", "qtd": 2},
+                    {"nome": f"Válvula balanceadora - Ø {bitola}", "qtd": 1},
+                    {"nome": f"Filtro Y - Ø {bitola}", "qtd": 1},
+                ])
+            composicao.append({"nome": f"Atuador proporcional para válvula de {vias}", "qtd": 1})
+            composicao.append({"nome": f"Válvula de {vias} - Ø {bitola}", "qtd": 1})
+
+        elif equipamento == "CHILLER":
+            composicao.extend([
+                {"nome": "Luva solda/rosca BSP de aço carbono - Ø 3/4\"", "qtd": 2},
+                {"nome": "Niple duplo de ferro maleável galvanizado - Ø 3/4\"", "qtd": 1},
+                {"nome": "Válvula de bloqueio tipo esfera - Ø 1/2\"", "qtd": 3},
+                {"nome": "União com assento cônico em bronze - Ø 1/2\"", "qtd": 4},
+                {"nome": "Tê de ferro maleável galvanizado - Ø 1/2\"", "qtd": 2},
+                {"nome": "Niple duplo de ferro maleável galvanizado - Ø 1/2\"", "qtd": 3},
+                {"nome": "Robinete com furo de alívio macho/fêmea - Ø 1/2\"", "qtd": 1},
+                {"nome": "Manômetro circular glicerinado - Ø 1/2\"", "qtd": 1},
+                {"nome": "Luva solda/rosca BSP de aço carbono - Ø 1/2\"", "qtd": 4},
+                {"nome": "Termômetro tipo capela haste horizontal - Ø 1/2\"", "qtd": 2},
+                {"nome": "Poço para termômetro haste 100mm - Ø 1/2\"", "qtd": 2},
+                {"nome": "Tubo de aço galvanizado SCH 40 - Ø 1/2\"", "qtd": 3.0},
+                {"nome": "Curva 90º raio curto de aço carbono preto - Ø 1/2\"", "qtd": 1},
+                {"nome": f"Tubo de aço carbono preto SCH 40 - Ø {bitola}", "qtd": 6.0},
+                {"nome": f"Filtro Y flangeado - Ø {bitola}", "qtd": 1},
+                {"nome": f"Válvula borboleta tipo Wafer - Ø {bitola}", "qtd": 2},
+                {"nome": f"Válvula globo tipo gaveta flangeada - Ø {bitola}", "qtd": 1},
+                {"nome": f"Junta de expansão de borracha flangeada - Ø {bitola}", "qtd": 2},
+                {"nome": f"Flange sobreposto tipo Slip-On de aço forjado - Ø {bitola}", "qtd": 14},
+                {"nome": f"Redução concêntrica de aço carbono preto - Ø {bitola}", "qtd": 2},
+                {"nome": f"Curva 90º raio longo de aço carbono preto - Ø {bitola}", "qtd": 4},
+            ])
+
+        elif equipamento == "BOMBA":
+            composicao.extend([
+                {"nome": "Tubo de aço galvanizado SCH 40 - Ø 1/2\"", "qtd": 2.0},
+                {"nome": "Luva solda/rosca BSP de aço carbono - Ø 3/4\"", "qtd": 1},
+                {"nome": "Niple duplo de ferro maleável galvanizado - Ø 3/4\"", "qtd": 1},
+                {"nome": "Válvula de bloqueio tipo gaveta - Ø 3/4\"", "qtd": 1},
+                {"nome": "Válvula de bloqueio tipo esfera - Ø 1/2\"", "qtd": 3},
+                {"nome": "União com assento cônico em bronze - Ø 1/2\"", "qtd": 3},
+                {"nome": "Conexão T 90º em ferro maleável galvanizado - Ø 1/2\"", "qtd": 2},
+                {"nome": "Luva solda/rosca BSP de aço carbono - Ø 1/2\"", "qtd": 3},
+                {"nome": "Niple duplo de ferro maleável galvanizado - Ø 1/2\"", "qtd": 6},
+                {"nome": "Robinete com furo de alívio - Ø 1/2\"", "qtd": 1},
+                {"nome": "Manômetro circular glicerinado - Ø 1/2\"", "qtd": 1},
+                {"nome": f"Tubo de aço carbono preto SCH 40 - Ø {bitola}", "qtd": 6.0},
+                {"nome": f"Válvula de retenção tipo portinhola flangeada - Ø {bitola}", "qtd": 1},
+                {"nome": f"Válvula borboleta flangeada - Ø {bitola}", "qtd": 2},
+                {"nome": f"Filtro Y flangeado - Ø {bitola}", "qtd": 1},
+                {"nome": f"Junta de expansão de borracha flangeada - Ø {bitola}", "qtd": 2},
+                {"nome": f"Flange sobreposto tipo Slip-On de aço forjado - Ø {bitola}", "qtd": 14},
+                {"nome": f"Redução concêntrica de aço carbono preto - Ø {bitola}", "qtd": 1},
+                {"nome": f"Redução excêntrica de aço carbono preto - Ø {bitola}", "qtd": 1},
+                {"nome": f"Curva 90º raio longo de aço carbono preto - Ø {bitola}", "qtd": 1},
+            ])
+        return composicao
+
+    # ==============================================================================
+    # MOTOR GERADOR DE TEMPLATES INICIAIS (LEGADO)
     # ==============================================================================
     def gerar_templates_matriz():
         templates = []
@@ -2741,7 +2836,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         medida_final = medida_final.replace("Variável {b}", bitola_cavalete)
         return f"{item_base} - Ø {medida_final}"
 
-    # 2. SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS
+    # SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS
     if st.session_state.get('versao_banco_hidro') != 'v15':
         banco_temp = {}
         for template in st.session_state.matriz_templates:
@@ -2790,8 +2885,37 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         "🔧 Dimensionamento", "💲 Tabela de Preços", "📝 Central de Padrões (Templates)", "📊 Resumos / BOM"
     ])
 
-    if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary"):
-            # Lógica exata para não confundir 2.1/2" com 1/2"
+    with aba_cadastro_hidro:
+        st.subheader("Configuração Estrutural de Hidráulica")
+        
+        tipo_sistema = st.radio("Tipo de Sistema da Instalação:", ["Fechado (Água Gelada/Quente)", "Aberto (Água de Condensação/Torre)"], horizontal=True)
+        st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+        metodo_dimensionamento = st.radio("Método de dimensionamento:", ["📏 Definir diretamente por Bitola comercial", "🌊 Dimensionar automaticamente por Vazão"], horizontal=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns(3)
+        tipo_equip = col1.selectbox("Tipo de Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"])
+        if tipo_equip in ["Chiller", "Bomba"]: 
+            tipo_vias = col2.selectbox("Válvula:", ["2 Vias"], disabled=True)
+        else: 
+            tipo_vias = col2.selectbox("Válvula:", ["2 Vias", "3 Vias"])
+        
+        if "Bitola comercial" in metodo_dimensionamento:
+            bitola_final = col3.selectbox("Bitola comercial:", todas_bitolas)
+            vazao_calculada = 0.0
+        else:
+            vazao_calculada = col3.number_input("Vazão de Água (m³/h):", min_value=0.1, step=0.5, value=5.0)
+            tipo_aplicacao = st.radio("Exigência Acústica:", ["Escritório / Áreas Críticas", "Indústria / Áreas Técnicas"], horizontal=True)
+            perda_carga = st.slider("Perda de Carga (mmCA/m):", 10, 40, 25) if "Escritório" in tipo_aplicacao else st.slider("Perda de Carga (mmCA/m):", 41, 90 if "Aberto" in tipo_sistema else 100, 70)
+            bitola_final = dimensionar_bitola_pelo_abaco(vazao_calculada, perda_carga, tipo_sistema)
+            st.info(f"📈 Bitola comercial recomendada: **{bitola_final}**.")
+            
+        col_q, col_t = st.columns([1, 2])
+        qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
+        tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: UTA-01, CH-01...")
+        
+        # --- BOTÃO ANTIGO (USANDO TEMPLATES MANUAIS) ---
+        if st.button("➕ Adicionar Cavalete ao Levantamento (Método Antigo)", type="secondary"):
             dict_pol = {"1/4\"": 0.25, "3/8\"": 0.375, "1/2\"": 0.5, "3/4\"": 0.75, "1\"": 1.0, "1.1/4\"": 1.25, "1.1/2\"": 1.5, "2\"": 2.0, "2.1/2\"": 2.5, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0}
             pol_dec = dict_pol.get(bitola_final, 1.0)
             
@@ -2809,28 +2933,15 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             
             dict_precos_memoria = {normalizar_string_busca(row["Item / Componente"]): float(row["Preço Unitário (R$)"]) for row in st.session_state.banco_precos_hidraulica}
             custo_material_total_kit = sum(dict_precos_memoria.get(normalizar_string_busca(comp["nome"]), 0.0) * comp["qtd"] for comp in composicao_kit)
-            
             mo_mont_calculado = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0) * pol_dec * 12.0
             
             if is_aberto:
                 mo_isol_calculado = 0.0
             else:
                 preco_base_isol_metro = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0) * pol_dec
-                
-                qtd_tubos_linear = 0.0
-                qtd_conexoes = 0.0
-                qtd_valvulas = 0.0
-                
-                for comp in composicao_kit:
-                    nome_low = comp["nome"].lower()
-                    qtd_c = comp["qtd"]
-                    if "tubo" in nome_low:
-                        qtd_tubos_linear += qtd_c
-                    elif "curva" in nome_low or "conexão t" in nome_low or "redução" in nome_low or "cotovelo" in nome_low:
-                        qtd_conexoes += qtd_c
-                    elif "válvula" in nome_low or "filtro" in nome_low:
-                        qtd_valvulas += qtd_c
-                
+                qtd_tubos_linear = sum(c["qtd"] for c in composicao_kit if "tubo" in c["nome"].lower())
+                qtd_conexoes = sum(c["qtd"] for c in composicao_kit if any(x in c["nome"].lower() for x in ["curva", "conexão t", "redução", "cotovelo"]))
+                qtd_valvulas = sum(c["qtd"] for c in composicao_kit if any(x in c["nome"].lower() for x in ["válvula", "filtro"]))
                 metragem_equivalente = qtd_tubos_linear + (qtd_conexoes * 1.5) + (qtd_valvulas * 2.0)
                 mo_isol_calculado = preco_base_isol_metro * metragem_equivalente
             
@@ -2918,7 +3029,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         filtro = (df_templates["Equipamento"] == sel_eq) & (df_templates["Vias"] == sel_vi) & (df_templates["Ligação"] == sel_li)
         df_editavel = df_templates[filtro][["Grupo", "Item Base", "Medida", "Qtd"]].copy()
         
-        # A TABELA DE EDIÇÃO
         df_editado = st.data_editor(
             df_editavel,
             column_config={
@@ -2939,12 +3049,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.session_state.versao_banco_hidro = 'forcar_recalculo'
             st.success("✅ Padrão salvo com sucesso!")
             
-        # ==============================================================================
-        # NOVO MÓDULO: ADICIONAR ITEM COM BUSCA NO BANCO OU NOME NOVO
-        # ==============================================================================
         st.markdown("---")
         with st.expander("➕ Inserir Novo Item nesta Receita", expanded=False):
-            # Varre o banco para pegar os nomes base (sem o Ø) para facilitar a seleção
             nomes_base_existentes = set()
             for item in st.session_state.banco_precos_hidraulica:
                 nome_bruto = item["Item / Componente"]
@@ -2965,7 +3071,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 if st.form_submit_button("Inserir na Receita Atual"):
                     nome_escolhido = add_novo if add_novo.strip() != "" else (add_base if add_base != "-- Selecione --" else "")
                     if nome_escolhido != "":
-                        # Insere diretamente na matriz mestre e recarrega
                         st.session_state.matriz_templates.append({"Equipamento": sel_eq, "Vias": sel_vi, "Ligação": sel_li, "Grupo": add_grp, "Item Base": nome_escolhido, "Medida": add_med, "Qtd": add_qtd})
                         st.session_state.versao_banco_hidro = 'forcar_recalculo'
                         st.toast(f"Item inserido na receita do(a) {sel_eq}!", icon="✅")
@@ -2978,7 +3083,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         st.caption("Gostou de como ficou essa receita? Copie-a idêntica para outro cenário para não ter que refazer tudo.")
         
         c_clon1, c_clon2, c_clon3 = st.columns(3)
-        # Já puxa selecionado o que você está editando no momento
         clon_eq = c_clon1.selectbox("Copiar PARA Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"], index=["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"].index(sel_eq), key="clon_eq")
         clon_vi = c_clon2.selectbox("Copiar PARA Vias:", ["2 Vias", "3 Vias"], index=["2 Vias", "3 Vias"].index(sel_vi) if sel_vi in ["2 Vias", "3 Vias"] else 0, key="clon_vi")
         clon_li = c_clon3.selectbox("Copiar PARA Ligação:", ["Roscado", "Flangeado"], index=["Roscado", "Flangeado"].index(sel_li), key="clon_li")
@@ -3026,11 +3130,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             
         with ch2:
             st.markdown("#### 📂 Devolver Planilha Cotada")
-            
-            # Uploader padrão, sem truques.
             upl_hidro = st.file_uploader("Selecione a planilha:", type=["xlsx", "xls"], label_visibility="collapsed")
             
-            # O BOTÃO VOLTOU: Fixo e sob seu controle
             if st.button("💾 Salvar Planilha no Banco", type="primary", use_container_width=True):
                 if upl_hidro is not None:
                     try:
@@ -3039,7 +3140,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         
                         if "Item / Componente" in df_up.columns:
                             df_up = df_up.dropna(subset=["Item / Componente"])
-                            
                             def limpar_preco(val):
                                 if isinstance(val, str):
                                     try: return float(val.replace("R$", "").replace(".", "").replace(",", ".").strip())
@@ -3049,14 +3149,11 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                             df_up['Preço Unitário (R$)'] = df_up['Preço Unitário (R$)'].apply(limpar_preco)
                             df_up = df_up.fillna("")
                             
-                            # Salva na memória
                             st.session_state.banco_precos_hidraulica = df_up.to_dict('records')
                             
-                            # Registra a Data e Hora
                             import datetime
                             st.session_state['data_ultima_atualizacao'] = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
                             
-                            # Salva na Nuvem
                             try:
                                 sh_cloud = conectar_google_sheets()
                                 ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
@@ -3066,25 +3163,19 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                                 st.success("✅ Valores gravados com sucesso na Nuvem!")
                             except Exception as e:
                                 st.warning(f"⚠️ Valores atualizados na tela, mas falha ao sincronizar com o Google: {e}")
-                                
                     except Exception as e:
                         st.error(f"Erro na leitura do arquivo: {e}")
                 else:
                     st.warning("⚠️ Anexe um arquivo antes de salvar.")
 
-        # ====================================================================
-        # TABELA DE VISUALIZAÇÃO COM EDIÇÃO MANUAL DIRETA
-        # ====================================================================
         st.markdown("---")
         st.subheader("📚 Itens Cadastrados no Banco de Dados")
         
-        # 1. DATA DA ÚLTIMA ATUALIZAÇÃO
         if 'data_ultima_atualizacao' in st.session_state:
             st.caption(f"🕒 **Última atualização:** {st.session_state['data_ultima_atualizacao']}")
         else:
             st.caption("🕒 **Última atualização:** Não registrada nesta sessão")
             
-        # 2. CARREGAMENTO DOS DADOS
         if not st.session_state.get('banco_precos_hidraulica'):
              try:
                  df_view_hidro = carregar_precos_hidraulica_itens()
@@ -3096,8 +3187,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             df_display = pd.DataFrame(st.session_state.banco_precos_hidraulica)
             
             if not df_display.empty and "Preço Unitário (R$)" in df_display.columns:
-                
-                # 3. EDIÇÃO MANUAL (st.data_editor)
                 st.info("💡 Você pode editar os preços dando dois cliques nos valores da tabela abaixo!")
                 df_editado = st.data_editor(
                     df_display, 
@@ -3108,7 +3197,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         "Preço Unitário (R$)": st.column_config.NumberColumn(
                             "Preço Unitário (R$)",
                             help="Edite o preço aqui",
-                            format="R$ %.2f", # Formata bonito na tela, mas mantém como número para o cálculo
+                            format="R$ %.2f",
                             step=0.01
                         ),
                         "Item / Componente": st.column_config.TextColumn(disabled=True),
@@ -3117,10 +3206,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     key="editor_manual_precos"
                 )
                 
-                # Botão Exclusivo para Salvar Edições Manuais
                 if st.button("💾 Salvar Edições Manuais", type="secondary"):
                     st.session_state.banco_precos_hidraulica = df_editado.to_dict('records')
-                    
                     import datetime
                     st.session_state['data_ultima_atualizacao'] = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
                     
@@ -3153,7 +3240,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             resumo_financeiro_quadros = []
             materiais_condensados_lista = {} 
             
-            # Puxa os valores ATUAIS da tabela de preços
             preco_base_mont = dict_lookup_valores.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0)
             preco_base_isol = dict_lookup_valores.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0)
             dict_pol = {"1/4\"": 0.25, "3/8\"": 0.375, "1/2\"": 0.5, "3/4\"": 0.75, "1\"": 1.0, "1.1/4\"": 1.25, "1.1/2\"": 1.5, "2\"": 2.0, "2.1/2\"": 2.5, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0}
@@ -3162,7 +3248,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 pol_dec = dict_pol.get(cav["bitola"], 1.0)
                 is_aberto = "Aberto" in cav.get("sistema", "")
                 
-                # 1. Recálculo Dinâmico dos Materiais
                 m_sub_unit = 0.0
                 qtd_tubos = 0.0; qtd_conexoes = 0.0; qtd_valvulas = 0.0
                 
@@ -3171,7 +3256,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     pr_u = dict_lookup_valores.get(n_busca, 0.0)
                     m_sub_unit += pr_u * comp_g["qtd"]
                     
-                    # Agrupamento da BOM
                     n_real = dict_nomes_originais.get(n_busca, comp_g["nome"])
                     qtd_tot = comp_g["qtd"] * cav["quantidade"]
                     if n_real not in materiais_condensados_lista: 
@@ -3180,13 +3264,11 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     if cav.get('tag', 'S/ TAG') != 'S/ TAG': 
                         materiais_condensados_lista[n_real]['tags'].add(cav.get('tag', 'S/ TAG'))
                     
-                    # Varredura para Isolamento
                     nome_low = comp_g["nome"].lower()
                     if "tubo" in nome_low: qtd_tubos += comp_g["qtd"]
                     elif "curva" in nome_low or "conexão t" in nome_low or "redução" in nome_low or "cotovelo" in nome_low: qtd_conexoes += comp_g["qtd"]
                     elif "válvula" in nome_low or "filtro" in nome_low: qtd_valvulas += comp_g["qtd"]
                 
-                # 2. Recálculo Dinâmico da Mão de Obra
                 mo_m_u = preco_base_mont * pol_dec * 12.0
                 if is_aberto:
                     mo_i_u = 0.0
@@ -3194,11 +3276,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     metragem_equivalente = qtd_tubos + (qtd_conexoes * 1.5) + (qtd_valvulas * 2.0)
                     mo_i_u = preco_base_isol * pol_dec * metragem_equivalente
                 
-                # Atualiza na memória para as tabelas abaixo usarem o novo valor
                 cav["mo_mont_unit"] = mo_m_u
                 cav["mo_isol_unit"] = mo_i_u
                 
-                # Soma Total
                 m_sub = m_sub_unit * cav["quantidade"]
                 mo_mont_sub = mo_m_u * cav["quantidade"]
                 mo_isol_sub = mo_i_u * cav["quantidade"]
@@ -3223,7 +3303,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             c1_h.info(f"**Materiais:**\nR$ {total_hidro_material:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             c2_h.warning(f"**Mão de Obra:**\nR$ {(total_hidro_montagem + total_hidro_isolamento):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             c3_h.success(f"**TOTAL:**\nR$ {(total_hidro_material + total_hidro_montagem + total_hidro_isolamento):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-            # --- MEMORIAL DE CÁLCULO DE MÃO DE OBRA ---
+            
             with st.expander("ℹ️ Entenda como a Mão de Obra é calculada pelo sistema"):
                 st.markdown("""
                 A Mão de Obra é parametrizada com base no indexador industrial de **"Polegada Equivalente"**.
@@ -3249,9 +3329,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.dataframe(df_res_quadros_disp, use_container_width=True, hide_index=True)
             
             st.markdown("---")
-            # ==============================================================================
-            # LISTA EXPLODIDA COM UNIDADES
-            # ==============================================================================
             st.subheader("📋 Lista Explodida (Por Equipamento)")
             for cav in st.session_state.cavaletes_selecionados:
                 st.markdown(f"#### {cav.get('tag', 'S/ TAG')} - {cav.get('equipamento', '')} (Ø {cav.get('bitola', '')})")
@@ -3317,9 +3394,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             df_bom_final = pd.DataFrame(lista_bom).sort_values(by=["Bitola", "Item / Componente"])
             st.dataframe(df_bom_final, use_container_width=True, hide_index=True)
             
-            # ==============================================================================
-            # EXPORTAÇÃO EXCEL RESTAURADA
-            # ==============================================================================
             st.markdown("---")
             buf_excel_hidro = io.BytesIO()
             wb_export_h = openpyxl.Workbook()
@@ -3370,9 +3444,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             wb_export_h.save(buf_excel_hidro); buf_excel_hidro.seek(0)
             st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidro_v17")
             
-            # ==============================================================================
-            # DESCRITIVO COMERCIAL RESTAURADO
-            # ==============================================================================
             st.markdown("---")
             st.markdown("### 📝 Descritivo Comercial Automático")
             texto_comercial_final = "FORNECIMENTO E MONTAGEM DE CAVALETES HIDRÁULICOS PARA SISTEMAS DE CLIMATIZAÇÃO\n\n"
