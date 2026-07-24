@@ -2761,11 +2761,11 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         
         st.session_state.versao_mat_rec = 'v17_DB'
 
-    def obter_bitola_menor(bitola_atual):
+    def obter_bitola_menor(bitola_atual, passos=1):
         lista = ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "5\"", "6\"", "8\"", "10\"", "12\""]
         if bitola_atual in lista:
             idx = lista.index(bitola_atual)
-            return lista[idx - 1] if idx > 0 else lista[0]
+            return lista[idx - passos] if idx >= passos else lista[0]
         return bitola_atual
 
     def construir_nome_peca(item_base, medida, bitola_cavalete):
