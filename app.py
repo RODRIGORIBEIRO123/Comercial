@@ -2952,47 +2952,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
             st.rerun()
 
-        # ====================================================================
-        # NOVO PAINEL: MONTAGEM ACELERADA DE CAVALETES
-        # ====================================================================
-        st.markdown("---")
-        st.subheader("⚡ Montagem Acelerada de Cavalete Típico (Automático)")
         
-        col_eq, col_bit, col_via, col_mont = st.columns(4)
-        
-        with col_eq:
-            eq_sel = st.selectbox("Equipamento:", ["UTA/FANCOIL", "CHILLER", "BOMBA"], key="fast_eq")
-        with col_bit:
-            todas_bits = ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "5\"", "6\"", "8\"", "10\"", "12\""]
-            b_sel = st.selectbox("Bitola Principal:", todas_bits, index=4, key="fast_bit")
-        with col_via:
-            via_sel = st.selectbox("Vias da Válvula:", ["2 Vias", "3 Vias"], key="fast_via") if eq_sel == "UTA/FANCOIL" else "2 Vias"
-            if eq_sel != "UTA/FANCOIL":
-                st.caption("Apenas 2 Vias suportadas")
-        with col_mont:
-            # AQUI ESTÁ A CORREÇÃO DO ERRO DO FLANGE DE 1.1/2": A seleção agora é blindada!
-            mont_auto = "Roscado" if b_sel in ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\""] else "Flangeado"
-            st.text_input("Ligação (Automática):", value=mont_auto, disabled=True, key="fast_mont")
-
-        tag_sel = st.text_input("TAG do Equipamento (Opcional):", value="S/ TAG", key="fast_tag")
-
-        if st.button("➕ Injetar Cavalete Automático", type="primary", use_container_width=True):
-            # Aciona a função (note que não mandamos mais o tipo de montagem, ela sabe sozinha)
-            receita_pronta = gerar_composicao_cavalete(eq_sel, via_sel, b_sel)
-            
-            st.session_state.cavaletes_selecionados.append({
-                "id": str(uuid.uuid4()), 
-                "equipamento": eq_sel,
-                "vias": via_sel,
-                "bitola": b_sel,
-                "quantidade": 1,
-                "tag": tag_sel,
-                "sistema": "Fechado", 
-                "composicao": receita_pronta
-            })
-            st.success(f"✅ Cavalete {eq_sel} de {b_sel} ({tag_sel}) adicionado! Ligação {mont_auto} aplicada.")
-            st.rerun()
-
         # ====================================================================
         # LISTA DE CAVALETES ADICIONADOS
         # ====================================================================
