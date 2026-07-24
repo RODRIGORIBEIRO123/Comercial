@@ -1,18 +1,18 @@
 import streamlit as st
 import pandas as pd
 import collections
-import re
-import math
-from docxtpl import DocxTemplate
 import io
 import json
 import math
 import re
 import uuid
+import os
 from datetime import date, datetime, timezone, timedelta
+
+# Importações de Terceiros
+from docxtpl import DocxTemplate
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import os
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
@@ -20,8 +20,11 @@ from openpyxl.utils import get_column_letter
 import google.generativeai as genai
 from PIL import Image
 
+# --- CONFIGURAÇÃO DA TELA (DEVE SER O PRIMEIRO COMANDO STREAMLIT) ---
+st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide", page_icon="📄")
+
 # =========================================================================
-# MOTOR PARAMÉTRICO DE ENGENHARIA (CAVALETES)
+# 🧠 MOTOR PARAMÉTRICO DE ENGENHARIA (CAVALETES)
 # =========================================================================
 def gerar_composicao_cavalete(equipamento, vias, bitola, tipo_montagem):
     composicao = []
@@ -117,9 +120,9 @@ def gerar_composicao_cavalete(equipamento, vias, bitola, tipo_montagem):
 
     return composicao
 
-# --- CONFIGURAÇÃO DA TELA ---
-st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide", page_icon="📄")
-
+# ==========================================
+# CONFIGURAÇÕES GERAIS E CONEXÕES
+# ==========================================
 def buscar_logo():
     nomes_possiveis = ["SIARCON.png", "SIARCON .png", "siarcon.png", "Siarcon.png", "logo.png"]
     for nome in nomes_possiveis:
@@ -129,9 +132,6 @@ def buscar_logo():
 
 ARQUIVO_LOGO = buscar_logo()
 
-# ==========================================
-# 🟢 CONEXÃO COM O GOOGLE SHEETS E IA
-# ==========================================
 PLANILHA_URL = "https://docs.google.com/spreadsheets/d/1DgBxNqwUepO2RW6GdRwnFHxg7dLlWiRGZjdglkQ8Ls0/edit?gid=1169331401#gid=1169331401"
 
 @st.cache_resource
@@ -146,7 +146,6 @@ def conectar_google_sheets():
         st.error(f"Erro na conexão com Google Sheets: {e}. Verifique o link.")
         st.stop()
 
-# Configuração da Inteligência Artificial (Google Gemini) - Corrigido para 1.5-flash
 try:
     if "GEMINI_API_KEY" in st.secrets:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
