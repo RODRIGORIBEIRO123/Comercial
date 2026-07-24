@@ -2751,15 +2751,10 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         except Exception as e:
             st.warning(f"⚠️ Padrão salvo na memória, mas falhou ao gravar no Google: {e}")
 
-    # Inicialização Forçada: Ignora a versão antiga da nuvem e regrava a versão corrigida (v17)
-    if 'matriz_templates' not in st.session_state or st.session_state.get('versao_mat_rec') != 'v17_DB':
-        nova_matriz_corrigida = gerar_templates_matriz()
-        st.session_state.matriz_templates = nova_matriz_corrigida
-        
-        # Empurra a correção para o Google Sheets imediatamente
-        salvar_templates_no_banco(nova_matriz_corrigida)
-        
-        st.session_state.versao_mat_rec = 'v17_DB'
+    # INICIALIZAÇÃO CORRETA E SEGURA (Lê da Nuvem e não sobrescreve)
+    if 'matriz_templates' not in st.session_state:
+        st.session_state.matriz_templates = carregar_templates_do_banco()
+        st.session_state.versao_mat_rec = 'v18_DB'
 
     def obter_bitola_menor(bitola_atual, passos=1):
         lista = ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "5\"", "6\"", "8\"", "10\"", "12\""]
@@ -2938,6 +2933,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         filtro = (df_templates["Equipamento"] == sel_eq) & (df_templates["Vias"] == sel_vi) & (df_templates["Ligação"] == sel_li)
         df_editavel = df_templates[filtro][["Grupo", "Item Base", "Medida", "Qtd"]].copy()
         
+        # A chave agora é dinâmica para blindar a memória de cada equipamento
         df_editado = st.data_editor(
             df_editavel,
             column_config={
@@ -2946,7 +2942,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 "Medida": st.column_config.SelectboxColumn("Medida (Bitola)", options=["Variável {b}", "Variável {b-1}", "Variável {b-2}", "Variável {b} x {b-1}", "Variável {b} x {b-2}", "Variável {b-1} x {b-2}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"], required=True),
                 "Qtd": st.column_config.NumberColumn("Quantidade", min_value=0.0, format="%.2f")
             },
-            num_rows="dynamic", use_container_width=True, key="grid_templates"
+            num_rows="dynamic", use_container_width=True, key=f"grid_tpl_{sel_eq}_{sel_vi}_{sel_li}"
         )
         
         if st.button("💾 Salvar Esta Tabela na Nuvem", type="primary"):
@@ -2955,13 +2951,13 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 if pd.notna(row["Item Base"]) and str(row["Item Base"]).strip() != "":
                     nova_matriz.append({"Equipamento": sel_eq, "Vias": sel_vi, "Ligação": sel_li, "Grupo": row["Grupo"], "Item Base": str(row["Item Base"]).strip(), "Medida": row["Medida"], "Qtd": float(row["Qtd"]) if pd.notna(row["Qtd"]) else 1.0})
             
-            # Salva na memória e empurra pro Banco de Dados
             st.session_state.matriz_templates = nova_matriz
             st.session_state.versao_banco_hidro = 'forcar_recalculo'
             
             with st.spinner("Gravando no Google Sheets..."):
                 salvar_templates_no_banco(nova_matriz)
                 st.success("✅ Padrão salvo com sucesso no Banco de Dados!")
+                st.rerun() 
             
         st.markdown("---")
         with st.expander("➕ Inserir Novo Item nesta Receita", expanded=False):
