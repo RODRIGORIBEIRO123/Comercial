@@ -20,6 +20,103 @@ from openpyxl.utils import get_column_letter
 import google.generativeai as genai
 from PIL import Image
 
+# =========================================================================
+# MOTOR PARAMÉTRICO DE ENGENHARIA (CAVALETES)
+# =========================================================================
+def gerar_composicao_cavalete(equipamento, vias, bitola, tipo_montagem):
+    composicao = []
+    
+    if equipamento == "UTA/FANCOIL":
+        composicao.extend([
+            {"nome": "Cotovelo 90º em ferro maleável galvanizado - Ø 1/2\"", "qtd": 1},
+            {"nome": "Ponta de rosca em ferro maleável galvanizado - Ø 1/2\"", "qtd": 3},
+            {"nome": "Meia luva soldada de aço carbono - Ø 1/2\"", "qtd": 2},
+            {"nome": "União com assento cônico em ferro maleável galvanizado - Ø 1/2\"", "qtd": 2},
+            {"nome": "Poço para termômetro em latão haste - Ø 1/2\"", "qtd": 2},
+            {"nome": "Termômetro tipo capela escala 0º a 40ºC - Ø 1/2\"", "qtd": 2},
+            {"nome": "Válvula de bloqueio tipo esfera em latão cromado - Ø 1/2\"", "qtd": 2},
+            {"nome": "Robinete com alívio para manômetro em latão - Ø 1/2\"", "qtd": 1},
+            {"nome": "Manômetro dial circular glicerinado - Ø 1/2\"", "qtd": 1},
+            {"nome": "Tubo em aço carbono galvanizado SCH 40 - Ø 1/2\"", "qtd": 1.0},
+            {"nome": "Ponta de rosca em ferro maleável galvanizado - Ø 3/4\"", "qtd": 1},
+            {"nome": "Válvula de bloqueio tipo esfera em latão cromado - Ø 3/4\"", "qtd": 1},
+        ])
+        if tipo_montagem == "Flangeado":
+            qtd_flanges = 12 if vias == "2 Vias" else 14
+            composicao.extend([
+                {"nome": f"Flange sobreposto tipo Slip-On de aço forjado - Ø {bitola}", "qtd": qtd_flanges},
+                {"nome": f"Cotovelo 90º soldado - Ø {bitola}", "qtd": 4},
+                {"nome": f"Tubo em aço carbono galvanizado SCH 40 - Ø {bitola}", "qtd": 4.0},
+                {"nome": f"Redução concêntrica - Ø {bitola}", "qtd": 2},
+                {"nome": f"Válvula de bloqueio tipo borboleta - Ø {bitola}", "qtd": 2},
+                {"nome": f"Válvula balanceadora - Ø {bitola}", "qtd": 1},
+                {"nome": f"Filtro Y - Ø {bitola}", "qtd": 1},
+            ])
+        elif tipo_montagem == "Roscado":
+            qtd_unioes = 4 if vias == "2 Vias" else 6
+            composicao.extend([
+                {"nome": f"União com assento cônico - Ø {bitola}", "qtd": qtd_unioes},
+                {"nome": f"Cotovelo 90º em ferro maleável galvanizado - Ø {bitola}", "qtd": 4},
+                {"nome": f"Tubo em aço carbono galvanizado SCH 40 - Ø {bitola}", "qtd": 4.0},
+                {"nome": f"Redução concêntrica - Ø {bitola}", "qtd": 2},
+                {"nome": f"Válvula de bloqueio tipo gaveta - Ø {bitola}", "qtd": 2},
+                {"nome": f"Válvula balanceadora - Ø {bitola}", "qtd": 1},
+                {"nome": f"Filtro Y - Ø {bitola}", "qtd": 1},
+            ])
+        composicao.append({"nome": f"Atuador proporcional para válvula de {vias}", "qtd": 1})
+        composicao.append({"nome": f"Válvula de {vias} - Ø {bitola}", "qtd": 1})
+
+    elif equipamento == "CHILLER":
+        composicao.extend([
+            {"nome": "Luva solda/rosca BSP de aço carbono - Ø 3/4\"", "qtd": 2},
+            {"nome": "Niple duplo de ferro maleável galvanizado - Ø 3/4\"", "qtd": 1},
+            {"nome": "Válvula de bloqueio tipo esfera - Ø 1/2\"", "qtd": 3},
+            {"nome": "União com assento cônico em bronze - Ø 1/2\"", "qtd": 4},
+            {"nome": "Tê de ferro maleável galvanizado - Ø 1/2\"", "qtd": 2},
+            {"nome": "Niple duplo de ferro maleável galvanizado - Ø 1/2\"", "qtd": 3},
+            {"nome": "Robinete com furo de alívio macho/fêmea - Ø 1/2\"", "qtd": 1},
+            {"nome": "Manômetro circular glicerinado - Ø 1/2\"", "qtd": 1},
+            {"nome": "Luva solda/rosca BSP de aço carbono - Ø 1/2\"", "qtd": 4},
+            {"nome": "Termômetro tipo capela haste horizontal - Ø 1/2\"", "qtd": 2},
+            {"nome": "Poço para termômetro haste 100mm - Ø 1/2\"", "qtd": 2},
+            {"nome": "Tubo de aço galvanizado SCH 40 - Ø 1/2\"", "qtd": 3.0},
+            {"nome": "Curva 90º raio curto de aço carbono preto - Ø 1/2\"", "qtd": 1},
+            {"nome": f"Tubo de aço carbono preto SCH 40 - Ø {bitola}", "qtd": 6.0},
+            {"nome": f"Filtro Y flangeado - Ø {bitola}", "qtd": 1},
+            {"nome": f"Válvula borboleta tipo Wafer - Ø {bitola}", "qtd": 2},
+            {"nome": f"Válvula globo tipo gaveta flangeada - Ø {bitola}", "qtd": 1},
+            {"nome": f"Junta de expansão de borracha flangeada - Ø {bitola}", "qtd": 2},
+            {"nome": f"Flange sobreposto tipo Slip-On de aço forjado - Ø {bitola}", "qtd": 14},
+            {"nome": f"Redução concêntrica de aço carbono preto - Ø {bitola}", "qtd": 2},
+            {"nome": f"Curva 90º raio longo de aço carbono preto - Ø {bitola}", "qtd": 4},
+        ])
+
+    elif equipamento == "BOMBA":
+        composicao.extend([
+            {"nome": "Tubo de aço galvanizado SCH 40 - Ø 1/2\"", "qtd": 2.0},
+            {"nome": "Luva solda/rosca BSP de aço carbono - Ø 3/4\"", "qtd": 1},
+            {"nome": "Niple duplo de ferro maleável galvanizado - Ø 3/4\"", "qtd": 1},
+            {"nome": "Válvula de bloqueio tipo gaveta - Ø 3/4\"", "qtd": 1},
+            {"nome": "Válvula de bloqueio tipo esfera - Ø 1/2\"", "qtd": 3},
+            {"nome": "União com assento cônico em bronze - Ø 1/2\"", "qtd": 3},
+            {"nome": "Conexão T 90º em ferro maleável galvanizado - Ø 1/2\"", "qtd": 2},
+            {"nome": "Luva solda/rosca BSP de aço carbono - Ø 1/2\"", "qtd": 3},
+            {"nome": "Niple duplo de ferro maleável galvanizado - Ø 1/2\"", "qtd": 6},
+            {"nome": "Robinete com furo de alívio - Ø 1/2\"", "qtd": 1},
+            {"nome": "Manômetro circular glicerinado - Ø 1/2\"", "qtd": 1},
+            {"nome": f"Tubo de aço carbono preto SCH 40 - Ø {bitola}", "qtd": 6.0},
+            {"nome": f"Válvula de retenção tipo portinhola flangeada - Ø {bitola}", "qtd": 1},
+            {"nome": f"Válvula borboleta flangeada - Ø {bitola}", "qtd": 2},
+            {"nome": f"Filtro Y flangeado - Ø {bitola}", "qtd": 1},
+            {"nome": f"Junta de expansão de borracha flangeada - Ø {bitola}", "qtd": 2},
+            {"nome": f"Flange sobreposto tipo Slip-On de aço forjado - Ø {bitola}", "qtd": 14},
+            {"nome": f"Redução concêntrica de aço carbono preto - Ø {bitola}", "qtd": 1},
+            {"nome": f"Redução excêntrica de aço carbono preto - Ø {bitola}", "qtd": 1},
+            {"nome": f"Curva 90º raio longo de aço carbono preto - Ø {bitola}", "qtd": 1},
+        ])
+
+    return composicao
+
 # --- CONFIGURAÇÃO DA TELA ---
 st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide", page_icon="📄")
 
@@ -2775,6 +2872,49 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             })
             st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
             st.rerun()
+
+        st.markdown("---")
+        st.subheader("⚡ Montagem Acelerada de Cavalete Típico (Automático)")
+        
+        col_eq, col_bit, col_via, col_mont = st.columns(4)
+        
+        with col_eq:
+            eq_sel = st.selectbox("Equipamento:", ["UTA/FANCOIL", "CHILLER", "BOMBA"], key="fast_eq")
+        with col_bit:
+            b_sel = st.selectbox("Bitola Principal:", ["1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "6\"", "8\"", "10\""], key="fast_bit")
+        with col_via:
+            via_sel = st.selectbox("Vias da Válvula:", ["2 Vias", "3 Vias"], key="fast_via") if eq_sel == "UTA/FANCOIL" else "N/A"
+            if eq_sel != "UTA/FANCOIL":
+                st.caption("Apenas para UTA")
+        with col_mont:
+            mont_sel = st.selectbox("Tipo de Montagem:", ["Flangeado", "Roscado"], key="fast_mont")
+
+        tag_sel = st.text_input("TAG do Equipamento (Opcional):", value="S/ TAG", key="fast_tag")
+
+        if st.button("➕ Injetar Cavalete Automático", type="primary", use_container_width=True):
+            # Aciona o Cérebro que colamos lá no topo do arquivo
+            receita_pronta = gerar_composicao_cavalete(eq_sel, via_sel, b_sel, mont_sel)
+            
+            st.session_state.cavaletes_selecionados.append({
+                "id": str(uuid.uuid4()), # ID único para não bugar a lixeira
+                "equipamento": eq_sel,
+                "vias": via_sel,
+                "bitola": b_sel,
+                "quantidade": 1,
+                "tag": tag_sel,
+                "sistema": "Fechado", # Padrão para água gelada base
+                "composicao": receita_pronta
+            })
+            st.success(f"✅ Cavalete {eq_sel} de {b_sel} ({tag_sel}) adicionado! {len(receita_pronta)} itens processados.")
+            st.rerun()
+        # ====================================================================
+        # 👆 O CÓDIGO NOVO TERMINA AQUI 👆
+        # ====================================================================
+
+        st.markdown("### 📋 Cavaletes Adicionados no Projeto")
+        if not st.session_state.cavaletes_selecionados: st.info("Nenhum item adicionado no levantamento.")
+        else:
+            for idx, cav in enumerate(st.session_state.cavaletes_selecionados):
 
         st.markdown("### 📋 Cavaletes Adicionados no Projeto")
         if not st.session_state.cavaletes_selecionados: st.info("Nenhum item adicionado no levantamento.")
