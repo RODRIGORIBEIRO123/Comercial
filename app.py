@@ -2770,9 +2770,15 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
 
     def construir_nome_peca(item_base, medida, bitola_cavalete):
         if medida == "Nenhum": return item_base
-        bitola_menor = obter_bitola_menor(bitola_cavalete)
-        medida_final = medida.replace("Variável {b-1}", bitola_menor)
-        medida_final = medida_final.replace("Variável {b}", bitola_cavalete)
+        bitola_b1 = obter_bitola_menor(bitola_cavalete, 1)
+        bitola_b2 = obter_bitola_menor(bitola_cavalete, 2)
+        
+        # Limpa a palavra "Variável " e substitui as tags matemáticas com precisão
+        medida_final = medida.replace("Variável ", "")
+        medida_final = medida_final.replace("{b-2}", bitola_b2)
+        medida_final = medida_final.replace("{b-1}", bitola_b1)
+        medida_final = medida_final.replace("{b}", bitola_cavalete)
+        
         return f"{item_base} - Ø {medida_final}"
 
     # SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS
@@ -2937,7 +2943,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             column_config={
                 "Grupo": st.column_config.SelectboxColumn("Grupo do Kit", options=["Kit Dinâmico", "Kit Fixo"], required=True),
                 "Item Base": st.column_config.TextColumn("Descrição Base (sem o diâmetro)", required=True),
-                "Medida": st.column_config.SelectboxColumn("Medida (Bitola)", options=["Variável {b}", "Variável {b-1}", "Variável {b} x {b-1}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"], required=True),
+                "Medida": st.column_config.SelectboxColumn("Medida (Bitola)", options=["Variável {b}", "Variável {b-1}", "Variável {b-2}", "Variável {b} x {b-1}", "Variável {b} x {b-2}", "Variável {b-1} x {b-2}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"], required=True),
                 "Qtd": st.column_config.NumberColumn("Quantidade", min_value=0.0, format="%.2f")
             },
             num_rows="dynamic", use_container_width=True, key="grid_templates"
@@ -2973,7 +2979,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 add_novo = c_a3.text_input("2. OU Digite um Nome Novo")
                 
                 c_a4, c_a5, c_a6 = st.columns(3)
-                add_med = c_a4.selectbox("Medida", ["Variável {b}", "Variável {b-1}", "Variável {b} x {b-1}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"])
+                add_med = c_a4.selectbox("Medida", ["Variável {b}", "Variável {b-1}", "Variável {b-2}", "Variável {b} x {b-1}", "Variável {b} x {b-2}", "Variável {b-1} x {b-2}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"])
                 add_qtd = c_a5.number_input("Quantidade", min_value=0.01, value=1.0)
                 
                 if st.form_submit_button("Inserir na Receita Atual"):
