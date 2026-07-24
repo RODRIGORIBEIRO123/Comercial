@@ -2681,104 +2681,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     todas_bitolas = bitolas_roscadas + bitolas_soldadas
 
     # ==============================================================================
-    # MOTOR GERADOR DE CAVALETES PARAMÉTRICOS (INJETADO AQUI PARA SEGURANÇA)
-    # ==============================================================================
-    def gerar_composicao_cavalete(equipamento, vias, bitola, tipo_montagem):
-        composicao = []
-        if equipamento == "UTA/FANCOIL":
-            composicao.extend([
-                {"nome": "Cotovelo 90º em ferro maleável galvanizado - Ø 1/2\"", "qtd": 1},
-                {"nome": "Ponta de rosca em ferro maleável galvanizado - Ø 1/2\"", "qtd": 3},
-                {"nome": "Meia luva soldada de aço carbono - Ø 1/2\"", "qtd": 2},
-                {"nome": "União com assento cônico em ferro maleável galvanizado - Ø 1/2\"", "qtd": 2},
-                {"nome": "Poço para termômetro em latão haste - Ø 1/2\"", "qtd": 2},
-                {"nome": "Termômetro tipo capela escala 0º a 40ºC - Ø 1/2\"", "qtd": 2},
-                {"nome": "Válvula de bloqueio tipo esfera em latão cromado - Ø 1/2\"", "qtd": 2},
-                {"nome": "Robinete com alívio para manômetro em latão - Ø 1/2\"", "qtd": 1},
-                {"nome": "Manômetro dial circular glicerinado - Ø 1/2\"", "qtd": 1},
-                {"nome": "Tubo em aço carbono galvanizado SCH 40 - Ø 1/2\"", "qtd": 1.0},
-                {"nome": "Ponta de rosca em ferro maleável galvanizado - Ø 3/4\"", "qtd": 1},
-                {"nome": "Válvula de bloqueio tipo esfera em latão cromado - Ø 3/4\"", "qtd": 1},
-            ])
-            if tipo_montagem == "Flangeado":
-                qtd_flanges = 12 if vias == "2 Vias" else 14
-                composicao.extend([
-                    {"nome": f"Flange sobreposto tipo Slip-On de aço forjado - Ø {bitola}", "qtd": qtd_flanges},
-                    {"nome": f"Cotovelo 90º soldado - Ø {bitola}", "qtd": 4},
-                    {"nome": f"Tubo em aço carbono galvanizado SCH 40 - Ø {bitola}", "qtd": 4.0},
-                    {"nome": f"Redução concêntrica - Ø {bitola}", "qtd": 2},
-                    {"nome": f"Válvula de bloqueio tipo borboleta - Ø {bitola}", "qtd": 2},
-                    {"nome": f"Válvula balanceadora - Ø {bitola}", "qtd": 1},
-                    {"nome": f"Filtro Y - Ø {bitola}", "qtd": 1},
-                ])
-            elif tipo_montagem == "Roscado":
-                qtd_unioes = 4 if vias == "2 Vias" else 6
-                composicao.extend([
-                    {"nome": f"União com assento cônico - Ø {bitola}", "qtd": qtd_unioes},
-                    {"nome": f"Cotovelo 90º em ferro maleável galvanizado - Ø {bitola}", "qtd": 4},
-                    {"nome": f"Tubo em aço carbono galvanizado SCH 40 - Ø {bitola}", "qtd": 4.0},
-                    {"nome": f"Redução concêntrica - Ø {bitola}", "qtd": 2},
-                    {"nome": f"Válvula de bloqueio tipo gaveta - Ø {bitola}", "qtd": 2},
-                    {"nome": f"Válvula balanceadora - Ø {bitola}", "qtd": 1},
-                    {"nome": f"Filtro Y - Ø {bitola}", "qtd": 1},
-                ])
-            composicao.append({"nome": f"Atuador proporcional para válvula de {vias}", "qtd": 1})
-            composicao.append({"nome": f"Válvula de {vias} - Ø {bitola}", "qtd": 1})
-
-        elif equipamento == "CHILLER":
-            composicao.extend([
-                {"nome": "Luva solda/rosca BSP de aço carbono - Ø 3/4\"", "qtd": 2},
-                {"nome": "Niple duplo de ferro maleável galvanizado - Ø 3/4\"", "qtd": 1},
-                {"nome": "Válvula de bloqueio tipo esfera - Ø 1/2\"", "qtd": 3},
-                {"nome": "União com assento cônico em bronze - Ø 1/2\"", "qtd": 4},
-                {"nome": "Tê de ferro maleável galvanizado - Ø 1/2\"", "qtd": 2},
-                {"nome": "Niple duplo de ferro maleável galvanizado - Ø 1/2\"", "qtd": 3},
-                {"nome": "Robinete com furo de alívio macho/fêmea - Ø 1/2\"", "qtd": 1},
-                {"nome": "Manômetro circular glicerinado - Ø 1/2\"", "qtd": 1},
-                {"nome": "Luva solda/rosca BSP de aço carbono - Ø 1/2\"", "qtd": 4},
-                {"nome": "Termômetro tipo capela haste horizontal - Ø 1/2\"", "qtd": 2},
-                {"nome": "Poço para termômetro haste 100mm - Ø 1/2\"", "qtd": 2},
-                {"nome": "Tubo de aço galvanizado SCH 40 - Ø 1/2\"", "qtd": 3.0},
-                {"nome": "Curva 90º raio curto de aço carbono preto - Ø 1/2\"", "qtd": 1},
-                {"nome": f"Tubo de aço carbono preto SCH 40 - Ø {bitola}", "qtd": 6.0},
-                {"nome": f"Filtro Y flangeado - Ø {bitola}", "qtd": 1},
-                {"nome": f"Válvula borboleta tipo Wafer - Ø {bitola}", "qtd": 2},
-                {"nome": f"Válvula globo tipo gaveta flangeada - Ø {bitola}", "qtd": 1},
-                {"nome": f"Junta de expansão de borracha flangeada - Ø {bitola}", "qtd": 2},
-                {"nome": f"Flange sobreposto tipo Slip-On de aço forjado - Ø {bitola}", "qtd": 14},
-                {"nome": f"Redução concêntrica de aço carbono preto - Ø {bitola}", "qtd": 2},
-                {"nome": f"Curva 90º raio longo de aço carbono preto - Ø {bitola}", "qtd": 4},
-            ])
-
-        elif equipamento == "BOMBA":
-            composicao.extend([
-                {"nome": "Tubo de aço galvanizado SCH 40 - Ø 1/2\"", "qtd": 2.0},
-                {"nome": "Luva solda/rosca BSP de aço carbono - Ø 3/4\"", "qtd": 1},
-                {"nome": "Niple duplo de ferro maleável galvanizado - Ø 3/4\"", "qtd": 1},
-                {"nome": "Válvula de bloqueio tipo gaveta - Ø 3/4\"", "qtd": 1},
-                {"nome": "Válvula de bloqueio tipo esfera - Ø 1/2\"", "qtd": 3},
-                {"nome": "União com assento cônico em bronze - Ø 1/2\"", "qtd": 3},
-                {"nome": "Conexão T 90º em ferro maleável galvanizado - Ø 1/2\"", "qtd": 2},
-                {"nome": "Luva solda/rosca BSP de aço carbono - Ø 1/2\"", "qtd": 3},
-                {"nome": "Niple duplo de ferro maleável galvanizado - Ø 1/2\"", "qtd": 6},
-                {"nome": "Robinete com furo de alívio - Ø 1/2\"", "qtd": 1},
-                {"nome": "Manômetro circular glicerinado - Ø 1/2\"", "qtd": 1},
-                {"nome": f"Tubo de aço carbono preto SCH 40 - Ø {bitola}", "qtd": 6.0},
-                {"nome": f"Válvula de retenção tipo portinhola flangeada - Ø {bitola}", "qtd": 1},
-                {"nome": f"Válvula borboleta flangeada - Ø {bitola}", "qtd": 2},
-                {"nome": f"Filtro Y flangeado - Ø {bitola}", "qtd": 1},
-                {"nome": f"Junta de expansão de borracha flangeada - Ø {bitola}", "qtd": 2},
-                {"nome": f"Flange sobreposto tipo Slip-On de aço forjado - Ø {bitola}", "qtd": 14},
-                {"nome": f"Redução concêntrica de aço carbono preto - Ø {bitola}", "qtd": 1},
-                {"nome": f"Redução excêntrica de aço carbono preto - Ø {bitola}", "qtd": 1},
-                {"nome": f"Curva 90º raio longo de aço carbono preto - Ø {bitola}", "qtd": 1},
-            ])
-        return composicao
-
-    # ==============================================================================
-    # MOTOR GERADOR DE TEMPLATES INICIAIS (LEGADO)
-    # ==============================================================================
-    # ==============================================================================
     # MOTOR GERADOR DE TEMPLATES INICIAIS (LEGADO)
     # ==============================================================================
     def gerar_templates_matriz():
@@ -2793,7 +2695,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Isolamento Espuma elastomérica, espessura 25 mm", "Medida": "Variável {b}", "Qtd": 2.0})
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Rechapeamento chapa de alumínio liso, espessura 0,5 mm", "Medida": "Variável {b}", "Qtd": 2.0})
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Válvula balanceadora", "Medida": "Variável {b}", "Qtd": 1.0})
-                    templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": f"Válvula {vias[0]} vias, motorizada com atuador proporcional", "Medida": "Variável {b}", "Qtd": 1.0})
+                    
+                    # CORREÇÃO APLICADA AQUI: A válvula de controle volta a ser {b-1}
+                    templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": f"Válvula {vias[0]} vias, motorizada com atuador proporcional", "Medida": "Variável {b-1}", "Qtd": 1.0})
                     
                     if ligacao == "Roscado":
                         templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Curva 90° Ferro maleável galvanizado", "Medida": "Variável {b}", "Qtd": 6.0 if vias == "3 Vias" else 4.0})
@@ -2828,9 +2732,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 dados = ws.get_all_records()
                 if len(dados) > 0:
                     return dados
-            except: pass # Se a aba não existe, cai no fallback
+            except: pass 
         except: pass
-        return gerar_templates_matriz() # Fallback seguro
+        return gerar_templates_matriz() 
 
     def salvar_templates_no_banco(matriz):
         try:
@@ -2847,10 +2751,15 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         except Exception as e:
             st.warning(f"⚠️ Padrão salvo na memória, mas falhou ao gravar no Google: {e}")
 
-    # Inicialização blindada: Lê da nuvem na primeira carga
-    if 'matriz_templates' not in st.session_state or st.session_state.get('versao_mat_rec') != 'v16_DB':
-        st.session_state.matriz_templates = carregar_templates_do_banco()
-        st.session_state.versao_mat_rec = 'v16_DB'
+    # Inicialização Forçada: Ignora a versão antiga da nuvem e regrava a versão corrigida (v17)
+    if 'matriz_templates' not in st.session_state or st.session_state.get('versao_mat_rec') != 'v17_DB':
+        nova_matriz_corrigida = gerar_templates_matriz()
+        st.session_state.matriz_templates = nova_matriz_corrigida
+        
+        # Empurra a correção para o Google Sheets imediatamente
+        salvar_templates_no_banco(nova_matriz_corrigida)
+        
+        st.session_state.versao_mat_rec = 'v17_DB'
 
     def obter_bitola_menor(bitola_atual):
         lista = ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "5\"", "6\"", "8\"", "10\"", "12\""]
