@@ -2663,7 +2663,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     from openpyxl.utils.dataframe import dataframe_to_rows
     from openpyxl.utils import get_column_letter
     from datetime import datetime
-
+    
     st.markdown("""<style>[data-testid="stVerticalBlockBorderWrapper"] { border-radius: 8px; border-left: 4px solid #1C8590 !important; background-color: rgba(28, 133, 144, 0.03); }</style>""", unsafe_allow_html=True)
     st.title("💧 Engenharia e Custos - Cavaletes Hidráulicos")
     
@@ -2681,7 +2681,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     todas_bitolas = bitolas_roscadas + bitolas_soldadas
 
     # ==============================================================================
-    # MOTOR GERADOR DE TEMPLATES INICIAIS (LEGADO)
+    # MOTOR GERADOR DE TEMPLATES INICIAIS (PADRÃO DE FÁBRICA DE SEGURANÇA)
     # ==============================================================================
     def gerar_templates_matriz():
         templates = []
@@ -2695,8 +2695,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Isolamento Espuma elastomérica, espessura 25 mm", "Medida": "Variável {b}", "Qtd": 2.0})
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Rechapeamento chapa de alumínio liso, espessura 0,5 mm", "Medida": "Variável {b}", "Qtd": 2.0})
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Válvula balanceadora", "Medida": "Variável {b}", "Qtd": 1.0})
-                    
-                    # CORREÇÃO APLICADA AQUI: A válvula de controle volta a ser {b-1}
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": f"Válvula {vias[0]} vias, motorizada com atuador proporcional", "Medida": "Variável {b-1}", "Qtd": 1.0})
                     
                     if ligacao == "Roscado":
@@ -2730,8 +2728,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             try:
                 ws = sh.worksheet("Templates_Hidraulica")
                 dados = ws.get_all_records()
-                if len(dados) > 0:
-                    return dados
+                if len(dados) > 0: return dados
             except: pass 
         except: pass
         return gerar_templates_matriz() 
@@ -2739,17 +2736,17 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     def salvar_templates_no_banco(matriz):
         try:
             sh = conectar_google_sheets()
-            try:
-                ws = sh.worksheet("Templates_Hidraulica")
-            except:
-                ws = sh.add_worksheet(title="Templates_Hidraulica", rows="2000", cols="10")
-            
+            try: ws = sh.worksheet("Templates_Hidraulica")
+            except: ws = sh.add_worksheet(title="Templates_Hidraulica", rows="2000", cols="10")
             ws.clear()
             if matriz:
-                df = pd.DataFrame(matriz)
+                # O preenchimento .fillna("") salva o banco de falhar e apagar seus dados.
+                df = pd.DataFrame(matriz).fillna("")
                 ws.append_rows([df.columns.tolist()] + df.values.tolist())
+            return True
         except Exception as e:
-            st.warning(f"⚠️ Padrão salvo na memória, mas falhou ao gravar no Google: {e}")
+            st.error(f"⚠️ Erro ao gravar no Google: {e}")
+            return False
 
     # ====================================================================
     # 🛑 INICIALIZAÇÃO BLINDADA (ÚNICA E DEFINITIVA)
@@ -2759,8 +2756,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         
     if 'trigger_refresh' not in st.session_state:
         st.session_state.trigger_refresh = 0
-
-    # AS 4 ABAS DO APLICATIVO'
 
     def obter_bitola_menor(bitola_atual, passos=1):
         lista = ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\"", "2.1/2\"", "3\"", "4\"", "5\"", "6\"", "8\"", "10\"", "12\""]
@@ -2774,12 +2769,10 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         bitola_b1 = obter_bitola_menor(bitola_cavalete, 1)
         bitola_b2 = obter_bitola_menor(bitola_cavalete, 2)
         
-        # Limpa a palavra "Variável " e substitui as tags matemáticas com precisão
         medida_final = medida.replace("Variável ", "")
         medida_final = medida_final.replace("{b-2}", bitola_b2)
         medida_final = medida_final.replace("{b-1}", bitola_b1)
         medida_final = medida_final.replace("{b}", bitola_cavalete)
-        
         return f"{item_base} - Ø {medida_final}"
 
     # SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS
@@ -2860,8 +2853,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
         tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: UTA-01, CH-01...")
         
-        # --- BOTÃO ANTIGO (USANDO TEMPLATES MANUAIS) ---
-        if st.button("➕ Adicionar Cavalete ao Levantamento", type="secondary"):
+        if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary", use_container_width=True):
             dict_pol = {"1/4\"": 0.25, "3/8\"": 0.375, "1/2\"": 0.5, "3/4\"": 0.75, "1\"": 1.0, "1.1/4\"": 1.25, "1.1/2\"": 1.5, "2\"": 2.0, "2.1/2\"": 2.5, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0}
             pol_dec = dict_pol.get(bitola_final, 1.0)
             
@@ -2900,10 +2892,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
             st.rerun()
 
-        
-        # ====================================================================
-        # LISTA DE CAVALETES ADICIONADOS
-        # ====================================================================
         st.markdown("---")
         st.markdown("### 📋 Cavaletes Adicionados no Projeto")
         if not st.session_state.cavaletes_selecionados: 
@@ -2939,7 +2927,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         filtro = (df_templates["Equipamento"] == sel_eq) & (df_templates["Vias"] == sel_vi) & (df_templates["Ligação"] == sel_li)
         df_editavel = df_templates[filtro][["Grupo", "Item Base", "Medida", "Qtd"]].copy()
         
-        # A chave tem um gatilho de refresh dinâmico para não bugar a memória da tabela
         df_editado = st.data_editor(
             df_editavel,
             column_config={
@@ -2962,9 +2949,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.session_state.trigger_refresh = st.session_state.get('trigger_refresh', 0) + 1 
             
             with st.spinner("Gravando no Google Sheets..."):
-                salvar_templates_no_banco(nova_matriz)
-                st.success("✅ Padrão salvo com sucesso no Banco de Dados!")
-                st.rerun() 
+                if salvar_templates_no_banco(nova_matriz):
+                    st.toast("✅ Padrão salvo com sucesso no Banco de Dados!")
+                    st.rerun() 
             
         st.markdown("---")
         with st.expander("➕ Inserir Novo Item nesta Receita", expanded=False):
@@ -2992,9 +2979,10 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         st.session_state.versao_banco_hidro = 'forcar_recalculo'
                         st.session_state.trigger_refresh = st.session_state.get('trigger_refresh', 0) + 1 
                         
-                        salvar_templates_no_banco(st.session_state.matriz_templates)
-                        st.toast(f"Item inserido e salvo na nuvem!", icon="✅")
-                        st.rerun()
+                        with st.spinner("Gravando no Google Sheets..."):
+                            if salvar_templates_no_banco(st.session_state.matriz_templates):
+                                st.toast(f"Item inserido e salvo na nuvem!", icon="✅")
+                                st.rerun()
                     else:
                         st.error("Selecione um item do banco ou digite um nome novo.")
 
@@ -3019,63 +3007,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 st.session_state.trigger_refresh = st.session_state.get('trigger_refresh', 0) + 1 
                 
                 with st.spinner("Clonando no Google Sheets..."):
-                    salvar_templates_no_banco(matriz_sem_alvo)
-                    st.toast(f"Receita clonada com sucesso para {clon_eq} | {clon_vi} | {clon_li}!", icon="📋")
-                    st.rerun()
-            
-        st.markdown("---")
-        with st.expander("➕ Inserir Novo Item nesta Receita", expanded=False):
-            nomes_base_existentes = set()
-            for item in st.session_state.banco_precos_hidraulica:
-                nome_bruto = item["Item / Componente"]
-                base = nome_bruto.split("- Ø")[0].strip() if "- Ø" in nome_bruto else nome_bruto
-                nomes_base_existentes.add(base)
-            nomes_base_existentes = sorted(list(nomes_base_existentes))
-
-            with st.form("form_add_item_template"):
-                c_a1, c_a2, c_a3 = st.columns(3)
-                add_grp = c_a1.selectbox("Grupo", ["Kit Dinâmico", "Kit Fixo"], help="Kit Dinâmico para peças que mudam a bitola. Fixo para peças estáticas.")
-                add_base = c_a2.selectbox("1. Selecionar Existente", ["-- Selecione --"] + nomes_base_existentes)
-                add_novo = c_a3.text_input("2. OU Digite um Nome Novo")
-                
-                c_a4, c_a5, c_a6 = st.columns(3)
-                add_med = c_a4.selectbox("Medida", ["Variável {b}", "Variável {b-1}", "Variável {b-2}", "Variável {b} x {b-1}", "Variável {b} x {b-2}", "Variável {b-1} x {b-2}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"])
-                add_qtd = c_a5.number_input("Quantidade", min_value=0.01, value=1.0)
-                
-                if st.form_submit_button("Inserir na Receita Atual"):
-                    nome_escolhido = add_novo if add_novo.strip() != "" else (add_base if add_base != "-- Selecione --" else "")
-                    if nome_escolhido != "":
-                        st.session_state.matriz_templates.append({"Equipamento": sel_eq, "Vias": sel_vi, "Ligação": sel_li, "Grupo": add_grp, "Item Base": nome_escolhido, "Medida": add_med, "Qtd": add_qtd})
-                        st.session_state.versao_banco_hidro = 'forcar_recalculo'
-                        
-                        salvar_templates_no_banco(st.session_state.matriz_templates)
-                        st.toast(f"Item inserido e salvo na nuvem!", icon="✅")
+                    if salvar_templates_no_banco(matriz_sem_alvo):
+                        st.toast(f"Receita clonada com sucesso para {clon_eq} | {clon_vi} | {clon_li}!", icon="📋")
                         st.rerun()
-                    else:
-                        st.error("Selecione um item do banco ou digite um nome novo.")
-
-        st.markdown("---")
-        st.markdown("#### 🔄 Clonar Padrão")
-        st.caption("Gostou de como ficou essa receita? Copie-a idêntica para outro cenário para não ter que refazer tudo.")
-        
-        c_clon1, c_clon2, c_clon3 = st.columns(3)
-        clon_eq = c_clon1.selectbox("Copiar PARA Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"], index=["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"].index(sel_eq), key="clon_eq")
-        clon_vi = c_clon2.selectbox("Copiar PARA Vias:", ["2 Vias", "3 Vias"], index=["2 Vias", "3 Vias"].index(sel_vi) if sel_vi in ["2 Vias", "3 Vias"] else 0, key="clon_vi")
-        clon_li = c_clon3.selectbox("Copiar PARA Ligação:", ["Roscado", "Flangeado"], index=["Roscado", "Flangeado"].index(sel_li), key="clon_li")
-        
-        if st.button("📋 Executar Clonagem e Salvar na Nuvem", type="secondary"):
-            if clon_eq in ["Chiller", "Bomba"] and clon_vi == "3 Vias":
-                st.error("⚠️ Atenção: Chiller e Bomba só trabalham com configuração de 2 Vias no sistema.")
-            else:
-                matriz_sem_alvo = [row for row in st.session_state.matriz_templates if not (row["Equipamento"] == clon_eq and row["Vias"] == clon_vi and row["Ligação"] == clon_li)]
-                for _, row in df_editado.iterrows():
-                    matriz_sem_alvo.append({"Equipamento": clon_eq, "Vias": clon_vi, "Ligação": clon_li, "Grupo": row["Grupo"], "Item Base": row["Item Base"], "Medida": row["Medida"], "Qtd": row["Qtd"]})
-                
-                st.session_state.matriz_templates = matriz_sem_alvo
-                with st.spinner("Clonando no Google Sheets..."):
-                    salvar_templates_no_banco(matriz_sem_alvo)
-                    st.toast(f"Receita clonada com sucesso para {clon_eq} | {clon_vi} | {clon_li}!", icon="📋")
-                    st.rerun()
 
     with aba_precos_hidro:
         st.header("Gestão Sênior de Preços (Componentes Abertos)")
@@ -3167,7 +3101,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             
             if not df_display.empty and "Preço Unitário (R$)" in df_display.columns:
                 st.info("💡 Você pode editar os preços dando dois cliques nos valores da tabela abaixo!")
-                df_editado = st.data_editor(
+                df_editado_preco = st.data_editor(
                     df_display, 
                     use_container_width=True, 
                     hide_index=True, 
@@ -3186,7 +3120,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 )
                 
                 if st.button("💾 Salvar Edições Manuais", type="secondary"):
-                    st.session_state.banco_precos_hidraulica = df_editado.to_dict('records')
+                    st.session_state.banco_precos_hidraulica = df_editado_preco.to_dict('records')
                     import datetime
                     st.session_state['data_ultima_atualizacao'] = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
                     
@@ -3194,7 +3128,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         sh_cloud = conectar_google_sheets()
                         ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
                         ws_ci.clear()
-                        linhas = [df_editado.columns.tolist()] + df_editado.values.tolist()
+                        linhas = [df_editado_preco.columns.tolist()] + df_editado_preco.values.tolist()
                         ws_ci.append_rows(linhas)
                         st.success("✅ Edições manuais gravadas no sistema!")
                         st.rerun()
@@ -3421,7 +3355,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     sheet_obj.column_dimensions[get_column_letter(col_obj[0].column)].width = max(max_len_val + 3, 12)
                     
             wb_export_h.save(buf_excel_hidro); buf_excel_hidro.seek(0)
-            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidro_v17")
+            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidro_v18")
             
             st.markdown("---")
             st.markdown("### 📝 Descritivo Comercial Automático")
