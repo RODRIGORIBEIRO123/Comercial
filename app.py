@@ -2790,34 +2790,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         "🔧 Dimensionamento", "💲 Tabela de Preços", "📝 Central de Padrões (Templates)", "📊 Resumos / BOM"
     ])
 
-    with aba_cadastro_hidro:
-        st.subheader("Configuração Estrutural de Hidráulica")
-        
-        tipo_sistema = st.radio("Tipo de Sistema da Instalação:", ["Fechado (Água Gelada/Quente)", "Aberto (Água de Condensação/Torre)"], horizontal=True)
-        st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-        metodo_dimensionamento = st.radio("Método de dimensionamento:", ["📏 Definir diretamente por Bitola comercial", "🌊 Dimensionar automaticamente por Vazão"], horizontal=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        col1, col2, col3 = st.columns(3)
-        tipo_equip = col1.selectbox("Tipo de Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"])
-        if tipo_equip in ["Chiller", "Bomba"]: tipo_vias = col2.selectbox("Válvula:", ["2 Vias"], disabled=True)
-        else: tipo_vias = col2.selectbox("Válvula:", ["2 Vias", "3 Vias"])
-        
-        if "Bitola comercial" in metodo_dimensionamento:
-            bitola_final = col3.selectbox("Bitola comercial:", todas_bitolas)
-            vazao_calculada = 0.0
-        else:
-            vazao_calculada = col3.number_input("Vazão de Água (m³/h):", min_value=0.1, step=0.5, value=5.0)
-            tipo_aplicacao = st.radio("Exigência Acústica:", ["Escritório / Áreas Críticas", "Indústria / Áreas Técnicas"], horizontal=True)
-            perda_carga = st.slider("Perda de Carga (mmCA/m):", 10, 40, 25) if "Escritório" in tipo_aplicacao else st.slider("Perda de Carga (mmCA/m):", 41, 90 if "Aberto" in tipo_sistema else 100, 70)
-            bitola_final = dimensionar_bitola_pelo_abaco(vazao_calculada, perda_carga, tipo_sistema)
-            st.info(f"📈 Bitola comercial recomendada: **{bitola_final}**.")
-            
-        col_q, col_t = st.columns([1, 2])
-        qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
-        tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: UTA-01, CH-01...")
-        
-        if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary"):
+    if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary"):
             # Lógica exata para não confundir 2.1/2" com 1/2"
             dict_pol = {"1/4\"": 0.25, "3/8\"": 0.375, "1/2\"": 0.5, "3/4\"": 0.75, "1\"": 1.0, "1.1/4\"": 1.25, "1.1/2\"": 1.5, "2\"": 2.0, "2.1/2\"": 2.5, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0}
             pol_dec = dict_pol.get(bitola_final, 1.0)
@@ -2839,7 +2812,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             
             mo_mont_calculado = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0) * pol_dec * 12.0
             
-            # --- NOVO MOTOR DE M.O. DE ISOLAMENTO (COMPRIMENTO EQUIVALENTE) ---
             if is_aberto:
                 mo_isol_calculado = 0.0
             else:
@@ -2859,7 +2831,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     elif "válvula" in nome_low or "filtro" in nome_low:
                         qtd_valvulas += qtd_c
                 
-                # Fator 1.0 para tubos, 1.5 para conexões/curvas, 2.0 para caixas de válvulas/filtros
                 metragem_equivalente = qtd_tubos_linear + (qtd_conexoes * 1.5) + (qtd_valvulas * 2.0)
                 mo_isol_calculado = preco_base_isol_metro * metragem_equivalente
             
@@ -2872,6 +2843,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
             st.rerun()
 
+        # ====================================================================
+        # NOVO PAINEL: MONTAGEM ACELERADA DE CAVALETES
+        # ====================================================================
         st.markdown("---")
         st.subheader("⚡ Montagem Acelerada de Cavalete Típico (Automático)")
         
@@ -2891,43 +2865,43 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         tag_sel = st.text_input("TAG do Equipamento (Opcional):", value="S/ TAG", key="fast_tag")
 
         if st.button("➕ Injetar Cavalete Automático", type="primary", use_container_width=True):
-            # Aciona o Cérebro que colamos lá no topo do arquivo
             receita_pronta = gerar_composicao_cavalete(eq_sel, via_sel, b_sel, mont_sel)
             
             st.session_state.cavaletes_selecionados.append({
-                "id": str(uuid.uuid4()), # ID único para não bugar a lixeira
+                "id": str(uuid.uuid4()), 
                 "equipamento": eq_sel,
                 "vias": via_sel,
                 "bitola": b_sel,
                 "quantidade": 1,
                 "tag": tag_sel,
-                "sistema": "Fechado", # Padrão para água gelada base
+                "sistema": "Fechado", 
                 "composicao": receita_pronta
             })
             st.success(f"✅ Cavalete {eq_sel} de {b_sel} ({tag_sel}) adicionado! {len(receita_pronta)} itens processados.")
             st.rerun()
-        # ====================================================================
-        # 👆 O CÓDIGO NOVO TERMINA AQUI 👆
-        # ====================================================================
 
+        # ====================================================================
+        # LISTA DE CAVALETES ADICIONADOS
+        # ====================================================================
+        st.markdown("---")
         st.markdown("### 📋 Cavaletes Adicionados no Projeto")
-        if not st.session_state.cavaletes_selecionados: st.info("Nenhum item adicionado no levantamento.")
-        else:
-            for idx, cav in enumerate(st.session_state.cavaletes_selecionados):
-
-        st.markdown("### 📋 Cavaletes Adicionados no Projeto")
-        if not st.session_state.cavaletes_selecionados: st.info("Nenhum item adicionado no levantamento.")
+        if not st.session_state.cavaletes_selecionados: 
+            st.info("Nenhum item adicionado no levantamento.")
         else:
             for idx, cav in enumerate(st.session_state.cavaletes_selecionados):
                 c_inf, c_tg, c_qt, c_rm = st.columns([4, 3, 2, 2])
                 sys_lbl = " [Aberto]" if "Aberto" in cav.get("sistema", "") else ""
-                c_inf.write(f"**Cavalete {cav['equipamento']} ({cav['vias']})** - Ø {cav['bitola']}{sys_lbl}")
+                c_inf.write(f"**Cavalete {cav.get('equipamento', 'EQ')} ({cav.get('vias', 'N/A')})** - Ø {cav.get('bitola', '')}{sys_lbl}")
                 c_tg.write(f"TAG: `{cav.get('tag', 'S/ TAG')}`")
-                c_qt.write(f"Qtd: **{cav['quantidade']} cjs**")
-                if c_rm.button("🗑️", key=f"rm_h_cv_{cav['id']}"):
-                    st.session_state.cavaletes_selecionados.pop(idx); st.rerun()
+                c_qt.write(f"Qtd: **{cav.get('quantidade', 1)} cjs**")
+                
+                if c_rm.button("🗑️", key=f"rm_h_cv_{cav.get('id', idx)}"):
+                    st.session_state.cavaletes_selecionados.pop(idx)
+                    st.rerun()
+                    
             if st.button("🗑️ Excluir Todos", type="secondary"):
-                st.session_state.cavaletes_selecionados = []; st.rerun()
+                st.session_state.cavaletes_selecionados = []
+                st.rerun()
 
     with aba_padroes_hidro:
         st.header("⚙️ Central de Padrões e Receitas (Templates)")
