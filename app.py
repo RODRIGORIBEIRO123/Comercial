@@ -2775,35 +2775,72 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         medida_final = medida_final.replace("{b}", bitola_cavalete)
         return f"{item_base} - Ø {medida_final}"
 
-    # SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS
-    if st.session_state.get('versao_banco_hidro') != 'v15':
-        banco_temp = {}
-        for template in st.session_state.matriz_templates:
-            bitolas_alvo = bitolas_roscadas if template["Ligação"] == "Roscado" else bitolas_soldadas
-            for b in bitolas_alvo:
-                nome_final = construir_nome_peca(template["Item Base"], template["Medida"], b)
-                if nome_final not in banco_temp:
-                    unid = "m" if "Tubo" in nome_final or "Isolamento" in nome_final or "Rechapeamento" in nome_final else "pç"
-                    preco = round(PESOS_SCH40.get(b, 2.0) * 12.50, 2) if "Tubo" in nome_final else 150.0
-                    banco_temp[nome_final] = {"Item / Componente": nome_final, "Preço Unitário (R$)": preco, "Unidade": unid}
+    # ====================================================================
+    # 🔄 SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS (VERSÃO CORRIGIDA)
+    # ====================================================================
+    if st.session_state.get('versao_banco_hidro') != 'v19_LIMPA':
+        banco_geral = {}
         
-        banco_temp["Mão de Obra de Montagem Hidráulica (Por Polegada)"] = {"Item / Componente": "Mão de Obra de Montagem Hidráulica (Por Polegada)", "Preço Unitário (R$)": 120.0, "Unidade": "pol"}
-        banco_temp["Mão de Obra de Isolamento Térmico (Por Polegada)"] = {"Item / Componente": "Mão de Obra de Isolamento Térmico (Por Polegada)", "Preço Unitário (R$)": 95.0, "Unidade": "pol"}
-
+        # 1. Puxa tudo que já existe na nuvem primeiro (para não perder nada que você já precificou)
         try:
             sh_hidro = conectar_google_sheets()
             aba_h = sh_hidro.worksheet("Precos_Hidraulica_Itens").get_all_records()
             for row in aba_h:
-                chave = normalizar_string_busca(row.get("Item / Componente", ""))
-                for key_banco in banco_temp.keys():
-                    if normalizar_string_busca(key_banco) == chave:
-                        banco_temp[key_banco]["Preço Unitário (R$)"] = float(row.get("Preço Unitário (R$)", 0.0))
-        except: pass
-        
-        st.session_state.banco_precos_hidraulica = list(banco_temp.values())
-        st.session_state.versao_banco_hidro = 'v15'
+                nome_orig = str(row.get("Item / Componente", "")).strip()
+                if nome_orig:
+                    chave = normalizar_string_busca(nome_orig)
+                    # Garante que números vazios não quebrem
+                    try:
+                        preco = float(str(row.get("Preço Unitário (R$)", 0.0)).replace("R$", "").replace(".", "").replace(",", ".").strip())
+                    except:
+                        preco = 0.0
+                    
+                    banco_geral[chave] = {
+                        "Item / Componente": nome_orig,
+                        "Preço Unitário (R$)": preco,
+                        "Unidade": str(row.get("Unidade", "un"))
+                    }
+        except: 
+            pass
 
-    if 'cavaletes_selecionados' not in st.session_state: st.session_state.cavaletes_selecionados = []
+        # 2. Garante Mão de Obra Base no banco
+        mo_mont_key = normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)")
+        if mo_mont_key not in banco_geral:
+            banco_geral[mo_mont_key] = {"Item / Componente": "Mão de Obra de Montagem Hidráulica (Por Polegada)", "Preço Unitário (R$)": 120.0, "Unidade": "pol"}
+        
+        mo_isol_key = normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)")
+        if mo_isol_key not in banco_geral:
+            banco_geral[mo_isol_key] = {"Item / Componente": "Mão de Obra de Isolamento Térmico (Por Polegada)", "Preço Unitário (R$)": 95.0, "Unidade": "pol"}
+
+        # 3. Varre os Templates: Adiciona peças NOVAS ao banco com valor R$ 0,00 para irem pro Excel
+        for template in st.session_state.matriz_templates:
+            bitolas_alvo = bitolas_roscadas if template["Ligação"] == "Roscado" else bitolas_soldadas
+            for b in bitolas_alvo:
+                nome_final = construir_nome_peca(template["Item Base"], template["Medida"], b)
+                chave_temp = normalizar_string_busca(nome_final)
+                
+                # Se a peça gerada pela receita não estiver no banco, cria ela ZERADA e com a unidade certa!
+                if chave_temp not in banco_geral:
+                    unid = "m" if "tubo" in chave_temp or "isolamento" in chave_temp or "rechapeamento" in chave_temp else "pç"
+                    banco_geral[chave_temp] = {
+                        "Item / Componente": nome_final, 
+                        "Preço Unitário (R$)": 0.0, 
+                        "Unidade": unid
+                    }
+        
+        # Salva o banco montado na memória
+        st.session_state.banco_precos_hidraulica = list(banco_geral.values())
+        st.session_state.versao_banco_hidro = 'v19_LIMPA'
+        
+        # Empurra esse banco completo de volta pro Google Sheets silenciosamente para garantir o Download do Excel
+        try:
+            df_bg = pd.DataFrame(st.session_state.banco_precos_hidraulica).fillna("")
+            sh_hidro = conectar_google_sheets()
+            ws_ci = sh_hidro.worksheet("Precos_Hidraulica_Itens")
+            ws_ci.clear()
+            ws_ci.append_rows([df_bg.columns.tolist()] + df_bg.values.tolist())
+        except:
+            pass
 
     def dimensionar_bitola_pelo_abaco(vazao_m3h, perda_mmca_m, tipo_sistema):
         C = 130.0 if "Fechado" in tipo_sistema else 120.0
