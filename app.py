@@ -711,15 +711,15 @@ if st.session_state.menu_selecionado == "🏠 Tela Inicial":
     st.write("")
     st.write("")
     
-    # NOVAS 3 COLUNAS PARA A TELA INICIAL
+    # NOVAS 3 COLUNAS PARA A TELA INICIAL (COM CSS RESPONSIVO)
     col1, col2, col3 = st.columns(3)
     
     with col1:
         st.markdown("""
-        <div style="background-color: white; padding: 20px; border-radius: 10px; text-align: center; height: 200px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 15px; border-top: 5px solid #1C8590;">
-            <h1 style="font-size: 50px; margin-bottom: 10px;">📄</h1>
-            <h3 style="color: #333;">Gerador de Propostas</h3>
-            <p style="color: #777; font-size: 14px; height: 40px;">Criação rápida e padronizada de escopos técnicos e comerciais em Word.</p>
+        <div style="background-color: white; padding: 25px 20px; border-radius: 10px; text-align: center; min-height: 220px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 15px; border-top: 5px solid #1C8590; display: flex; flex-direction: column; justify-content: center;">
+            <h1 style="font-size: 50px; margin-top: 0; margin-bottom: 10px;">📄</h1>
+            <h3 style="color: #333; margin-top: 0; margin-bottom: 10px;">Gerador de Propostas</h3>
+            <p style="color: #777; font-size: 14px; margin-bottom: 0;">Criação rápida e padronizada de escopos técnicos e comerciais em Word.</p>
         </div>
         """, unsafe_allow_html=True)
         if st.button("Acessar Módulo ➔", key="btn_home_prop", type="primary", use_container_width=True):
@@ -728,10 +728,10 @@ if st.session_state.menu_selecionado == "🏠 Tela Inicial":
 
     with col2:
         st.markdown("""
-        <div style="background-color: white; padding: 20px; border-radius: 10px; text-align: center; height: 200px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 15px; border-top: 5px solid #1C8590;">
-            <h1 style="font-size: 50px; margin-bottom: 10px;">🔌</h1>
-            <h3 style="color: #333;">Levantamento Automação</h3>
-            <p style="color: #777; font-size: 14px; height: 40px;">Dimensionamento estrutural e financeiro de hardware, infraestrutura e supervisório.</p>
+        <div style="background-color: white; padding: 25px 20px; border-radius: 10px; text-align: center; min-height: 220px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 15px; border-top: 5px solid #1C8590; display: flex; flex-direction: column; justify-content: center;">
+            <h1 style="font-size: 50px; margin-top: 0; margin-bottom: 10px;">🔌</h1>
+            <h3 style="color: #333; margin-top: 0; margin-bottom: 10px;">Levantamento Automação</h3>
+            <p style="color: #777; font-size: 14px; margin-bottom: 0;">Dimensionamento estrutural e financeiro de hardware, infraestrutura e supervisório.</p>
         </div>
         """, unsafe_allow_html=True)
         if st.button("Acessar Módulo ➔", key="btn_home_auto", type="primary", use_container_width=True):
@@ -740,10 +740,10 @@ if st.session_state.menu_selecionado == "🏠 Tela Inicial":
 
     with col3:
         st.markdown("""
-        <div style="background-color: white; padding: 20px; border-radius: 10px; text-align: center; height: 200px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 15px; border-top: 5px solid #1C8590;">
-            <h1 style="font-size: 50px; margin-bottom: 10px;">💧</h1>
-            <h3 style="color: #333;">Cavaletes Hidráulica</h3>
-            <p style="color: #777; font-size: 14px; height: 40px;">Engenharia, dimensionamento e custos de cavaletes e válvulas.</p>
+        <div style="background-color: white; padding: 25px 20px; border-radius: 10px; text-align: center; min-height: 220px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 15px; border-top: 5px solid #1C8590; display: flex; flex-direction: column; justify-content: center;">
+            <h1 style="font-size: 50px; margin-top: 0; margin-bottom: 10px;">💧</h1>
+            <h3 style="color: #333; margin-top: 0; margin-bottom: 10px;">Cavaletes Hidráulica</h3>
+            <p style="color: #777; font-size: 14px; margin-bottom: 0;">Engenharia, dimensionamento e custos de cavaletes e válvulas.</p>
         </div>
         """, unsafe_allow_html=True)
         if st.button("Acessar Módulo ➔", key="btn_home_hidro", type="primary", use_container_width=True):
@@ -2956,28 +2956,75 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 c_tg.write(f"TAG: `{cav.get('tag', 'S/ TAG')}`")
                 c_qt.write(f"Qtd: **{cav.get('quantidade', 1)} cjs**")
 
-                # --- DESENHO VISUAL DO CAVALETE ---
+                # --- DESENHO VISUAL DO CAVALETE (DINÂMICO E COMPLETO) ---
                 import graphviz
-                with st.expander("👁️ Ver Representação Visual (P&ID)"):
-                    dot = graphviz.Digraph(node_attr={'shape': 'box', 'style': 'rounded,filled', 'fillcolor': '#f9f9f9', 'color': '#1C8590', 'fontname': 'Arial'})
-                    dot.attr(rankdir='LR') # Desenha da Esquerda para Direita
+                import re
+                
+                with st.expander("👁️ Ver Representação Visual Completa (P&ID)"):
+                    dot = graphviz.Digraph(node_attr={'shape': 'box', 'style': 'rounded,filled', 'fillcolor': '#ffffff', 'color': '#1C8590', 'fontname': 'Arial', 'fontsize': '10'})
+                    dot.attr(rankdir='LR', splines='ortho') # Desenha da Esquerda para Direita com linhas retas
                     
-                    dot.node('A', 'Entrada\nÁgua', shape='rarrow', fillcolor='#e0f2f1')
-                    dot.node('B', f'Bloqueio\nØ {cav.get("bitola", "")}')
-                    dot.node('C', 'Filtro Y')
-                    dot.node('D', f'{cav.get("equipamento", "Equip.")}', shape='cylinder', fillcolor='#cce4f7')
-                    dot.node('E', 'Válvula\nControle')
-                    dot.node('F', 'Válvula\nBalanceadora')
-                    dot.node('G', f'Bloqueio\nØ {cav.get("bitola", "")}')
-                    dot.node('H', 'Retorno\nÁgua', shape='rarrow', fillcolor='#fce4e4')
+                    # 1. Analisa a composição REAL da sua receita de cavalete
+                    has_filtro, has_bal, has_retencao, valv_controle = None, None, None, None
+                    juntas_exp = []
+                    bloqueios = []
                     
-                    dot.edges(['AB', 'BC', 'CD', 'DE', 'EF', 'FG', 'GH'])
-                    
-                    if "3 Vias" in cav.get("vias", "2 Vias"):
-                        dot.node('BP', 'Linha de\nBy-pass', shape='parallelogram', fillcolor='#fff3cd')
-                        dot.edge('C', 'BP')
-                        dot.edge('BP', 'E')
+                    for c in cav.get("composicao", []):
+                        nome, qtd = c["nome"], int(c["qtd"])
+                        nome_low = nome.lower()
                         
+                        # Extrai a bitola real da peça (Ex: pega o 1.1/2" e ignora o resto)
+                        match = re.search(r'Ø\s*([\d\./"]+)', nome)
+                        b_str = f"Ø {match.group(1)}" if match else ""
+                        
+                        # Filtra apenas os itens principais de linha
+                        if "filtro" in nome_low: has_filtro = f"Filtro Y\n{b_str}"
+                        elif "balanceadora" in nome_low: has_bal = f"Balanceadora\n{b_str}"
+                        elif "retenção" in nome_low: has_retencao = f"Retenção\n{b_str}"
+                        elif "motorizada" in nome_low or "proporcional" in nome_low or "on/off" in nome_low:
+                            t = "Válv. 3 Vias" if "3 vias" in nome_low else "Válv. 2 Vias"
+                            valv_controle = f"{t}\n{b_str}"
+                        elif "junta de expansão" in nome_low:
+                            juntas_exp.extend([f"Junta de Expansão\n{b_str}"] * qtd)
+                        elif "gaveta" in nome_low or "borboleta" in nome_low:
+                            t = "Borboleta" if "borboleta" in nome_low else "Gaveta"
+                            bloqueios.extend([f"{t}\n{b_str}"] * qtd)
+
+                    # 2. Monta a sequência da tubulação logicamente (Pipe)
+                    seq = [('IN', 'Entrada Água', 'rarrow', '#e0f2f1')]
+                    
+                    if len(bloqueios) > 0: seq.append(('B1', bloqueios[0], 'box', '#f9f9f9'))
+                    if has_filtro: seq.append(('FY', has_filtro, 'box', '#f9f9f9'))
+                    if len(juntas_exp) > 0: seq.append(('JE1', juntas_exp[0], 'box', '#f9f9f9'))
+                    
+                    seq.append(('EQ', f'{cav.get("equipamento", "Equipamento")}', 'cylinder', '#cce4f7'))
+                    
+                    if len(juntas_exp) > 1: seq.append(('JE2', juntas_exp[1], 'box', '#f9f9f9'))
+                    if has_retencao: seq.append(('VR', has_retencao, 'box', '#f9f9f9'))
+                    if valv_controle: seq.append(('VC', valv_controle, 'box', '#f9f9f9'))
+                    if has_bal: seq.append(('VB', has_bal, 'box', '#f9f9f9'))
+                    if len(bloqueios) > 1: seq.append(('B2', bloqueios[1], 'box', '#f9f9f9'))
+                    
+                    seq.append(('OUT', 'Retorno Água', 'rarrow', '#fce4e4'))
+                    
+                    # 3. Desenha os Nós e as Linhas
+                    for nid, lbl, shp, clr in seq: dot.node(nid, lbl, shape=shp, fillcolor=clr)
+                    for i in range(len(seq) - 1): dot.edge(seq[i][0], seq[i+1][0])
+                        
+                    # 4. Tratamento Especial: Adiciona Linha de By-pass se for 3 Vias
+                    if valv_controle and "3" in valv_controle:
+                        dot.node('BP', 'Linha de\nBy-pass', shape='parallelogram', fillcolor='#fff3cd')
+                        no_saida_bp = 'FY' if has_filtro else ('B1' if len(bloqueios) > 0 else 'IN')
+                        dot.edge(no_saida_bp, 'BP')
+                        
+                        # Se existir uma 3ª válvula de bloqueio (fechamento do by-pass), desenha ela
+                        if len(bloqueios) > 2:
+                            dot.node('B3', bloqueios[2], shape='box', fillcolor='#f9f9f9')
+                            dot.edge('BP', 'B3')
+                            dot.edge('B3', 'VC')
+                        else:
+                            dot.edge('BP', 'VC')
+                            
                     st.graphviz_chart(dot)
                 
                 if c_rm.button("🗑️", key=f"rm_h_cv_{cav.get('id', idx)}"):
