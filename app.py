@@ -2905,6 +2905,21 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
         tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: UTA-01, CH-01...")
         
+        # --- OPÇÕES ESPECÍFICAS DO CHILLER ---
+        chiller_inc_bal = True
+        chiller_tipo_valv = "Proporcional"
+        
+        if tipo_equip == "Chiller":
+            st.markdown("""
+            <div style='background-color: rgba(28, 133, 144, 0.05); padding: 15px; border-radius: 8px; border-left: 4px solid #1C8590; margin-top: 10px; margin-bottom: 15px;'>
+                <h5 style='margin-top: 0; margin-bottom: 15px; color: #1C8590;'>⚙️ Configurações Específicas do Chiller</h5>
+            """, unsafe_allow_html=True)
+            cc1, cc2 = st.columns(2)
+            chiller_inc_bal = cc1.checkbox("Incluir Válvula de Balanceamento?", value=True)
+            chiller_tipo_valv = cc2.radio("Válvula de Controle Motorizada:", ["Proporcional", "ON/OFF", "Sem Válvula"], horizontal=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+        # ---------------------------------------
+        
         if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary", use_container_width=True):
             dict_pol = {"1/4\"": 0.25, "3/8\"": 0.375, "1/2\"": 0.5, "3/4\"": 0.75, "1\"": 1.0, "1.1/4\"": 1.25, "1.1/2\"": 1.5, "2\"": 2.0, "2.1/2\"": 2.5, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0}
             pol_dec = dict_pol.get(bitola_final, 1.0)
@@ -2918,6 +2933,24 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             for regra in regras_ativas:
                 nome_final = construir_nome_peca(regra["Item Base"], regra["Medida"], bitola_final)
                 if is_aberto and ("Isolamento" in nome_final or "Rechapeamento" in nome_final): continue
+                
+                # --- APLICANDO A REGRA DO CHILLER ---
+                if tipo_equip == "Chiller":
+                    nome_low = nome_final.lower()
+                    
+                    # Remove Balanceadora se desmarcada na tela
+                    if "balanceadora" in nome_low and not chiller_inc_bal:
+                        continue
+                        
+                    # Trata a Válvula de Controle (Troca pela ON/OFF ou Remove)
+                    if "motorizada" in nome_low or "proporcional" in nome_low or "on/off" in nome_low:
+                        if chiller_tipo_valv == "Sem Válvula":
+                            continue
+                        elif chiller_tipo_valv == "ON/OFF":
+                            # Puxa o nome exato do seu banco de preços preenchido, mas mantém a medida da regra original (ex: b-1)
+                            nome_final = construir_nome_peca("Válvula de controle 2 vias, ON/OFF", regra["Medida"], bitola_final)
+                # ------------------------------------
+                
                 if regra["Qtd"] > 0:
                     composicao_kit.append({"nome": nome_final, "qtd": regra["Qtd"]})
             
