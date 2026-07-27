@@ -710,33 +710,48 @@ if st.session_state.menu_selecionado == "🏠 Tela Inicial":
     st.markdown("<p style='text-align: center; font-size: 18px; color: #666;'>Portal Comercial e de Engenharia SIARCON. Selecione o módulo desejado para iniciar:</p>", unsafe_allow_html=True)
     st.write("")
     st.write("")
-    col_vazia_esq, col_card1, col_vazia_meio, col_card2, col_vazia_dir = st.columns([1, 2.5, 0.5, 2.5, 1])
     
-    with col_card1:
+    # NOVAS 3 COLUNAS PARA A TELA INICIAL
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
         st.markdown("""
-        <div style='text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #1C8590;'>
-            <h1 style='font-size: 50px; margin-bottom: 10px;'>📄</h1>
-            <h3 style='color: #333;'>Gerador de Propostas</h3>
-            <p style='color: #666; font-size: 14px; height: 40px;'>Criação rápida e padronizada de escopos técnicos e comerciais em Word.</p>
+        <div style="background-color: white; padding: 20px; border-radius: 10px; text-align: center; height: 200px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 15px; border-top: 5px solid #1C8590;">
+            <h1 style="font-size: 50px; margin-bottom: 10px;">📄</h1>
+            <h3 style="color: #333;">Gerador de Propostas</h3>
+            <p style="color: #777; font-size: 14px; height: 40px;">Criação rápida e padronizada de escopos técnicos e comerciais em Word.</p>
         </div>
         """, unsafe_allow_html=True)
-        st.write("")
         if st.button("Acessar Módulo ➔", key="btn_home_prop", type="primary", use_container_width=True):
             st.session_state.menu_selecionado = "📄 Gerador de Propostas"
             st.rerun()
 
-    with col_card2:
+    with col2:
         st.markdown("""
-        <div style='text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #1C8590;'>
-            <h1 style='font-size: 50px; margin-bottom: 10px;'>🔌</h1>
-            <h3 style='color: #333;'>Levantamento de Automação</h3>
-            <p style='color: #666; font-size: 14px; height: 40px;'>Dimensionamento estrutural e financeiro de hardware, infraestrutura e supervisório.</p>
+        <div style="background-color: white; padding: 20px; border-radius: 10px; text-align: center; height: 200px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 15px; border-top: 5px solid #1C8590;">
+            <h1 style="font-size: 50px; margin-bottom: 10px;">🔌</h1>
+            <h3 style="color: #333;">Levantamento Automação</h3>
+            <p style="color: #777; font-size: 14px; height: 40px;">Dimensionamento estrutural e financeiro de hardware, infraestrutura e supervisório.</p>
         </div>
         """, unsafe_allow_html=True)
-        st.write("")
         if st.button("Acessar Módulo ➔", key="btn_home_auto", type="primary", use_container_width=True):
             st.session_state.menu_selecionado = "🔌 Levantamento de Automação"
             st.rerun()
+
+    with col3:
+        st.markdown("""
+        <div style="background-color: white; padding: 20px; border-radius: 10px; text-align: center; height: 200px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 15px; border-top: 5px solid #1C8590;">
+            <h1 style="font-size: 50px; margin-bottom: 10px;">💧</h1>
+            <h3 style="color: #333;">Cavaletes Hidráulica</h3>
+            <p style="color: #777; font-size: 14px; height: 40px;">Engenharia, dimensionamento e custos de cavaletes e válvulas.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Acessar Módulo ➔", key="btn_home_hidro", type="primary", use_container_width=True):
+            st.session_state.menu_selecionado = "💧 Levantamento de Hidráulica"
+            st.rerun()
+
+# ==============================================================================
+# MÓDULO 1: GERADOR DE PROPOSTAS
 
 # ==============================================================================
 # MÓDULO 1: GERADOR DE PROPOSTAS
@@ -2940,6 +2955,30 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 c_inf.write(f"**Cavalete {cav.get('equipamento', 'EQ')} ({cav.get('vias', 'N/A')})** - Ø {cav.get('bitola', '')}{sys_lbl}")
                 c_tg.write(f"TAG: `{cav.get('tag', 'S/ TAG')}`")
                 c_qt.write(f"Qtd: **{cav.get('quantidade', 1)} cjs**")
+
+                # --- DESENHO VISUAL DO CAVALETE ---
+                import graphviz
+                with st.expander("👁️ Ver Representação Visual (P&ID)"):
+                    dot = graphviz.Digraph(node_attr={'shape': 'box', 'style': 'rounded,filled', 'fillcolor': '#f9f9f9', 'color': '#1C8590', 'fontname': 'Arial'})
+                    dot.attr(rankdir='LR') # Desenha da Esquerda para Direita
+                    
+                    dot.node('A', 'Entrada\nÁgua', shape='rarrow', fillcolor='#e0f2f1')
+                    dot.node('B', f'Bloqueio\nØ {cav.get("bitola", "")}')
+                    dot.node('C', 'Filtro Y')
+                    dot.node('D', f'{cav.get("equipamento", "Equip.")}', shape='cylinder', fillcolor='#cce4f7')
+                    dot.node('E', 'Válvula\nControle')
+                    dot.node('F', 'Válvula\nBalanceadora')
+                    dot.node('G', f'Bloqueio\nØ {cav.get("bitola", "")}')
+                    dot.node('H', 'Retorno\nÁgua', shape='rarrow', fillcolor='#fce4e4')
+                    
+                    dot.edges(['AB', 'BC', 'CD', 'DE', 'EF', 'FG', 'GH'])
+                    
+                    if "3 Vias" in cav.get("vias", "2 Vias"):
+                        dot.node('BP', 'Linha de\nBy-pass', shape='parallelogram', fillcolor='#fff3cd')
+                        dot.edge('C', 'BP')
+                        dot.edge('BP', 'E')
+                        
+                    st.graphviz_chart(dot)
                 
                 if c_rm.button("🗑️", key=f"rm_h_cv_{cav.get('id', idx)}"):
                     st.session_state.cavaletes_selecionados.pop(idx)
@@ -3047,6 +3086,35 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     if salvar_templates_no_banco(matriz_sem_alvo):
                         st.toast(f"Receita clonada com sucesso para {clon_eq} | {clon_vi} | {clon_li}!", icon="📋")
                         st.rerun()
+
+    # ====================================================================
+        # FERRAMENTA DE SANEAMENTO: UNIFICADOR DE DUPLICATAS (DE-PARA)
+        # ====================================================================
+        st.markdown("---")
+        st.subheader("🔗 Unificador de Nomes (De-Para)")
+        st.caption("Tem itens com nomes diferentes que são a mesma coisa? Selecione o nome que está na sua receita e o nome oficial. O sistema corrigirá todas as matrizes de uma só vez.")
+        
+        # Puxa os itens que estão em uso nas receitas
+        itens_em_uso = sorted(list(set(row["Item Base"] for row in st.session_state.matriz_templates)))
+        
+        col_de, col_para = st.columns(2)
+        item_errado = col_de.selectbox("1. Substituir este nome (O que está nas receitas):", ["-- Selecione --"] + itens_em_uso, key="unif_de")
+        item_correto = col_para.selectbox("2. Por este nome oficial (O que está no Banco de Preços):", ["-- Selecione --"] + nomes_base_existentes, key="unif_para")
+        
+        if st.button("🔄 Executar Unificação e Salvar na Nuvem", type="secondary"):
+            if item_errado != "-- Selecione --" and item_correto != "-- Selecione --" and item_errado != item_correto:
+                for row in st.session_state.matriz_templates:
+                    if row["Item Base"] == item_errado:
+                        row["Item Base"] = item_correto
+                
+                with st.spinner("Unificando no Google Sheets..."):
+                    salvar_templates_no_banco(st.session_state.matriz_templates)
+                    st.session_state.versao_banco_hidro = 'forcar_recalculo'
+                    st.session_state.trigger_refresh = st.session_state.get('trigger_refresh', 0) + 1
+                    st.success(f"✅ Todos os '{item_errado}' foram trocados por '{item_correto}' com sucesso!")
+                    st.rerun()
+            else:
+                st.warning("Selecione um nome de origem e um destino válido e diferente.")
 
     with aba_precos_hidro:
         st.header("Gestão Sênior de Preços (Componentes Abertos)")
