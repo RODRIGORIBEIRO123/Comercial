@@ -3257,7 +3257,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 st.session_state.cavaletes_selecionados = []
                 st.rerun()
                 
-        with aba_padroes_hidro:
+    with aba_padroes_hidro:
         st.header("⚙️ Central de Padrões e Receitas (Templates)")
         st.caption("Selecione o equipamento e a variação que deseja editar. Suas alterações serão gravadas na nuvem (Google Sheets).")
         
