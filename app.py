@@ -3134,10 +3134,16 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
 
         st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
         
-        # 4. Quantidade, Tag e Adição
+        # 4. Quantidade, Tag, Verbas e Adição
         col_q, col_t = st.columns([1, 2])
         qtd = col_q.number_input("Quantidade de conjuntos (Cavaletes):", min_value=1, step=1, value=1)
         tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: FC-01, UTA-01...")
+        
+        st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+        st.markdown("#### 📦 Verbas de Fabricação (Ajustáveis)")
+        cv1, cv2 = st.columns(2)
+        pct_suporte = cv1.number_input("Suportação Metálica (% do Custo de Materiais):", min_value=0.0, max_value=100.0, value=5.0, step=1.0)
+        pct_consumiveis = cv2.number_input("Consumíveis (Solda, Fundo, Tinta) (%):", min_value=0.0, max_value=100.0, value=5.0, step=1.0)
         
         if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary", use_container_width=True):
             dict_fator_mo = {
@@ -3184,7 +3190,26 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     if chiller_tipo_valv != "Sem Válvula" and not tem_ctrl:
                         v_str = "Válvula de controle 2 vias, ON/OFF" if chiller_tipo_valv == "ON/OFF" else "Válvula 2 vias, motorizada com atuador proporcional"
                         composicao_kit.append({"nome": construir_nome_peca(v_str, "Variável {b-1}", bitola_final), "qtd": 1.0})
+                
+                # --- NOVAS REGRAS DE INJEÇÃO: CAMBOTAS E PARAFUSOS ---
+                # 1. Cambotas de Madeira Tratada (4 por cavalete base)
+                composicao_kit.append({"nome": f"Cambota de Madeira Tratada/Poliuretano - Ø {bitola_final}", "qtd": 4.0})
+                
+                # 2. Parafusos Inteligentes para Flanges
+                if ligacao == "Flangeado":
+                    qtd_flanges = sum(c["qtd"] for c in composicao_kit if "flange" in c["nome"].lower())
+                    if qtd_flanges > 0:
+                        dict_parafusos = {
+                            "2.1/2\"": "5/8\" x 2.1/2\"", "3\"": "5/8\" x 2.1/2\"", "4\"": "5/8\" x 3\"", 
+                            "5\"": "3/4\" x 3.1/4\"", "6\"": "3/4\" x 3.1/4\"", "8\"": "3/4\" x 3.1/2\"", 
+                            "10\"": "7/8\" x 4\"", "12\"": "7/8\" x 4\""
+                        }
+                        medida_parafuso = dict_parafusos.get(bitola_final, "5/8\" x 3\"")
+                        # 4 parafusos por par = 2 parafusos para cada unidade de flange na lista
+                        qtd_parafusos = qtd_flanges * 2.0
+                        composicao_kit.append({"nome": f"Parafuso Sextavado Aço c/ Porca e Arruelas - {medida_parafuso}", "qtd": qtd_parafusos})
             
+            # --- PRECIFICAÇÃO E GERAÇÃO DAS VERBAS FINANCEIRAS ---
             dict_precos_memoria = {}
             for row in st.session_state.banco_precos_hidraulica:
                 chave_n = normalizar_string_busca(row.get("Item / Componente", ""))
@@ -3194,12 +3219,32 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
 
             custo_material_total_kit = 0.0
             
+            # Varredura Inicial (Apenas Materiais Físicos)
             for comp in composicao_kit:
                 n_busca = normalizar_string_busca(comp["nome"])
                 if n_busca not in dict_precos_memoria:
                     st.session_state.banco_precos_hidraulica.append({"Item / Componente": comp["nome"], "Preço Unitário (R$)": 0.0, "Unidade": "pç"})
                     dict_precos_memoria[n_busca] = 0.0
                 custo_material_total_kit += dict_precos_memoria.get(n_busca, 0.0) * comp["qtd"]
+                
+            custo_base_materiais = custo_material_total_kit # Salva a base sem juros compostos
+            
+            # Aplicação das Verbas como Itens Virtuais (Garante que sairá na planilha do cliente)
+            if pct_suporte > 0:
+                v_sup = custo_base_materiais * (pct_suporte / 100.0)
+                nome_verba_sup = f"Verba Dinâmica - Suportação Metálica ({pct_suporte}%)"
+                composicao_kit.append({"nome": nome_verba_sup, "qtd": v_sup})
+                if normalizar_string_busca(nome_verba_sup) not in dict_precos_memoria:
+                    st.session_state.banco_precos_hidraulica.append({"Item / Componente": nome_verba_sup, "Preço Unitário (R$)": 1.0, "Unidade": "R$"})
+                custo_material_total_kit += v_sup
+                
+            if pct_consumiveis > 0:
+                v_cons = custo_base_materiais * (pct_consumiveis / 100.0)
+                nome_verba_cons = f"Verba Dinâmica - Consumíveis de Solda e Pintura ({pct_consumiveis}%)"
+                composicao_kit.append({"nome": nome_verba_cons, "qtd": v_cons})
+                if normalizar_string_busca(nome_verba_cons) not in dict_precos_memoria:
+                    st.session_state.banco_precos_hidraulica.append({"Item / Componente": nome_verba_cons, "Preço Unitário (R$)": 1.0, "Unidade": "R$"})
+                custo_material_total_kit += v_cons
             
             if tipo_equip == "Fancolete" and is_danfoss:
                 mo_danfoss_nome = "Mão de Obra FIXA - Instalação Kit Danfoss Flexo (Por Conjunto)"
@@ -3223,6 +3268,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     qtd_tubos_linear = 0.0; qtd_conexoes = 0.0; qtd_valvulas = 0.0
                     for c in composicao_kit:
                         nome_low = c["nome"].lower()
+                        if "verba" in nome_low: continue # Ignora as verbas no cálculo do metro de isolamento
                         if "tubo" in nome_low: qtd_tubos_linear += c["qtd"]
                         elif any(x in nome_low for x in ["curva", "conexão t", "redução", "cotovelo"]): qtd_conexoes += c["qtd"]
                         elif any(x in nome_low for x in ["válvula", "filtro", "danfoss"]): qtd_valvulas += c["qtd"]
