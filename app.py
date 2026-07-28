@@ -2979,7 +2979,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.markdown("</div>", unsafe_allow_html=True)
         # ---------------------------------------
         
-        iif st.button("➕ Adicionar Cavalete ao Levantamento", type="primary", use_container_width=True):
+        if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary", use_container_width=True):
             dict_pol = {"1/4\"": 0.25, "3/8\"": 0.375, "1/2\"": 0.5, "3/4\"": 0.75, "1\"": 1.0, "1.1/4\"": 1.25, "1.1/2\"": 1.5, "2\"": 2.0, "2.1/2\"": 2.5, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0}
             pol_dec = dict_pol.get(bitola_final, 1.0)
             
