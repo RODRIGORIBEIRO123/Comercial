@@ -3786,17 +3786,31 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 for comp in cav['composicao']:
                     n_busca = normalizar_string_busca(comp["nome"])
                     pr_u = dict_lookup_valores.get(n_busca, 0.0)
-                    pr_t = pr_u * comp["qtd"] * qtd_conjuntos
-                    unidade_item = dict_lookup_unidades.get(n_busca, "un")
                     
-                    lista_itens_cav.append({
-                        "Componente": comp["nome"],
-                        "Unid": unidade_item,
-                        "Qtd Unit": comp["qtd"],
-                        f"Qtd Total ({qtd_conjuntos} conj.)": comp["qtd"] * qtd_conjuntos,
-                        "Valor Unit": f"R$ {pr_u:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-                        "Valor Total": f"R$ {pr_t:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    })
+                    # --- A MÁSCARA COSMÉTICA PARA AS VERBAS ---
+                    if "Verba Dinâmica" in comp["nome"]:
+                        # Para verbas, o valor total é o próprio valor calculado, e na tela mostramos como 1 vb
+                        valor_total_verba = comp["qtd"] * qtd_conjuntos
+                        lista_itens_cav.append({
+                            "Componente": comp["nome"],
+                            "Unid": "vb",
+                            "Qtd Unit": 1.0,
+                            f"Qtd Total ({qtd_conjuntos} conj.)": 1.0 * qtd_conjuntos,
+                            "Valor Unit": f"R$ {comp['qtd']:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                            "Valor Total": f"R$ {valor_total_verba:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                        })
+                    else:
+                        # Para itens normais, faz o cálculo padrão
+                        pr_t = pr_u * comp["qtd"] * qtd_conjuntos
+                        unidade_item = dict_lookup_unidades.get(n_busca, "un")
+                        lista_itens_cav.append({
+                            "Componente": comp["nome"],
+                            "Unid": unidade_item,
+                            "Qtd Unit": comp["qtd"],
+                            f"Qtd Total ({qtd_conjuntos} conj.)": comp["qtd"] * qtd_conjuntos,
+                            "Valor Unit": f"R$ {pr_u:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                            "Valor Total": f"R$ {pr_t:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                        })
                 
                 if cav.get("mo_mont_unit", 0.0) > 0:
                     mo_m_u = cav["mo_mont_unit"]
