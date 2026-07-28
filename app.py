@@ -3408,11 +3408,11 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                             
                     st.graphviz_chart(dot)
                 
-                if c_rm.button("🗑️", key=f"btn_del_cavalete_{idx}_{cav.get('id', 'antigo')}"):
+                if c_rm.button("🗑️", key=f"btn_del_cavalete_novo_{idx}_{cav.get('id', 'antigo')}"):
                     st.session_state.cavaletes_selecionados.pop(idx)
                     st.rerun()
                     
-            if st.button("🗑️ Excluir Todos", type="secondary", key="btn_excluir_absolutamente_todos_cavaletes"):
+            if st.button("🗑️ Excluir Todos", type="secondary", key="btn_excluir_todos_novo_bloco"):
                 st.session_state.cavaletes_selecionados = []
                 st.rerun()
                 
