@@ -3646,7 +3646,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             for cav in st.session_state.cavaletes_selecionados:
                 pol_dec = dict_fator_mo.get(cav["bitola"], 1.0)
             for cav in st.session_state.cavaletes_selecionados:
-                pol_dec = dict_pol.get(cav["bitola"], 1.0)
+                pol_dec = dict_fator_mo.get(cav["bitola"], 1.0)
                 is_aberto = "Aberto" in cav.get("sistema", "")
                 
                 m_sub_unit = 0.0
