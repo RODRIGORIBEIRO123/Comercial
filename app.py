@@ -3140,8 +3140,15 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: FC-01, UTA-01...")
         
         if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary", use_container_width=True):
-            dict_pol = {"1/4\"": 0.25, "3/8\"": 0.375, "1/2\"": 0.5, "3/4\"": 0.75, "1\"": 1.0, "1.1/4\"": 1.25, "1.1/2\"": 1.5, "2\"": 2.0, "2.1/2\"": 2.5, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0}
-            pol_dec = dict_pol.get(bitola_final, 1.0)
+            if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary", use_container_width=True):
+            # NOVA CURVA DE ESFORÇO: Cria um "Piso" financeiro para bitolas pequenas
+            dict_fator_mo = {
+                "1/4\"": 1.4, "3/8\"": 1.5, "1/2\"": 1.6, "3/4\"": 1.8, 
+                "1\"": 2.0, "1.1/4\"": 2.2, "1.1/2\"": 2.4, "2\"": 2.6, 
+                "2.1/2\"": 2.8, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, 
+                "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0
+            }
+            pol_dec = dict_fator_mo.get(bitola_final, 1.0)
             
             is_aberto = "Aberto" in tipo_sistema
             ligacao = "Roscado" if bitola_final in bitolas_roscadas else "Flangeado"
@@ -3629,8 +3636,17 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             
             preco_base_mont = dict_lookup_valores.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0)
             preco_base_isol = dict_lookup_valores.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0)
-            dict_pol = {"1/4\"": 0.25, "3/8\"": 0.375, "1/2\"": 0.5, "3/4\"": 0.75, "1\"": 1.0, "1.1/4\"": 1.25, "1.1/2\"": 1.5, "2\"": 2.0, "2.1/2\"": 2.5, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0}
             
+            # NOVA CURVA DE ESFORÇO: Acompanha a lógica do botão na hora de fechar a conta
+            dict_fator_mo = {
+                "1/4\"": 1.4, "3/8\"": 1.5, "1/2\"": 1.6, "3/4\"": 1.8, 
+                "1\"": 2.0, "1.1/4\"": 2.2, "1.1/2\"": 2.4, "2\"": 2.6, 
+                "2.1/2\"": 2.8, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, 
+                "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0
+            }
+            
+            for cav in st.session_state.cavaletes_selecionados:
+                pol_dec = dict_fator_mo.get(cav["bitola"], 1.0)
             for cav in st.session_state.cavaletes_selecionados:
                 pol_dec = dict_pol.get(cav["bitola"], 1.0)
                 is_aberto = "Aberto" in cav.get("sistema", "")
