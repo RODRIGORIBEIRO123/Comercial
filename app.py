@@ -2981,6 +2981,68 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 st.session_state.cavaletes_selecionados = []
                 st.rerun()
 
+# ====================================================================
+    # FUNÇÃO DE DIMENSIONAMENTO HIDRÁULICO (ÁBACOS OFICIAIS: FECHADO E ABERTO)
+    # ====================================================================
+    def dimensionar_bitola_pelo_abaco(vazao_m3h, perda_mmca_m, tipo_sistema):
+        if vazao_m3h <= 0.0:
+            return "1/2\""
+            
+        import math
+        
+        # 1. Vazão em m³/s
+        q_m3s = vazao_m3h / 3600.0
+        
+        # 2. Parametrização conforme o Ábaco (Aberto vs Fechado)
+        is_aberto = "Aberto" in str(tipo_sistema)
+        
+        # Coeficiente de rugosidade de Hazen-Williams (C)
+        # Fechado = 130 (Água Gelada/Quente sem aeração)
+        # Aberto = 100 (Torre de Condensação sujeita à incrustação e oxidação)
+        c_rugosidade = 100.0 if is_aberto else 130.0
+        
+        # Limite de velocidade máxima (m/s) segundo os critérios de ruído/erosão dos ábacos:
+        # Perda <= 40 mmCA/m (Escritório / Áreas Críticas) -> v_max = 1.2 m/s
+        # Perda > 40 mmCA/m (Indústria / Áreas Técnicas) -> v_max = 2.0 m/s (Aberto) ou 2.4 m/s (Fechado)
+        if perda_mmca_m <= 40:
+            v_max = 1.2
+        else:
+            v_max = 2.0 if is_aberto else 2.4
+            
+        # 3. Tabela de Diâmetros Internos Reais (Tubo Aço Carbono SCH 40) em metros
+        tabela_bitolas = [
+            ("1/2\"", 0.0158),
+            ("3/4\"", 0.0209),
+            ("1\"", 0.0266),
+            ("1.1/4\"", 0.0351),
+            ("1.1/2\"", 0.0409),
+            ("2\"", 0.0525),
+            ("2.1/2\"", 0.0627),
+            ("3\"", 0.0779),
+            ("4\"", 0.1023),
+            ("5\"", 0.1282),
+            ("6\"", 0.1541),
+            ("8\"", 0.2027),
+            ("10\"", 0.2545),
+            ("12\"", 0.3048)
+        ]
+        
+        j_limite = float(perda_mmca_m)
+        
+        # 4. Varre as bitolas em ordem crescente e escolhe a menor que atenda Perda e Velocidade
+        for nome_bitola, d_m in tabela_bitolas:
+            area_m2 = (math.pi * (d_m ** 2)) / 4.0
+            vel_ms = q_m3s / area_m2
+            
+            # Perda de Carga em mmCA/m (Hazen-Williams)
+            j_calculado = 1000.0 * (10.67 * (q_m3s ** 1.852)) / ((c_rugosidade ** 1.852) * (d_m ** 4.8704))
+            
+            # A bitola é aprovada se respeitar a perda máxima E o limite acústico/velocidade
+            if j_calculado <= j_limite and vel_ms <= v_max:
+                return nome_bitola
+                
+        return "12\""
+    
     # AS 4 ABAS DO APLICATIVO
     aba_cadastro_hidro, aba_precos_hidro, aba_padroes_hidro, aba_resumo_hidro = st.tabs([
         "🔧 Dimensionamento", "💲 Tabela de Preços", "📝 Central de Padrões (Templates)", "📊 Resumos / BOM"
