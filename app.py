@@ -3011,7 +3011,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             bitola_final = dimensionar_bitola_pelo_abaco(vazao_calculada, perda_carga, tipo_sistema)
             st.info(f"📈 Bitola comercial recomendada: **{bitola_final}**.")
             
-       col_q, col_t = st.columns([1, 2])
+        col_q, col_t = st.columns([1, 2])
         qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
         tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: UTA-01, CH-01...")
         
