@@ -2805,10 +2805,10 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         medida_final = medida_final.replace("{b}", bitola_cavalete)
         return f"{item_base} - Ø {medida_final}"
 
+# ====================================================================
+    # 🔄 SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS (v22 - ANTI-CACHE E ANTI-DISTORÇÃO)
     # ====================================================================
-    # 🔄 SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS (BLINDADA CONTRA RESET)
-    # ====================================================================
-    if st.session_state.get('versao_banco_hidro') != 'v21_BLINDADA':
+    if st.session_state.get('versao_banco_hidro') != 'v22_SUPER_BLINDADA':
         banco_geral = {}
         leitura_nuvem_sucesso = False
         
@@ -2822,8 +2822,20 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     nome_orig = str(row.get("Item / Componente", "")).strip()
                     if nome_orig:
                         chave = normalizar_string_busca(nome_orig)
-                        try: preco = float(str(row.get("Preço Unitário (R$)", 0.0)).replace("R$", "").replace(".", "").replace(",", ".").strip())
-                        except: preco = 0.0
+                        # Leitura Sênior (Lida com R$, vírgulas e floats puros do Google Sheets sem distorcer)
+                        val_bruto = row.get("Preço Unitário (R$)", 0.0)
+                        if isinstance(val_bruto, (int, float)):
+                            preco = float(val_bruto)
+                        else:
+                            try:
+                                v_str = str(val_bruto).upper().replace("R$", "").strip()
+                                if "," in v_str:
+                                    if "." in v_str: v_str = v_str.replace(".", "").replace(",", ".")
+                                    else: v_str = v_str.replace(",", ".")
+                                preco = float(v_str)
+                            except:
+                                preco = 0.0
+                                
                         banco_geral[chave] = {
                             "Item / Componente": nome_orig,
                             "Preço Unitário (R$)": preco,
@@ -2839,7 +2851,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 chave = normalizar_string_busca(row.get("Item / Componente", ""))
                 banco_geral[chave] = row
             st.toast("⚠️ Atraso na nuvem. Usando preços da memória local.", icon="⏳")
-            leitura_nuvem_sucesso = True # Evita que a trava zere os dados
+            leitura_nuvem_sucesso = True
 
         # 3. Garante M.O. Base
         mo_m_key = normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)")
@@ -2866,207 +2878,18 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     houve_adicao_nova = True
 
         st.session_state.banco_precos_hidraulica = list(banco_geral.values())
-        st.session_state.versao_banco_hidro = 'v21_BLINDADA'
+        st.session_state.versao_banco_hidro = 'v22_SUPER_BLINDADA'
         
         # 5. Só grava na nuvem automaticamente se tiver lido tudo com sucesso E criado uma peça nova.
         if leitura_nuvem_sucesso and houve_adicao_nova:
             try:
                 df_bg = pd.DataFrame(st.session_state.banco_precos_hidraulica).fillna("")
-                ws_h.clear()
-                ws_h.append_rows([df_bg.columns.tolist()] + df_bg.values.tolist())
+                sh_hidro_w = conectar_google_sheets()
+                ws_h_w = sh_hidro_w.worksheet("Precos_Hidraulica_Itens")
+                ws_h_w.clear()
+                ws_h_w.append_rows([df_bg.columns.tolist()] + df_bg.values.tolist())
             except:
                 pass
-
-        # 2. Garante Mão de Obra Base no banco
-        mo_mont_key = normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)")
-        if mo_mont_key not in banco_geral:
-            banco_geral[mo_mont_key] = {"Item / Componente": "Mão de Obra de Montagem Hidráulica (Por Polegada)", "Preço Unitário (R$)": 120.0, "Unidade": "pol"}
-        
-        mo_isol_key = normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)")
-        if mo_isol_key not in banco_geral:
-            banco_geral[mo_isol_key] = {"Item / Componente": "Mão de Obra de Isolamento Térmico (Por Polegada)", "Preço Unitário (R$)": 95.0, "Unidade": "pol"}
-
-        # 3. Varre os Templates: Adiciona peças NOVAS ao banco com valor R$ 0,00 para irem pro Excel
-        for template in st.session_state.matriz_templates:
-            bitolas_alvo = bitolas_roscadas if template["Ligação"] == "Roscado" else bitolas_soldadas
-            for b in bitolas_alvo:
-                nome_final = construir_nome_peca(template["Item Base"], template["Medida"], b)
-                chave_temp = normalizar_string_busca(nome_final)
-                
-                # Se a peça gerada pela receita não estiver no banco, cria ela ZERADA e com a unidade certa!
-                if chave_temp not in banco_geral:
-                    unid = "m" if "tubo" in chave_temp or "isolamento" in chave_temp or "rechapeamento" in chave_temp else "pç"
-                    banco_geral[chave_temp] = {
-                        "Item / Componente": nome_final, 
-                        "Preço Unitário (R$)": 0.0, 
-                        "Unidade": unid
-                    }
-        
-        # Salva o banco montado na memória
-        st.session_state.banco_precos_hidraulica = list(banco_geral.values())
-        st.session_state.versao_banco_hidro = 'v19_LIMPA'
-        
-        # Empurra esse banco completo de volta pro Google Sheets silenciosamente para garantir o Download do Excel
-        try:
-            df_bg = pd.DataFrame(st.session_state.banco_precos_hidraulica).fillna("")
-            sh_hidro = conectar_google_sheets()
-            ws_ci = sh_hidro.worksheet("Precos_Hidraulica_Itens")
-            ws_ci.clear()
-            ws_ci.append_rows([df_bg.columns.tolist()] + df_bg.values.tolist())
-        except:
-            pass
-
-    def dimensionar_bitola_pelo_abaco(vazao_m3h, perda_mmca_m, tipo_sistema):
-        C = 130.0 if "Fechado" in tipo_sistema else 120.0
-        q_m3s = vazao_m3h / 3600.0
-        hf_m_m = perda_mmca_m / 1000.0
-        if hf_m_m <= 0 or q_m3s <= 0: return "1/2\""
-        numerador = 10.67 * (q_m3s ** 1.852)
-        denominador = (C ** 1.852) * hf_m_m
-        d_interno_calc_mm = ((numerador / denominador) ** (1 / 4.8704)) * 1000.0
-        tabela_sch40 = [(15.8, "1/2\""), (20.9, "3/4\""), (26.6, "1\""), (35.1, "1.1/4\""), (40.9, "1.1/2\""), (52.5, "2\""), (62.7, "2.1/2\""), (77.9, "3\""), (102.3, "4\""), (128.2, "5\""), (154.1, "6\""), (202.7, "8\""), (254.5, "10\""), (303.2, "12\"")]
-        bitola_selecionada = "12\""
-        for int_mm, bit_nom in tabela_sch40:
-            if d_interno_calc_mm <= int_mm: bitola_selecionada = bit_nom; break
-        return bitola_selecionada
-
-    # AS 4 ABAS DO APLICATIVO
-    aba_cadastro_hidro, aba_precos_hidro, aba_padroes_hidro, aba_resumo_hidro = st.tabs([
-        "🔧 Dimensionamento", "💲 Tabela de Preços", "📝 Central de Padrões (Templates)", "📊 Resumos / BOM"
-    ])
-
-    with aba_cadastro_hidro:
-        st.subheader("Configuração Estrutural de Hidráulica")
-        
-        tipo_sistema = st.radio("Tipo de Sistema da Instalação:", ["Fechado (Água Gelada/Quente)", "Aberto (Água de Condensação/Torre)"], horizontal=True)
-        st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-        metodo_dimensionamento = st.radio("Método de dimensionamento:", ["📏 Definir diretamente por Bitola comercial", "🌊 Dimensionar automaticamente por Vazão"], horizontal=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        col1, col2, col3 = st.columns(3)
-        tipo_equip = col1.selectbox("Tipo de Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"])
-        if tipo_equip in ["Chiller", "Bomba"]: 
-            tipo_vias = col2.selectbox("Válvula:", ["2 Vias"], disabled=True)
-        else: 
-            tipo_vias = col2.selectbox("Válvula:", ["2 Vias", "3 Vias"])
-        
-        if "Bitola comercial" in metodo_dimensionamento:
-            bitola_final = col3.selectbox("Bitola comercial:", todas_bitolas)
-            vazao_calculada = 0.0
-        else:
-            vazao_calculada = col3.number_input("Vazão de Água (m³/h):", min_value=0.1, step=0.5, value=5.0)
-            tipo_aplicacao = st.radio("Exigência Acústica:", ["Escritório / Áreas Críticas", "Indústria / Áreas Técnicas"], horizontal=True)
-            perda_carga = st.slider("Perda de Carga (mmCA/m):", 10, 40, 25) if "Escritório" in tipo_aplicacao else st.slider("Perda de Carga (mmCA/m):", 41, 90 if "Aberto" in tipo_sistema else 100, 70)
-            bitola_final = dimensionar_bitola_pelo_abaco(vazao_calculada, perda_carga, tipo_sistema)
-            st.info(f"📈 Bitola comercial recomendada: **{bitola_final}**.")
-            
-        col_q, col_t = st.columns([1, 2])
-        qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
-        tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: UTA-01, CH-01...")
-        
-        # --- OPÇÕES ESPECÍFICAS DO CHILLER ---
-        chiller_inc_bal = True
-        chiller_tipo_valv = "Proporcional"
-        
-        if tipo_equip == "Chiller":
-            st.markdown("""
-            <div style='background-color: rgba(28, 133, 144, 0.05); padding: 15px; border-radius: 8px; border-left: 4px solid #1C8590; margin-top: 10px; margin-bottom: 15px;'>
-                <h5 style='margin-top: 0; margin-bottom: 15px; color: #1C8590;'>⚙️ Configurações Específicas do Chiller</h5>
-            """, unsafe_allow_html=True)
-            cc1, cc2 = st.columns(2)
-            chiller_inc_bal = cc1.checkbox("Incluir Válvula de Balanceamento?", value=True)
-            chiller_tipo_valv = cc2.radio("Válvula de Controle Motorizada:", ["Proporcional", "ON/OFF", "Sem Válvula"], horizontal=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-        # ---------------------------------------
-        
-        if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary", use_container_width=True):
-            dict_pol = {"1/4\"": 0.25, "3/8\"": 0.375, "1/2\"": 0.5, "3/4\"": 0.75, "1\"": 1.0, "1.1/4\"": 1.25, "1.1/2\"": 1.5, "2\"": 2.0, "2.1/2\"": 2.5, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0}
-            pol_dec = dict_pol.get(bitola_final, 1.0)
-            
-            is_aberto = "Aberto" in tipo_sistema
-            ligacao = "Roscado" if bitola_final in bitolas_roscadas else "Flangeado"
-            
-            composicao_kit = []
-            regras_ativas = [t for t in st.session_state.matriz_templates if t["Equipamento"] == tipo_equip and t["Vias"] == tipo_vias and t["Ligação"] == ligacao]
-            
-            tem_bal = False
-            tem_ctrl = False
-            
-            for regra in regras_ativas:
-                nome_final = construir_nome_peca(regra["Item Base"], regra["Medida"], bitola_final)
-                if is_aberto and ("Isolamento" in nome_final or "Rechapeamento" in nome_final): continue
-                
-                # --- APLICANDO A REGRA DO CHILLER ---
-                if tipo_equip == "Chiller":
-                    nome_low = nome_final.lower()
-                    if "balanceadora" in nome_low:
-                        if not chiller_inc_bal: continue
-                        tem_bal = True
-                    if "motorizada" in nome_low or "proporcional" in nome_low or "on/off" in nome_low:
-                        if chiller_tipo_valv == "Sem Válvula": continue
-                        elif chiller_tipo_valv == "ON/OFF":
-                            nome_final = construir_nome_peca("Válvula de controle 2 vias, ON/OFF", regra["Medida"], bitola_final)
-                        tem_ctrl = True
-                
-                if regra["Qtd"] > 0:
-                    composicao_kit.append({"nome": nome_final, "qtd": regra["Qtd"]})
-
-            # --- FORÇAR INCLUSÃO SE FALTAR NA RECEITA DO CHILLER ---
-            if tipo_equip == "Chiller":
-                if chiller_inc_bal and not tem_bal:
-                    composicao_kit.append({"nome": construir_nome_peca("Válvula balanceadora", "Variável {b}", bitola_final), "qtd": 1.0})
-                if chiller_tipo_valv != "Sem Válvula" and not tem_ctrl:
-                    v_str = "Válvula de controle 2 vias, ON/OFF" if chiller_tipo_valv == "ON/OFF" else "Válvula 2 vias, motorizada com atuador proporcional"
-                    composicao_kit.append({"nome": construir_nome_peca(v_str, "Variável {b-1}", bitola_final), "qtd": 1.0})
-            
-            # --- CÁLCULO DE CUSTOS DESENROLADO (BLINDADO CONTRA NAMEERROR) ---
-            dict_precos_memoria = {}
-            for row in st.session_state.banco_precos_hidraulica:
-                chave_n = normalizar_string_busca(row.get("Item / Componente", ""))
-                try: val = float(row.get("Preço Unitário (R$)", 0.0))
-                except: val = 0.0
-                dict_precos_memoria[chave_n] = val
-
-            custo_material_total_kit = 0.0
-            for comp in composicao_kit:
-                n_busca = normalizar_string_busca(comp["nome"])
-                pr_u = dict_precos_memoria.get(n_busca, 0.0)
-                custo_material_total_kit += pr_u * comp["qtd"]
-            
-            mo_mont_calculado = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0) * pol_dec * 12.0
-            
-            if is_aberto:
-                mo_isol_calculado = 0.0
-            else:
-                preco_base_isol_metro = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0) * pol_dec
-                
-                qtd_tubos_linear = 0.0
-                qtd_conexoes = 0.0
-                qtd_valvulas = 0.0
-                
-                for c in composicao_kit:
-                    nome_low = c["nome"].lower()
-                    if "tubo" in nome_low: 
-                        qtd_tubos_linear += c["qtd"]
-                    elif any(x in nome_low for x in ["curva", "conexão t", "redução", "cotovelo"]): 
-                        qtd_conexoes += c["qtd"]
-                    elif any(x in nome_low for x in ["válvula", "filtro"]): 
-                        qtd_valvulas += c["qtd"]
-                
-                metragem_equivalente = qtd_tubos_linear + (qtd_conexoes * 1.5) + (qtd_valvulas * 2.0)
-                mo_isol_calculado = preco_base_isol_metro * metragem_equivalente
-            
-            st.session_state.cavaletes_selecionados.append({
-                "id": str(uuid.uuid4()), "tag": tag_equip if tag_equip else "S/ TAG",
-                "equipamento": tipo_equip, "vias": tipo_vias, "bitola": bitola_final, "quantidade": qtd,
-                "vazao": vazao_calculada, "sistema": tipo_sistema, "custo_mat_unit": custo_material_total_kit,
-                "mo_mont_unit": mo_mont_calculado, "mo_isol_unit": mo_isol_calculado, "composicao": composicao_kit
-            })
-            st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
-            st.rerun()
-
-        st.markdown("---")
-        st.markdown("### 📋 Cavaletes Adicionados no Projeto")
         if not st.session_state.cavaletes_selecionados: 
             st.info("Nenhum item adicionado no levantamento.")
         else:
@@ -3327,27 +3150,15 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         if "Item / Componente" in df_up.columns:
                             df_up = df_up.dropna(subset=["Item / Componente"])
                             
-                            # --- TRATAMENTO SÊNIOR DE CONVERSÃO DE MOEDA (ANTI-DISTORÇÃO) ---
                             def limpar_e_converter_preco(val):
-                                if pd.isna(val) or str(val).strip() in ["", "-", "nan"]:
-                                    return 0.0
-                                if isinstance(val, (int, float)):
-                                    return float(val)
-                                
-                                # Se vier como texto (ex: "R$ 162,00" ou "162,00")
+                                if pd.isna(val) or str(val).strip() in ["", "-", "nan"]: return 0.0
+                                if isinstance(val, (int, float)): return float(val)
                                 val_str = str(val).upper().replace("R$", "").strip()
-                                
-                                # Se tiver pontos e vírgulas no padrão BR (ex: 1.250,50 ou 162,00)
                                 if "," in val_str:
-                                    if "." in val_str:
-                                        val_str = val_str.replace(".", "").replace(",", ".")
-                                    else:
-                                        val_str = val_str.replace(",", ".")
-                                        
-                                try:
-                                    return float(val_str)
-                                except:
-                                    return 0.0
+                                    if "." in val_str: val_str = val_str.replace(".", "").replace(",", ".")
+                                    else: val_str = val_str.replace(",", ".")
+                                try: return float(val_str)
+                                except: return 0.0
                                 
                             df_up['Preço Unitário (R$)'] = df_up['Preço Unitário (R$)'].apply(limpar_e_converter_preco)
                             df_up = df_up.fillna("")
@@ -3356,6 +3167,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                             
                             import datetime
                             st.session_state['data_ultima_atualizacao'] = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
+                            st.session_state['trigger_tabela'] = st.session_state.get('trigger_tabela', 0) + 1
                             
                             try:
                                 sh_cloud = conectar_google_sheets()
@@ -3364,7 +3176,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                                 linhas = [df_up.columns.tolist()] + df_up.values.tolist()
                                 ws_ci.append_rows(linhas)
                                 
-                                st.session_state.versao_banco_hidro = 'forcar_recalculo_apos_upload_limpo'
+                                # TRAVA ANTI-CACHE: Diz ao sistema que não precisa reler da nuvem agora!
+                                st.session_state.versao_banco_hidro = 'v22_SUPER_BLINDADA'
                                 st.success("✅ Valores gravados com sucesso na Nuvem!")
                                 st.rerun()
                                 
@@ -3382,19 +3195,16 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.caption(f"🕒 **Última atualização:** {st.session_state['data_ultima_atualizacao']}")
         else:
             st.caption("🕒 **Última atualização:** Não registrada nesta sessão")
-            
-        if not st.session_state.get('banco_precos_hidraulica'):
-             try:
-                 df_view_hidro = carregar_precos_hidraulica_itens()
-                 st.session_state.banco_precos_hidraulica = df_view_hidro.to_dict('records')
-             except:
-                 st.session_state.banco_precos_hidraulica = []
 
         if st.session_state.get('banco_precos_hidraulica'):
             df_display = pd.DataFrame(st.session_state.banco_precos_hidraulica)
             
             if not df_display.empty and "Preço Unitário (R$)" in df_display.columns:
                 st.info("💡 Você pode editar os preços dando dois cliques nos valores da tabela abaixo!")
+                
+                # CHAVE DINÂMICA: Força a tabela visual a resetar sempre que um upload for feito!
+                chave_tabela = f"editor_manual_precos_{st.session_state.get('trigger_tabela', 0)}"
+                
                 df_editado_preco = st.data_editor(
                     df_display, 
                     use_container_width=True, 
@@ -3410,13 +3220,14 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         "Item / Componente": st.column_config.TextColumn(disabled=True),
                         "Unidade": st.column_config.TextColumn(disabled=True)
                     },
-                    key="editor_manual_precos"
+                    key=chave_tabela
                 )
                 
                 if st.button("💾 Salvar Edições Manuais", type="secondary"):
                     st.session_state.banco_precos_hidraulica = df_editado_preco.to_dict('records')
                     import datetime
                     st.session_state['data_ultima_atualizacao'] = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
+                    st.session_state['trigger_tabela'] = st.session_state.get('trigger_tabela', 0) + 1
                     
                     try:
                         sh_cloud = conectar_google_sheets()
@@ -3424,6 +3235,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         ws_ci.clear()
                         linhas = [df_editado_preco.columns.tolist()] + df_editado_preco.values.tolist()
                         ws_ci.append_rows(linhas)
+                        st.session_state.versao_banco_hidro = 'v22_SUPER_BLINDADA'
                         st.success("✅ Edições manuais gravadas no sistema!")
                         st.rerun()
                     except Exception as e:
