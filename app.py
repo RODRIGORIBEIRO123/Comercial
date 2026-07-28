@@ -2960,9 +2960,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             bitola_final = dimensionar_bitola_pelo_abaco(vazao_calculada, perda_carga, tipo_sistema)
             st.info(f"📈 Bitola comercial recomendada: **{bitola_final}**.")
             
-         col_q, col_t = st.columns([1, 2])
-         qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
-         tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: UTA-01, CH-01...")
+        col_q, col_t = st.columns([1, 2])
+        qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
+        tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: UTA-01, CH-01...")
         
         # --- OPÇÕES ESPECÍFICAS DO CHILLER ---
         chiller_inc_bal = True
@@ -3018,55 +3018,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 if chiller_tipo_valv != "Sem Válvula" and not tem_ctrl:
                     v_str = "Válvula de controle 2 vias, ON/OFF" if chiller_tipo_valv == "ON/OFF" else "Válvula 2 vias, motorizada com atuador proporcional"
                     composicao_kit.append({"nome": construir_nome_peca(v_str, "Variável {b-1}", bitola_final), "qtd": 1.0})
-            
-            # --- CÁLCULO DE CUSTOS DESENROLADO (BLINDADO CONTRA NAMEERROR) ---
-            dict_precos_memoria = {}
-            for row in st.session_state.banco_precos_hidraulica:
-                chave_n = normalizar_string_busca(row.get("Item / Componente", ""))
-                try: val = float(row.get("Preço Unitário (R$)", 0.0))
-                except: val = 0.0
-                dict_precos_memoria[chave_n] = val
-
-            custo_material_total_kit = 0.0
-            for comp in composicao_kit:
-                n_busca = normalizar_string_busca(comp["nome"])
-                pr_u = dict_precos_memoria.get(n_busca, 0.0)
-                custo_material_total_kit += pr_u * comp["qtd"]
-            
-            mo_mont_calculado = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0) * pol_dec * 12.0
-            
-            if is_aberto:
-                mo_isol_calculado = 0.0
-            else:
-                preco_base_isol_metro = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0) * pol_dec
-                
-                qtd_tubos_linear = 0.0
-                qtd_conexoes = 0.0
-                qtd_valvulas = 0.0
-                
-                for c in composicao_kit:
-                    nome_low = c["nome"].lower()
-                    if "tubo" in nome_low: 
-                        qtd_tubos_linear += c["qtd"]
-                    elif any(x in nome_low for x in ["curva", "conexão t", "redução", "cotovelo"]): 
-                        qtd_conexoes += c["qtd"]
-                    elif any(x in nome_low for x in ["válvula", "filtro"]): 
-                        qtd_valvulas += c["qtd"]
-                
-                metragem_equivalente = qtd_tubos_linear + (qtd_conexoes * 1.5) + (qtd_valvulas * 2.0)
-                mo_isol_calculado = preco_base_isol_metro * metragem_equivalente
-            
-            st.session_state.cavaletes_selecionados.append({
-                "id": str(uuid.uuid4()), "tag": tag_equip if tag_equip else "S/ TAG",
-                "equipamento": tipo_equip, "vias": tipo_vias, "bitola": bitola_final, "quantidade": qtd,
-                "vazao": vazao_calculada, "sistema": tipo_sistema, "custo_mat_unit": custo_material_total_kit,
-                "mo_mont_unit": mo_mont_calculado, "mo_isol_unit": mo_isol_calculado, "composicao": composicao_kit
-            })
-            st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
-            st.rerun()
-                
-                if regra["Qtd"] > 0:
-                    composicao_kit.append({"nome": nome_final, "qtd": regra["Qtd"]})
             
             # --- CÁLCULO DE CUSTOS DESENROLADO (BLINDADO CONTRA NAMEERROR) ---
             dict_precos_memoria = {}
