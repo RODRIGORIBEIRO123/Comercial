@@ -2791,32 +2791,76 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         return f"{item_base} - Ø {medida_final}"
 
     # ====================================================================
-    # 🔄 SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS (VERSÃO CORRIGIDA)
+    # 🔄 SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS (BLINDADA CONTRA RESET)
     # ====================================================================
-    if st.session_state.get('versao_banco_hidro') != 'v19_LIMPA':
+    if st.session_state.get('versao_banco_hidro') != 'v21_BLINDADA':
         banco_geral = {}
+        leitura_nuvem_sucesso = False
         
-        # 1. Puxa tudo que já existe na nuvem primeiro (para não perder nada que você já precificou)
+        # 1. Tenta puxar da nuvem primeiro
         try:
             sh_hidro = conectar_google_sheets()
-            aba_h = sh_hidro.worksheet("Precos_Hidraulica_Itens").get_all_records()
-            for row in aba_h:
-                nome_orig = str(row.get("Item / Componente", "")).strip()
-                if nome_orig:
-                    chave = normalizar_string_busca(nome_orig)
-                    # Garante que números vazios não quebrem
-                    try:
-                        preco = float(str(row.get("Preço Unitário (R$)", 0.0)).replace("R$", "").replace(".", "").replace(",", ".").strip())
-                    except:
-                        preco = 0.0
-                    
-                    banco_geral[chave] = {
-                        "Item / Componente": nome_orig,
-                        "Preço Unitário (R$)": preco,
-                        "Unidade": str(row.get("Unidade", "un"))
-                    }
-        except: 
+            ws_h = sh_hidro.worksheet("Precos_Hidraulica_Itens")
+            aba_h = ws_h.get_all_records()
+            if len(aba_h) > 0:
+                for row in aba_h:
+                    nome_orig = str(row.get("Item / Componente", "")).strip()
+                    if nome_orig:
+                        chave = normalizar_string_busca(nome_orig)
+                        try: preco = float(str(row.get("Preço Unitário (R$)", 0.0)).replace("R$", "").replace(".", "").replace(",", ".").strip())
+                        except: preco = 0.0
+                        banco_geral[chave] = {
+                            "Item / Componente": nome_orig,
+                            "Preço Unitário (R$)": preco,
+                            "Unidade": str(row.get("Unidade", "pç"))
+                        }
+                leitura_nuvem_sucesso = True
+        except Exception as e:
             pass
+
+        # 2. Se a nuvem falhou, puxa da memória local para não perder o que você digitou
+        if not leitura_nuvem_sucesso and 'banco_precos_hidraulica' in st.session_state and st.session_state.banco_precos_hidraulica:
+            for row in st.session_state.banco_precos_hidraulica:
+                chave = normalizar_string_busca(row.get("Item / Componente", ""))
+                banco_geral[chave] = row
+            st.toast("⚠️ Atraso na nuvem. Usando preços da memória local.", icon="⏳")
+            leitura_nuvem_sucesso = True # Evita que a trava zere os dados
+
+        # 3. Garante M.O. Base
+        mo_m_key = normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)")
+        if mo_m_key not in banco_geral: banco_geral[mo_m_key] = {"Item / Componente": "Mão de Obra de Montagem Hidráulica (Por Polegada)", "Preço Unitário (R$)": 120.0, "Unidade": "pol"}
+        
+        mo_i_key = normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)")
+        if mo_i_key not in banco_geral: banco_geral[mo_i_key] = {"Item / Componente": "Mão de Obra de Isolamento Térmico (Por Polegada)", "Preço Unitário (R$)": 95.0, "Unidade": "pol"}
+
+        # 4. Varre as Receitas: Se o item for novo de verdade, adiciona zerado.
+        houve_adicao_nova = False
+        for template in st.session_state.matriz_templates:
+            bitolas_alvo = bitolas_roscadas if template["Ligação"] == "Roscado" else bitolas_soldadas
+            for b in bitolas_alvo:
+                nome_final = construir_nome_peca(template["Item Base"], template["Medida"], b)
+                chave_temp = normalizar_string_busca(nome_final)
+                
+                if chave_temp not in banco_geral:
+                    unid = "m" if "tubo" in chave_temp or "isolamento" in chave_temp or "rechapeamento" in chave_temp else "pç"
+                    banco_geral[chave_temp] = {
+                        "Item / Componente": nome_final, 
+                        "Preço Unitário (R$)": 0.0, 
+                        "Unidade": unid
+                    }
+                    houve_adicao_nova = True
+
+        st.session_state.banco_precos_hidraulica = list(banco_geral.values())
+        st.session_state.versao_banco_hidro = 'v21_BLINDADA'
+        
+        # 5. Só grava na nuvem automaticamente se tiver lido tudo com sucesso E criado uma peça nova.
+        if leitura_nuvem_sucesso and houve_adicao_nova:
+            try:
+                df_bg = pd.DataFrame(st.session_state.banco_precos_hidraulica).fillna("")
+                ws_h.clear()
+                ws_h.append_rows([df_bg.columns.tolist()] + df_bg.values.tolist())
+            except:
+                pass
 
         # 2. Garante Mão de Obra Base no banco
         mo_mont_key = normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)")
