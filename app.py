@@ -2736,26 +2736,41 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Fixo", "Item Base": "Niple duplo Ferro maleável galvanizado", "Medida": "1/4\"", "Qtd": 2.0})
         return templates
 
-    # --- PONTES COM O GOOGLE SHEETS PARA OS TEMPLATES ---
+   # --- PONTES COM O GOOGLE SHEETS PARA OS TEMPLATES (BLINDAGEM MÁXIMA) ---
     def carregar_templates_do_banco():
         try:
             sh = conectar_google_sheets()
             try:
                 ws = sh.worksheet("Templates_Hidraulica")
                 dados = ws.get_all_records()
-                if len(dados) > 0: return dados
-            except: pass 
-        except: pass
+                if len(dados) > 0: 
+                    st.session_state.status_nuvem_templates = "OK"
+                    return dados
+            except:
+                st.session_state.status_nuvem_templates = "CRIADO"
+                return gerar_templates_matriz()
+        except Exception as e:
+            st.session_state.status_nuvem_templates = "ERRO"
+            st.toast("⚠️ Falha de conexão. Usando receitas da memória local para evitar perda de dados.", icon="📶")
+            
+        # Se a nuvem falhou, usa a memória para NUNCA resetar o seu trabalho
+        if 'matriz_templates' in st.session_state and st.session_state.matriz_templates:
+            return st.session_state.matriz_templates
+            
         return gerar_templates_matriz() 
 
     def salvar_templates_no_banco(matriz):
+        # Proteção: Se a nuvem estava com erro, não deixa sobrescrever com lixo
+        if st.session_state.get("status_nuvem_templates") == "ERRO":
+            st.warning("⚠️ Nuvem offline. Padrão salvo apenas na memória local desta sessão.")
+            return False
+            
         try:
             sh = conectar_google_sheets()
             try: ws = sh.worksheet("Templates_Hidraulica")
             except: ws = sh.add_worksheet(title="Templates_Hidraulica", rows="2000", cols="10")
             ws.clear()
             if matriz:
-                # O preenchimento .fillna("") salva o banco de falhar e apagar seus dados.
                 df = pd.DataFrame(matriz).fillna("")
                 ws.append_rows([df.columns.tolist()] + df.values.tolist())
             return True
@@ -2974,6 +2989,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             composicao_kit = []
             regras_ativas = [t for t in st.session_state.matriz_templates if t["Equipamento"] == tipo_equip and t["Vias"] == tipo_vias and t["Ligação"] == ligacao]
             
+            tem_bal = False
+            tem_ctrl = False
+            
             for regra in regras_ativas:
                 nome_final = construir_nome_peca(regra["Item Base"], regra["Medida"], bitola_final)
                 if is_aberto and ("Isolamento" in nome_final or "Rechapeamento" in nome_final): continue
@@ -2981,18 +2999,133 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 # --- APLICANDO A REGRA DO CHILLER ---
                 if tipo_equip == "Chiller":
                     nome_low = nome_final.lower()
-                    
-                    # Remove Balanceadora se desmarcada na tela
-                    if "balanceadora" in nome_low and not chiller_inc_bal:
-                        continue
-                        
-                    # Trata a Válvula de Controle (Troca pela ON/OFF ou Remove)
+                    if "balanceadora" in nome_low:
+                        if not chiller_inc_bal: continue
+                        tem_bal = True
                     if "motorizada" in nome_low or "proporcional" in nome_low or "on/off" in nome_low:
-                        if chiller_tipo_valv == "Sem Válvula":
-                            continue
+                        if chiller_tipo_valv == "Sem Válvula": continue
                         elif chiller_tipo_valv == "ON/OFF":
-                            # Puxa o nome exato do seu banco de preços preenchido, mas mantém a medida da regra original (ex: b-1)
                             nome_final = construir_nome_peca("Válvula de controle 2 vias, ON/OFF", regra["Medida"], bitola_final)
+                        tem_ctrl = True
+                
+                if regra["Qtd"] > 0:
+                    composicao_kit.append({"nome": nome_final, "qtd": regra["Qtd"]})
+
+            # --- FORÇAR INCLUSÃO SE FALTAR NA RECEITA DO CHILLER ---
+            if tipo_equip == "Chiller":
+                if chiller_inc_bal and not tem_bal:
+                    composicao_kit.append({"nome": construir_nome_peca("Válvula balanceadora", "Variável {b}", bitola_final), "qtd": 1.0})
+                if chiller_tipo_valv != "Sem Válvula" and not tem_ctrl:
+                    v_str = "Válvula de controle 2 vias, ON/OFF" if chiller_tipo_valv == "ON/OFF" else "Válvula 2 vias, motorizada com atuador proporcional"
+                    composicao_kit.append({"nome": construir_nome_peca(v_str, "Variável {b-1}", bitola_final), "qtd": 1.0})
+            
+            dict_precos_memoria = {normalizar_string_busca(row["Item / Componente"]): float(row["Preço Unitário (R$)"]) for row in st.session_state.banco_precos_hidraulica}
+            custo_material_total_kit = sum(dict_precos_memoria.get(normalizar_string_busca(comp["nome"]), 0.0) * comp["qtd"] for comp in composicao_kit)
+            mo_mont_calculado = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0) * pol_dec * 12.0
+            
+            if is_aberto:
+                mo_isol_calculado = 0.0
+            else:
+                preco_base_isol_metro = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0) * pol_dec
+                qtd_tubos_linear = sum(c["qtd"] for c in composicao_kit if "tubo" in c["nome"].lower())
+                qtd_conexoes = sum(c["qtd"] for c in composicao_kit if any(x in c["nome"].lower() for x in ["curva", "conexão t", "redução", "cotovelo"]))
+                qtd_valvulas = sum(c["qtd"] for c in composicao_kit if any(x in c["nome"].lower() for x in ["válvula", "filtro"]))
+                metragem_equivalente = qtd_tubos_linear + (qtd_conexoes * 1.5) + (qtd_valvulas * 2.0)
+                mo_isol_calculado = preco_base_isol_metro * metragem_equivalente
+            
+            st.session_state.cavaletes_selecionados.append({
+                "id": str(uuid.uuid4()), "tag": tag_equip if tag_equip else "S/ TAG",
+                "equipamento": tipo_equip, "vias": tipo_vias, "bitola": bitola_final, "quantidade": qtd,
+                "vazao": vazao_calculada, "sistema": tipo_sistema, "custo_mat_unit": custo_material_total_kit,
+                "mo_mont_unit": mo_mont_calculado, "mo_isol_unit": mo_isol_calculado, "composicao": composicao_kit
+            })
+            st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
+            st.rerun()
+
+        st.markdown("---")
+        st.markdown("### 📋 Cavaletes Adicionados no Projeto")
+        if not st.session_state.cavaletes_selecionados: 
+            st.info("Nenhum item adicionado no levantamento.")
+        else:
+            for idx, cav in enumerate(st.session_state.cavaletes_selecionados):
+                c_inf, c_tg, c_qt, c_rm = st.columns([4, 3, 2, 2])
+                sys_lbl = " [Aberto]" if "Aberto" in cav.get("sistema", "") else ""
+                c_inf.write(f"**Cavalete {cav.get('equipamento', 'EQ')} ({cav.get('vias', 'N/A')})** - Ø {cav.get('bitola', '')}{sys_lbl}")
+                c_tg.write(f"TAG: `{cav.get('tag', 'S/ TAG')}`")
+                c_qt.write(f"Qtd: **{cav.get('quantidade', 1)} cjs**")
+
+                # --- DESENHO VISUAL DO CAVALETE (ICONES REALISTAS E SEM ERRO) ---
+                import graphviz
+                import re
+                
+                with st.expander("Ver Representação Visual Completa (P&ID)", expanded=False):
+                    dot = graphviz.Digraph(node_attr={'shape': 'box', 'style': 'rounded,filled', 'fillcolor': '#ffffff', 'color': '#1C8590', 'fontname': 'Arial', 'fontsize': '10'})
+                    dot.attr(rankdir='LR', splines='ortho')
+                    
+                    has_filtro, has_bal, has_retencao, valv_controle = None, None, None, None
+                    juntas_exp = []
+                    bloqueios = []
+                    
+                    for c in cav.get("composicao", []):
+                        nome, qtd = c["nome"], int(c["qtd"])
+                        nome_low = nome.lower()
+                        match = re.search(r'Ø\s*([\d\./"]+)', nome)
+                        b_str = f"Ø {match.group(1)}" if match else ""
+                        
+                        if "filtro" in nome_low: has_filtro = f"🔽 Filtro Y\n{b_str}"
+                        elif "balanceadora" in nome_low: has_bal = f"⚖️ Balanceadora\n{b_str}"
+                        elif "retenção" in nome_low: has_retencao = f"🛑 Retenção\n{b_str}"
+                        elif "motorizada" in nome_low or "proporcional" in nome_low or "on/off" in nome_low:
+                            t = "🎛️ Válv. 3 Vias" if "3 vias" in nome_low else "🎛️ Válv. Controle"
+                            valv_controle = f"{t}\n{b_str}"
+                        elif "junta de expansão" in nome_low:
+                            juntas_exp.extend([f"〰️ Junta Expansão\n{b_str}"] * qtd)
+                        elif "gaveta" in nome_low or "borboleta" in nome_low or "esfera" in nome_low:
+                            t = "🦋 Borboleta" if "borboleta" in nome_low else ("⚙️ Gaveta" if "gaveta" in nome_low else "⚽ Esfera")
+                            bloqueios.extend([f"{t}\n{b_str}"] * qtd)
+
+                    seq = [('IN', '🔵 Entrada Água', 'rarrow', '#e0f2f1')]
+                    
+                    if len(bloqueios) > 0: seq.append(('B1', bloqueios[0], 'box', '#f9f9f9'))
+                    if has_filtro: seq.append(('FY', has_filtro, 'invhouse', '#f9f9f9'))
+                    if len(juntas_exp) > 0: seq.append(('JE1', juntas_exp[0], 'cds', '#f9f9f9'))
+                    
+                    eq_nome = cav.get("equipamento", "Equipamento").upper()
+                    eq_lbl = f"❄️ CHILLER" if eq_nome=="CHILLER" else (f"⚙️ BOMBA" if eq_nome=="BOMBA" else f"🌬️ {eq_nome}")
+                    eq_shape = 'box3d' if eq_nome in ["CHILLER", "UTA", "FANCOIL"] else 'cylinder'
+                    seq.append(('EQ', eq_lbl, eq_shape, '#cce4f7'))
+                    
+                    if len(juntas_exp) > 1: seq.append(('JE2', juntas_exp[1], 'cds', '#f9f9f9'))
+                    if has_retencao: seq.append(('VR', has_retencao, 'box', '#f9f9f9'))
+                    if valv_controle: seq.append(('VC', valv_controle, 'component', '#f9f9f9'))
+                    if has_bal: seq.append(('VB', has_bal, 'box', '#f9f9f9'))
+                    if len(bloqueios) > 1: seq.append(('B2', bloqueios[1], 'box', '#f9f9f9'))
+                    
+                    seq.append(('OUT', '🔴 Retorno Água', 'rarrow', '#fce4e4'))
+                    
+                    for nid, lbl, shp, clr in seq: dot.node(nid, lbl, shape=shp, fillcolor=clr)
+                    for i in range(len(seq) - 1): dot.edge(seq[i][0], seq[i+1][0])
+                        
+                    if valv_controle and "3" in valv_controle:
+                        dot.node('BP', '🔄 By-pass', shape='parallelogram', fillcolor='#fff3cd')
+                        no_saida_bp = 'FY' if has_filtro else ('B1' if len(bloqueios) > 0 else 'IN')
+                        dot.edge(no_saida_bp, 'BP')
+                        if len(bloqueios) > 2:
+                            dot.node('B3', bloqueios[2], shape='box', fillcolor='#f9f9f9')
+                            dot.edge('BP', 'B3')
+                            dot.edge('B3', 'VC')
+                        else:
+                            dot.edge('BP', 'VC')
+                            
+                    st.graphviz_chart(dot)
+                
+                if c_rm.button("🗑️", key=f"rm_h_cv_{cav.get('id', idx)}"):
+                    st.session_state.cavaletes_selecionados.pop(idx)
+                    st.rerun()
+                    
+            if st.button("🗑️ Excluir Todos", type="secondary"):
+                st.session_state.cavaletes_selecionados = []
+                st.rerun()
                 # ------------------------------------
                 
                 if regra["Qtd"] > 0:
@@ -3446,7 +3579,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             c2_h.warning(f"**Mão de Obra:**\nR$ {(total_hidro_montagem + total_hidro_isolamento):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             c3_h.success(f"**TOTAL:**\nR$ {(total_hidro_material + total_hidro_montagem + total_hidro_isolamento):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             
-            with st.expander("ℹ️ Entenda como a Mão de Obra é calculada pelo sistema"):
+            with st.expander(" Entenda como a Mão de Obra é calculada pelo sistema"):
                 st.markdown("""
                 A Mão de Obra é parametrizada com base no indexador industrial de **"Polegada Equivalente"**.
                 
