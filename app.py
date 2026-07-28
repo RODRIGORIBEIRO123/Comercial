@@ -3011,7 +3011,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             bitola_final = dimensionar_bitola_pelo_abaco(vazao_calculada, perda_carga, tipo_sistema)
             st.info(f"📈 Bitola comercial recomendada: **{bitola_final}**.")
             
-        col_q, col_t = st.columns([1, 2])
+       col_q, col_t = st.columns([1, 2])
         qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
         tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: UTA-01, CH-01...")
         
@@ -3028,6 +3028,40 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             chiller_inc_bal = cc1.checkbox("Incluir Válvula de Balanceamento?", value=True)
             chiller_tipo_valv = cc2.radio("Válvula de Controle Motorizada:", ["Proporcional", "ON/OFF", "Sem Válvula"], horizontal=True)
             st.markdown("</div>", unsafe_allow_html=True)
+            
+        # --- OPÇÕES ESPECÍFICAS DO FANCOLETE ---
+        fancolete_tipo_montagem = "Fabricado na Obra (Tradicional)"
+        kit_danfoss_final = ""
+        
+        if tipo_equip == "Fancolete":
+            st.markdown("""
+            <div style='background-color: rgba(28, 133, 144, 0.05); padding: 15px; border-radius: 8px; border-left: 4px solid #1C8590; margin-top: 10px; margin-bottom: 15px;'>
+                <h5 style='margin-top: 0; margin-bottom: 15px; color: #1C8590;'>⚙️ Configurações Específicas do Fancolete</h5>
+            """, unsafe_allow_html=True)
+            fancolete_tipo_montagem = st.radio("Tipo de Montagem do Cavalete:", ["Fabricado na Obra (Tradicional)", "Kit Pronto Danfoss (AB-QM 4.0 Flexo)"], horizontal=True)
+            
+            if "Danfoss" in fancolete_tipo_montagem:
+                cf1, cf2 = st.columns(2)
+                vazao_fanco = cf1.number_input("Vazão do Fancolete (m³/h):", min_value=0.01, step=0.05, value=vazao_calculada if vazao_calculada > 0 else 0.10)
+                
+                # Inteligência de seleção baseada na tabela técnica Danfoss
+                idx_sel = 0
+                if vazao_fanco <= 0.20: idx_sel = 0
+                elif vazao_fanco <= 0.70: idx_sel = 1
+                elif vazao_fanco <= 1.10: idx_sel = 3 # DN 20 Normal vai até 1.10
+                elif vazao_fanco <= 1.20: idx_sel = 2 # DN 15 HF vai até 1.20
+                else: idx_sel = 4 # DN 20 HF
+                
+                opcoes_danfoss = [
+                    'Kit Danfoss AB-QM 4.0 Flexo - DN 15 LF',
+                    'Kit Danfoss AB-QM 4.0 Flexo - DN 15',
+                    'Kit Danfoss AB-QM 4.0 Flexo - DN 15 HF',
+                    'Kit Danfoss AB-QM 4.0 Flexo - DN 20',
+                    'Kit Danfoss AB-QM 4.0 Flexo - DN 20 HF'
+                ]
+                kit_danfoss_final = cf2.selectbox("Modelo Compatível Sugerido:", opcoes_danfoss, index=idx_sel)
+                st.caption("Faixas de Vazão: DN 15 LF (0.02-0.2) | DN 15 (0.07-0.7) | DN 15 HF (0.12-1.2) | DN 20 (0.11-1.1) | DN 20 HF (0.19-1.9)")
+            st.markdown("</div>", unsafe_allow_html=True)
         # ---------------------------------------
         
         if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary", use_container_width=True):
@@ -3036,41 +3070,44 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             
             is_aberto = "Aberto" in tipo_sistema
             ligacao = "Roscado" if bitola_final in bitolas_roscadas else "Flangeado"
-            
             composicao_kit = []
-            regras_ativas = [t for t in st.session_state.matriz_templates if t["Equipamento"] == tipo_equip and t["Vias"] == tipo_vias and t["Ligação"] == ligacao]
             
-            tem_bal = False
-            tem_ctrl = False
-            
-            for regra in regras_ativas:
-                nome_final = construir_nome_peca(regra["Item Base"], regra["Medida"], bitola_final)
-                if is_aberto and ("Isolamento" in nome_final or "Rechapeamento" in nome_final): continue
+            # --- LÓGICA DE INJEÇÃO DO KIT NA BOM ---
+            if tipo_equip == "Fancolete" and "Danfoss" in fancolete_tipo_montagem:
+                bitola_final = "1/2\"" if "DN 15" in kit_danfoss_final else "3/4\""
+                pol_dec = dict_pol.get(bitola_final, 0.5)
+                composicao_kit.append({"nome": kit_danfoss_final, "qtd": 1.0})
+            else:
+                regras_ativas = [t for t in st.session_state.matriz_templates if t["Equipamento"] == tipo_equip and t["Vias"] == tipo_vias and t["Ligação"] == ligacao]
+                tem_bal = False
+                tem_ctrl = False
                 
-                # --- APLICANDO A REGRA DO CHILLER ---
-                if tipo_equip == "Chiller":
-                    nome_low = nome_final.lower()
-                    if "balanceadora" in nome_low:
-                        if not chiller_inc_bal: continue
-                        tem_bal = True
-                    if "motorizada" in nome_low or "proporcional" in nome_low or "on/off" in nome_low:
-                        if chiller_tipo_valv == "Sem Válvula": continue
-                        elif chiller_tipo_valv == "ON/OFF":
-                            nome_final = construir_nome_peca("Válvula de controle 2 vias, ON/OFF", regra["Medida"], bitola_final)
-                        tem_ctrl = True
-                
-                if regra["Qtd"] > 0:
-                    composicao_kit.append({"nome": nome_final, "qtd": regra["Qtd"]})
+                for regra in regras_ativas:
+                    nome_final = construir_nome_peca(regra["Item Base"], regra["Medida"], bitola_final)
+                    if is_aberto and ("Isolamento" in nome_final or "Rechapeamento" in nome_final): continue
+                    
+                    if tipo_equip == "Chiller":
+                        nome_low = nome_final.lower()
+                        if "balanceadora" in nome_low:
+                            if not chiller_inc_bal: continue
+                            tem_bal = True
+                        if "motorizada" in nome_low or "proporcional" in nome_low or "on/off" in nome_low:
+                            if chiller_tipo_valv == "Sem Válvula": continue
+                            elif chiller_tipo_valv == "ON/OFF":
+                                nome_final = construir_nome_peca("Válvula de controle 2 vias, ON/OFF", regra["Medida"], bitola_final)
+                            tem_ctrl = True
+                    
+                    if regra["Qtd"] > 0:
+                        composicao_kit.append({"nome": nome_final, "qtd": regra["Qtd"]})
 
-            # --- FORÇAR INCLUSÃO SE FALTAR NA RECEITA DO CHILLER ---
-            if tipo_equip == "Chiller":
-                if chiller_inc_bal and not tem_bal:
-                    composicao_kit.append({"nome": construir_nome_peca("Válvula balanceadora", "Variável {b}", bitola_final), "qtd": 1.0})
-                if chiller_tipo_valv != "Sem Válvula" and not tem_ctrl:
-                    v_str = "Válvula de controle 2 vias, ON/OFF" if chiller_tipo_valv == "ON/OFF" else "Válvula 2 vias, motorizada com atuador proporcional"
-                    composicao_kit.append({"nome": construir_nome_peca(v_str, "Variável {b-1}", bitola_final), "qtd": 1.0})
+                if tipo_equip == "Chiller":
+                    if chiller_inc_bal and not tem_bal:
+                        composicao_kit.append({"nome": construir_nome_peca("Válvula balanceadora", "Variável {b}", bitola_final), "qtd": 1.0})
+                    if chiller_tipo_valv != "Sem Válvula" and not tem_ctrl:
+                        v_str = "Válvula de controle 2 vias, ON/OFF" if chiller_tipo_valv == "ON/OFF" else "Válvula 2 vias, motorizada com atuador proporcional"
+                        composicao_kit.append({"nome": construir_nome_peca(v_str, "Variável {b-1}", bitola_final), "qtd": 1.0})
             
-            # --- CÁLCULO DE CUSTOS DESENROLADO (BLINDADO) ---
+            # --- CÁLCULO DE CUSTOS DESENROLADO ---
             dict_precos_memoria = {}
             for row in st.session_state.banco_precos_hidraulica:
                 chave_n = normalizar_string_busca(row.get("Item / Componente", ""))
@@ -3090,19 +3127,15 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 mo_isol_calculado = 0.0
             else:
                 preco_base_isol_metro = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0) * pol_dec
-                
                 qtd_tubos_linear = 0.0
                 qtd_conexoes = 0.0
                 qtd_valvulas = 0.0
                 
                 for c in composicao_kit:
                     nome_low = c["nome"].lower()
-                    if "tubo" in nome_low: 
-                        qtd_tubos_linear += c["qtd"]
-                    elif any(x in nome_low for x in ["curva", "conexão t", "redução", "cotovelo"]): 
-                        qtd_conexoes += c["qtd"]
-                    elif any(x in nome_low for x in ["válvula", "filtro"]): 
-                        qtd_valvulas += c["qtd"]
+                    if "tubo" in nome_low: qtd_tubos_linear += c["qtd"]
+                    elif any(x in nome_low for x in ["curva", "conexão t", "redução", "cotovelo"]): qtd_conexoes += c["qtd"]
+                    elif any(x in nome_low for x in ["válvula", "filtro", "danfoss"]): qtd_valvulas += c["qtd"]
                 
                 metragem_equivalente = qtd_tubos_linear + (qtd_conexoes * 1.5) + (qtd_valvulas * 2.0)
                 mo_isol_calculado = preco_base_isol_metro * metragem_equivalente
@@ -3113,7 +3146,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 "vazao": vazao_calculada, "sistema": tipo_sistema, "custo_mat_unit": custo_material_total_kit,
                 "mo_mont_unit": mo_mont_calculado, "mo_isol_unit": mo_isol_calculado, "composicao": composicao_kit
             })
-            st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
+            st.toast(f"✅ Conjunto adicionado com sucesso!", icon="👍")
             st.rerun()
 
         st.markdown("---")
@@ -3128,7 +3161,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 c_tg.write(f"TAG: `{cav.get('tag', 'S/ TAG')}`")
                 c_qt.write(f"Qtd: **{cav.get('quantidade', 1)} cjs**")
 
-                # --- DESENHO VISUAL DO CAVALETE ---
+                # --- DESENHO VISUAL DO CAVALETE (INCLUINDO DANFOSS) ---
                 import graphviz
                 import re
                 
@@ -3139,6 +3172,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     has_filtro, has_bal, has_retencao, valv_controle = None, None, None, None
                     juntas_exp = []
                     bloqueios = []
+                    is_danfoss = False
+                    nome_kit_danfoss = ""
                     
                     for c in cav.get("composicao", []):
                         nome, qtd = c["nome"], int(c["qtd"])
@@ -3146,7 +3181,10 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         match = re.search(r'Ø\s*([\d\./"]+)', nome)
                         b_str = f"Ø {match.group(1)}" if match else ""
                         
-                        if "filtro" in nome_low: has_filtro = f"🔽 Filtro Y\n{b_str}"
+                        if "danfoss" in nome_low:
+                            is_danfoss = True
+                            nome_kit_danfoss = f"📦 {nome}"
+                        elif "filtro" in nome_low: has_filtro = f"🔽 Filtro Y\n{b_str}"
                         elif "balanceadora" in nome_low: has_bal = f"⚖️ Balanceadora\n{b_str}"
                         elif "retenção" in nome_low: has_retencao = f"🛑 Retenção\n{b_str}"
                         elif "motorizada" in nome_low or "proporcional" in nome_low or "on/off" in nome_low:
@@ -3159,28 +3197,30 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                             bloqueios.extend([f"{t}\n{b_str}"] * qtd)
 
                     seq = [('IN', '🔵 Entrada Água', 'rarrow', '#e0f2f1')]
-                    
-                    if len(bloqueios) > 0: seq.append(('B1', bloqueios[0], 'box', '#f9f9f9'))
-                    if has_filtro: seq.append(('FY', has_filtro, 'invhouse', '#f9f9f9'))
-                    if len(juntas_exp) > 0: seq.append(('JE1', juntas_exp[0], 'cds', '#f9f9f9'))
-                    
                     eq_nome = cav.get("equipamento", "Equipamento").upper()
                     eq_lbl = f"❄️ CHILLER" if eq_nome=="CHILLER" else (f"⚙️ BOMBA" if eq_nome=="BOMBA" else f"🌬️ {eq_nome}")
                     eq_shape = 'box3d' if eq_nome in ["CHILLER", "UTA", "FANCOIL"] else 'cylinder'
-                    seq.append(('EQ', eq_lbl, eq_shape, '#cce4f7'))
                     
-                    if len(juntas_exp) > 1: seq.append(('JE2', juntas_exp[1], 'cds', '#f9f9f9'))
-                    if has_retencao: seq.append(('VR', has_retencao, 'box', '#f9f9f9'))
-                    if valv_controle: seq.append(('VC', valv_controle, 'component', '#f9f9f9'))
-                    if has_bal: seq.append(('VB', has_bal, 'box', '#f9f9f9'))
-                    if len(bloqueios) > 1: seq.append(('B2', bloqueios[1], 'box', '#f9f9f9'))
+                    if is_danfoss:
+                        seq.append(('DK', nome_kit_danfoss, 'component', '#fff3cd'))
+                        seq.append(('EQ', eq_lbl, eq_shape, '#cce4f7'))
+                    else:
+                        if len(bloqueios) > 0: seq.append(('B1', bloqueios[0], 'box', '#f9f9f9'))
+                        if has_filtro: seq.append(('FY', has_filtro, 'invhouse', '#f9f9f9'))
+                        if len(juntas_exp) > 0: seq.append(('JE1', juntas_exp[0], 'cds', '#f9f9f9'))
+                        seq.append(('EQ', eq_lbl, eq_shape, '#cce4f7'))
+                        if len(juntas_exp) > 1: seq.append(('JE2', juntas_exp[1], 'cds', '#f9f9f9'))
+                        if has_retencao: seq.append(('VR', has_retencao, 'box', '#f9f9f9'))
+                        if valv_controle: seq.append(('VC', valv_controle, 'component', '#f9f9f9'))
+                        if has_bal: seq.append(('VB', has_bal, 'box', '#f9f9f9'))
+                        if len(bloqueios) > 1: seq.append(('B2', bloqueios[1], 'box', '#f9f9f9'))
                     
                     seq.append(('OUT', '🔴 Retorno Água', 'rarrow', '#fce4e4'))
                     
                     for nid, lbl, shp, clr in seq: dot.node(nid, lbl, shape=shp, fillcolor=clr)
                     for i in range(len(seq) - 1): dot.edge(seq[i][0], seq[i+1][0])
                         
-                    if valv_controle and "3" in valv_controle:
+                    if valv_controle and "3" in valv_controle and not is_danfoss:
                         dot.node('BP', '🔄 By-pass', shape='parallelogram', fillcolor='#fff3cd')
                         no_saida_bp = 'FY' if has_filtro else ('B1' if len(bloqueios) > 0 else 'IN')
                         dot.edge(no_saida_bp, 'BP')
@@ -3193,141 +3233,13 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                             
                     st.graphviz_chart(dot)
                 
-                if c_rm.button("🗑️", key=f"rm_h_cv_{cav.get('id', idx)}"):
+                if c_rm.button("🗑️", key=f"btn_del_cavalete_{idx}_{cav.get('id', 'antigo')}"):
                     st.session_state.cavaletes_selecionados.pop(idx)
                     st.rerun()
                     
-            if st.button("🗑️ Excluir Todos", type="secondary"):
+            if st.button("🗑️ Excluir Todos", type="secondary", key="btn_excluir_absolutamente_todos_cavaletes"):
                 st.session_state.cavaletes_selecionados = []
                 st.rerun()
-
-    with aba_padroes_hidro:
-        st.header("⚙️ Central de Padrões e Receitas (Templates)")
-        st.caption("Selecione o equipamento e a variação que deseja editar. Suas alterações serão gravadas na nuvem (Google Sheets).")
-        
-        f_eq, f_vi, f_li = st.columns(3)
-        sel_eq = f_eq.selectbox("1. Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"], key="tpl_eq")
-        sel_vi = f_vi.selectbox("2. Vias:", ["2 Vias"] if sel_eq in ["Chiller", "Bomba"] else ["2 Vias", "3 Vias"], key="tpl_vi")
-        sel_li = f_li.selectbox("3. Ligação (Tamanho):", ["Roscado", "Flangeado"], help="Roscado (1/2\" a 2\") | Flangeado (2.1/2\" a 12\")", key="tpl_li")
-        
-        st.markdown(f"#### Editando Receita: **{sel_eq} | {sel_vi} | {sel_li}**")
-        
-        df_templates = pd.DataFrame(st.session_state.matriz_templates)
-        filtro = (df_templates["Equipamento"] == sel_eq) & (df_templates["Vias"] == sel_vi) & (df_templates["Ligação"] == sel_li)
-        df_editavel = df_templates[filtro][["Grupo", "Item Base", "Medida", "Qtd"]].copy()
-        
-        df_editado = st.data_editor(
-            df_editavel,
-            column_config={
-                "Grupo": st.column_config.SelectboxColumn("Grupo do Kit", options=["Kit Dinâmico", "Kit Fixo"], required=True),
-                "Item Base": st.column_config.TextColumn("Descrição Base (sem o diâmetro)", required=True),
-                "Medida": st.column_config.SelectboxColumn("Medida (Bitola)", options=["Variável {b}", "Variável {b-1}", "Variável {b-2}", "Variável {b} x {b-1}", "Variável {b} x {b-2}", "Variável {b-1} x {b-2}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"], required=True),
-                "Qtd": st.column_config.NumberColumn("Quantidade", min_value=0.0, format="%.2f")
-            },
-            num_rows="dynamic", use_container_width=True, key=f"grid_tpl_{sel_eq}_{sel_vi}_{sel_li}_{st.session_state.get('trigger_refresh', 0)}"
-        )
-        
-        if st.button("💾 Salvar Esta Tabela na Nuvem", type="primary"):
-            nova_matriz = [row for row in st.session_state.matriz_templates if not (row["Equipamento"] == sel_eq and row["Vias"] == sel_vi and row["Ligação"] == sel_li)]
-            for _, row in df_editado.iterrows():
-                if pd.notna(row["Item Base"]) and str(row["Item Base"]).strip() != "":
-                    nova_matriz.append({"Equipamento": sel_eq, "Vias": sel_vi, "Ligação": sel_li, "Grupo": row["Grupo"], "Item Base": str(row["Item Base"]).strip(), "Medida": row["Medida"], "Qtd": float(row["Qtd"]) if pd.notna(row["Qtd"]) else 1.0})
-            
-            st.session_state.matriz_templates = nova_matriz
-            st.session_state.versao_banco_hidro = 'forcar_recalculo'
-            st.session_state.trigger_refresh = st.session_state.get('trigger_refresh', 0) + 1 
-            
-            with st.spinner("Gravando no Google Sheets..."):
-                if salvar_templates_no_banco(nova_matriz):
-                    st.toast("✅ Padrão salvo com sucesso no Banco de Dados!")
-                    st.rerun() 
-            
-        st.markdown("---")
-        with st.expander("➕ Inserir Novo Item nesta Receita", expanded=False):
-            nomes_base_existentes = set()
-            for item in st.session_state.banco_precos_hidraulica:
-                nome_bruto = item["Item / Componente"]
-                base = nome_bruto.split("- Ø")[0].strip() if "- Ø" in nome_bruto else nome_bruto
-                nomes_base_existentes.add(base)
-            nomes_base_existentes = sorted(list(nomes_base_existentes))
-
-            with st.form("form_add_item_template"):
-                c_a1, c_a2, c_a3 = st.columns(3)
-                add_grp = c_a1.selectbox("Grupo", ["Kit Dinâmico", "Kit Fixo"], help="Kit Dinâmico para peças que mudam a bitola. Fixo para peças estáticas.")
-                add_base = c_a2.selectbox("1. Selecionar Existente", ["-- Selecione --"] + nomes_base_existentes)
-                add_novo = c_a3.text_input("2. OU Digite um Nome Novo")
-                
-                c_a4, c_a5, c_a6 = st.columns(3)
-                add_med = c_a4.selectbox("Medida", ["Variável {b}", "Variável {b-1}", "Variável {b-2}", "Variável {b} x {b-1}", "Variável {b} x {b-2}", "Variável {b-1} x {b-2}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"])
-                add_qtd = c_a5.number_input("Quantidade", min_value=0.01, value=1.0)
-                
-                if st.form_submit_button("Inserir na Receita Atual"):
-                    nome_escolhido = add_novo if add_novo.strip() != "" else (add_base if add_base != "-- Selecione --" else "")
-                    if nome_escolhido != "":
-                        st.session_state.matriz_templates.append({"Equipamento": sel_eq, "Vias": sel_vi, "Ligação": sel_li, "Grupo": add_grp, "Item Base": nome_escolhido, "Medida": add_med, "Qtd": add_qtd})
-                        st.session_state.versao_banco_hidro = 'forcar_recalculo'
-                        st.session_state.trigger_refresh = st.session_state.get('trigger_refresh', 0) + 1 
-                        
-                        with st.spinner("Gravando no Google Sheets..."):
-                            if salvar_templates_no_banco(st.session_state.matriz_templates):
-                                st.toast(f"Item inserido e salvo na nuvem!", icon="✅")
-                                st.rerun()
-                    else:
-                        st.error("Selecione um item do banco ou digite um nome novo.")
-
-        st.markdown("---")
-        st.markdown("#### 🔄 Clonar Padrão")
-        st.caption("Gostou de como ficou essa receita? Copie-a idêntica para outro cenário para não ter que refazer tudo.")
-        
-        c_clon1, c_clon2, c_clon3 = st.columns(3)
-        clon_eq = c_clon1.selectbox("Copiar PARA Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"], index=["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"].index(sel_eq), key="clon_eq")
-        clon_vi = c_clon2.selectbox("Copiar PARA Vias:", ["2 Vias", "3 Vias"], index=["2 Vias", "3 Vias"].index(sel_vi) if sel_vi in ["2 Vias", "3 Vias"] else 0, key="clon_vi")
-        clon_li = c_clon3.selectbox("Copiar PARA Ligação:", ["Roscado", "Flangeado"], index=["Roscado", "Flangeado"].index(sel_li), key="clon_li")
-        
-        if st.button("📋 Executar Clonagem e Salvar na Nuvem", type="secondary"):
-            if clon_eq in ["Chiller", "Bomba"] and clon_vi == "3 Vias":
-                st.error("⚠️ Atenção: Chiller e Bomba só trabalham com configuração de 2 Vias no sistema.")
-            else:
-                matriz_sem_alvo = [row for row in st.session_state.matriz_templates if not (row["Equipamento"] == clon_eq and row["Vias"] == clon_vi and row["Ligação"] == clon_li)]
-                for _, row in df_editado.iterrows():
-                    matriz_sem_alvo.append({"Equipamento": clon_eq, "Vias": clon_vi, "Ligação": clon_li, "Grupo": row["Grupo"], "Item Base": row["Item Base"], "Medida": row["Medida"], "Qtd": row["Qtd"]})
-                
-                st.session_state.matriz_templates = matriz_sem_alvo
-                st.session_state.trigger_refresh = st.session_state.get('trigger_refresh', 0) + 1 
-                
-                with st.spinner("Clonando no Google Sheets..."):
-                    if salvar_templates_no_banco(matriz_sem_alvo):
-                        st.toast(f"Receita clonada com sucesso para {clon_eq} | {clon_vi} | {clon_li}!", icon="📋")
-                        st.rerun()
-
-    # ====================================================================
-        # FERRAMENTA DE SANEAMENTO: UNIFICADOR DE DUPLICATAS (DE-PARA)
-        # ====================================================================
-        st.markdown("---")
-        st.subheader("🔗 Unificador de Nomes (De-Para)")
-        st.caption("Tem itens com nomes diferentes que são a mesma coisa? Selecione o nome que está na sua receita e o nome oficial. O sistema corrigirá todas as matrizes de uma só vez.")
-        
-        # Puxa os itens que estão em uso nas receitas
-        itens_em_uso = sorted(list(set(row["Item Base"] for row in st.session_state.matriz_templates)))
-        
-        col_de, col_para = st.columns(2)
-        item_errado = col_de.selectbox("1. Substituir este nome (O que está nas receitas):", ["-- Selecione --"] + itens_em_uso, key="unif_de")
-        item_correto = col_para.selectbox("2. Por este nome oficial (O que está no Banco de Preços):", ["-- Selecione --"] + nomes_base_existentes, key="unif_para")
-        
-        if st.button("🔄 Executar Unificação e Salvar na Nuvem", type="secondary"):
-            if item_errado != "-- Selecione --" and item_correto != "-- Selecione --" and item_errado != item_correto:
-                for row in st.session_state.matriz_templates:
-                    if row["Item Base"] == item_errado:
-                        row["Item Base"] = item_correto
-                
-                with st.spinner("Unificando no Google Sheets..."):
-                    salvar_templates_no_banco(st.session_state.matriz_templates)
-                    st.session_state.versao_banco_hidro = 'forcar_recalculo'
-                    st.session_state.trigger_refresh = st.session_state.get('trigger_refresh', 0) + 1
-                    st.success(f"✅ Todos os '{item_errado}' foram trocados por '{item_correto}' com sucesso!")
-                    st.rerun()
-            else:
-                st.warning("Selecione um nome de origem e um destino válido e diferente.")
 
     with aba_precos_hidro:
         st.header("Gestão Sênior de Preços (Componentes Abertos)")
