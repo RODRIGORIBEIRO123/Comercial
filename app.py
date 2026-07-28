@@ -3053,16 +3053,54 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         
         tipo_sistema = st.radio("Tipo de Sistema da Instalação:", ["Fechado (Água Gelada/Quente)", "Aberto (Água de Condensação/Torre)"], horizontal=True)
         st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-        metodo_dimensionamento = st.radio("Método de dimensionamento:", ["📏 Definir diretamente por Bitola comercial", "🌊 Dimensionar automaticamente por Vazão"], horizontal=True)
-        st.markdown("<br>", unsafe_allow_html=True)
         
+        # 1. Seleção de Equipamento e Vias
         col1, col2, col3 = st.columns(3)
         tipo_equip = col1.selectbox("Tipo de Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"])
         if tipo_equip in ["Chiller", "Bomba"]: 
             tipo_vias = col2.selectbox("Válvula:", ["2 Vias"], disabled=True)
         else: 
             tipo_vias = col2.selectbox("Válvula:", ["2 Vias", "3 Vias"])
+            
+        # 2. Método de Dimensionamento
+        metodo_dimensionamento = st.radio("Método de dimensionamento:", ["📏 Definir diretamente por Bitola comercial", "🌊 Dimensionar automaticamente por Vazão"], horizontal=True)
         
+        # --- OPÇÕES ESPECÍFICAS DO FANCOLETE (EXIBIDAS LOGO ABAIXO DO MÉTODO DE DIMENSIONAMENTO) ---
+        fancolete_tipo_montagem = "Fabricado na Obra (Tradicional)"
+        kit_danfoss_final = ""
+        
+        if tipo_equip == "Fancolete":
+            st.markdown("""
+            <div style='background-color: rgba(28, 133, 144, 0.05); padding: 15px; border-radius: 8px; border-left: 4px solid #1C8590; margin-top: 10px; margin-bottom: 15px;'>
+                <h5 style='margin-top: 0; margin-bottom: 15px; color: #1C8590;'>⚙️ Opções do Cavalete de Fancoletes</h5>
+            """, unsafe_allow_html=True)
+            fancolete_tipo_montagem = st.radio("Tipo de Montagem do Cavalete:", ["Fabricado na Obra (Tradicional)", "Kit Pronto Danfoss (AB-QM 4.0 Flexo)"], horizontal=True)
+            
+            if "Danfoss" in fancolete_tipo_montagem:
+                cf1, cf2 = st.columns(2)
+                vazao_fanco = cf1.number_input("Vazão do Fancolete (m³/h):", min_value=0.01, step=0.05, value=0.10)
+                
+                # Seleção automática baseada nas faixas técnicas Danfoss
+                idx_sel = 0
+                if vazao_fanco <= 0.20: idx_sel = 0
+                elif vazao_fanco <= 0.70: idx_sel = 1
+                elif vazao_fanco <= 1.10: idx_sel = 3 # DN 20
+                elif vazao_fanco <= 1.20: idx_sel = 2 # DN 15 HF
+                else: idx_sel = 4 # DN 20 HF
+                
+                opcoes_danfoss = [
+                    'Kit Danfoss AB-QM 4.0 Flexo - DN 15 LF',
+                    'Kit Danfoss AB-QM 4.0 Flexo - DN 15',
+                    'Kit Danfoss AB-QM 4.0 Flexo - DN 15 HF',
+                    'Kit Danfoss AB-QM 4.0 Flexo - DN 20',
+                    'Kit Danfoss AB-QM 4.0 Flexo - DN 20 HF'
+                ]
+                kit_danfoss_final = cf2.selectbox("Modelo Compatível Sugerido:", opcoes_danfoss, index=idx_sel)
+                st.caption("Faixas de Vazão: DN 15 LF (0.02-0.2 m³/h) | DN 15 (0.07-0.7 m³/h) | DN 15 HF (0.12-1.2 m³/h) | DN 20 (0.11-1.1 m³/h) | DN 20 HF (0.19-1.9 m³/h)")
+            st.markdown("</div>", unsafe_allow_html=True)
+        # --------------------------------------------------------------------------------------------
+
+        # 3. Definição da Bitola/Vazão na 3ª coluna superior
         if "Bitola comercial" in metodo_dimensionamento:
             bitola_final = col3.selectbox("Bitola comercial:", todas_bitolas)
             vazao_calculada = 0.0
@@ -3071,11 +3109,11 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             tipo_aplicacao = st.radio("Exigência Acústica:", ["Escritório / Áreas Críticas", "Indústria / Áreas Técnicas"], horizontal=True)
             perda_carga = st.slider("Perda de Carga (mmCA/m):", 10, 40, 25) if "Escritório" in tipo_aplicacao else st.slider("Perda de Carga (mmCA/m):", 41, 90 if "Aberto" in tipo_sistema else 100, 70)
             bitola_final = dimensionar_bitola_pelo_abaco(vazao_calculada, perda_carga, tipo_sistema)
-            st.info(f"📈 Bitola comercial recomendada: **{bitola_final}**.")
-            
+            st.info(f"📈 Bitola comercial recomendada pelo ábaco: **{bitola_final}**.")
+
         col_q, col_t = st.columns([1, 2])
         qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
-        tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: UTA-01, CH-01...")
+        tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: FC-01, UTA-01...")
         
         # --- OPÇÕES ESPECÍFICAS DO CHILLER ---
         chiller_inc_bal = True
@@ -3090,40 +3128,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             chiller_inc_bal = cc1.checkbox("Incluir Válvula de Balanceamento?", value=True)
             chiller_tipo_valv = cc2.radio("Válvula de Controle Motorizada:", ["Proporcional", "ON/OFF", "Sem Válvula"], horizontal=True)
             st.markdown("</div>", unsafe_allow_html=True)
-            
-        # --- OPÇÕES ESPECÍFICAS DO FANCOLETE ---
-        fancolete_tipo_montagem = "Fabricado na Obra (Tradicional)"
-        kit_danfoss_final = ""
-        
-        if tipo_equip == "Fancolete":
-            st.markdown("""
-            <div style='background-color: rgba(28, 133, 144, 0.05); padding: 15px; border-radius: 8px; border-left: 4px solid #1C8590; margin-top: 10px; margin-bottom: 15px;'>
-                <h5 style='margin-top: 0; margin-bottom: 15px; color: #1C8590;'>⚙️ Configurações Específicas do Fancolete</h5>
-            """, unsafe_allow_html=True)
-            fancolete_tipo_montagem = st.radio("Tipo de Montagem do Cavalete:", ["Fabricado na Obra (Tradicional)", "Kit Pronto Danfoss (AB-QM 4.0 Flexo)"], horizontal=True)
-            
-            if "Danfoss" in fancolete_tipo_montagem:
-                cf1, cf2 = st.columns(2)
-                vazao_fanco = cf1.number_input("Vazão do Fancolete (m³/h):", min_value=0.01, step=0.05, value=vazao_calculada if vazao_calculada > 0 else 0.10)
-                
-                # Inteligência de seleção baseada na tabela técnica Danfoss
-                idx_sel = 0
-                if vazao_fanco <= 0.20: idx_sel = 0
-                elif vazao_fanco <= 0.70: idx_sel = 1
-                elif vazao_fanco <= 1.10: idx_sel = 3 # DN 20 Normal vai até 1.10
-                elif vazao_fanco <= 1.20: idx_sel = 2 # DN 15 HF vai até 1.20
-                else: idx_sel = 4 # DN 20 HF
-                
-                opcoes_danfoss = [
-                    'Kit Danfoss AB-QM 4.0 Flexo - DN 15 LF',
-                    'Kit Danfoss AB-QM 4.0 Flexo - DN 15',
-                    'Kit Danfoss AB-QM 4.0 Flexo - DN 15 HF',
-                    'Kit Danfoss AB-QM 4.0 Flexo - DN 20',
-                    'Kit Danfoss AB-QM 4.0 Flexo - DN 20 HF'
-                ]
-                kit_danfoss_final = cf2.selectbox("Modelo Compatível Sugerido:", opcoes_danfoss, index=idx_sel)
-                st.caption("Faixas de Vazão: DN 15 LF (0.02-0.2) | DN 15 (0.07-0.7) | DN 15 HF (0.12-1.2) | DN 20 (0.11-1.1) | DN 20 HF (0.19-1.9)")
-            st.markdown("</div>", unsafe_allow_html=True)
         # ---------------------------------------
         
         if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary", use_container_width=True):
@@ -3134,7 +3138,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             ligacao = "Roscado" if bitola_final in bitolas_roscadas else "Flangeado"
             composicao_kit = []
             
-            # --- LÓGICA DE INJEÇÃO DO KIT NA BOM (COM MANGUEIRAS E MO FIXA) ---
+            # LÓGICA DE COMPOSIÇÃO: FANCOLETE DANFOSS VS TRADICIONAL
             if tipo_equip == "Fancolete" and "Danfoss" in fancolete_tipo_montagem:
                 bitola_final = "1/2\"" if "DN 15" in kit_danfoss_final else "3/4\""
                 pol_dec = dict_pol.get(bitola_final, 0.5)
@@ -3170,7 +3174,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         v_str = "Válvula de controle 2 vias, ON/OFF" if chiller_tipo_valv == "ON/OFF" else "Válvula 2 vias, motorizada com atuador proporcional"
                         composicao_kit.append({"nome": construir_nome_peca(v_str, "Variável {b-1}", bitola_final), "qtd": 1.0})
             
-            # --- CÁLCULO DE CUSTOS DESENROLADO ---
+            # CÁLCULO DE CUSTOS E MÃO DE OBRA
             dict_precos_memoria = {}
             for row in st.session_state.banco_precos_hidraulica:
                 chave_n = normalizar_string_busca(row.get("Item / Componente", ""))
@@ -3179,8 +3183,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 dict_precos_memoria[chave_n] = val
 
             custo_material_total_kit = 0.0
-            
-            # Injeta peças novas no banco se não existirem
             for comp in composicao_kit:
                 n_busca = normalizar_string_busca(comp["nome"])
                 if n_busca not in dict_precos_memoria:
@@ -3188,12 +3190,10 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     dict_precos_memoria[n_busca] = 0.0
                 custo_material_total_kit += dict_precos_memoria.get(n_busca, 0.0) * comp["qtd"]
             
-            # --- CÁLCULO DE MÃO DE OBRA MISTA (FLEXO VS TRADICIONAL) ---
             if tipo_equip == "Fancolete" and "Danfoss" in fancolete_tipo_montagem:
                 mo_danfoss_nome = "Mão de Obra FIXA - Instalação Kit Danfoss Flexo (Por Conjunto)"
                 iso_danfoss_nome = "Isolamento Térmico FIXO - Kit Danfoss Flexo (Por Conjunto)"
                 
-                # Se não existir no banco, cria para poder editar
                 if normalizar_string_busca(mo_danfoss_nome) not in dict_precos_memoria:
                     st.session_state.banco_precos_hidraulica.append({"Item / Componente": mo_danfoss_nome, "Preço Unitário (R$)": 0.0, "Unidade": "cj"})
                     dict_precos_memoria[normalizar_string_busca(mo_danfoss_nome)] = 0.0
@@ -3239,7 +3239,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 c_tg.write(f"TAG: `{cav.get('tag', 'S/ TAG')}`")
                 c_qt.write(f"Qtd: **{cav.get('quantidade', 1)} cjs**")
 
-                # --- DESENHO VISUAL DO CAVALETE (INCLUINDO DANFOSS) ---
+                # P&ID VISUAL
                 import graphviz
                 import re
                 
