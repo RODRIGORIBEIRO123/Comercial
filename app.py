@@ -2960,7 +2960,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             bitola_final = dimensionar_bitola_pelo_abaco(vazao_calculada, perda_carga, tipo_sistema)
             st.info(f"📈 Bitola comercial recomendada: **{bitola_final}**.")
             
-        col_q, col_t = st.columns([1, 2])
+       col_q, col_t = st.columns([1, 2])
         qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
         tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: UTA-01, CH-01...")
         
@@ -3064,89 +3064,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             })
             st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
             st.rerun()
-        if not st.session_state.cavaletes_selecionados: 
-            st.info("Nenhum item adicionado no levantamento.")
-        else:
-            for idx, cav in enumerate(st.session_state.cavaletes_selecionados):
-                c_inf, c_tg, c_qt, c_rm = st.columns([4, 3, 2, 2])
-                sys_lbl = " [Aberto]" if "Aberto" in cav.get("sistema", "") else ""
-                c_inf.write(f"**Cavalete {cav.get('equipamento', 'EQ')} ({cav.get('vias', 'N/A')})** - Ø {cav.get('bitola', '')}{sys_lbl}")
-                c_tg.write(f"TAG: `{cav.get('tag', 'S/ TAG')}`")
-                c_qt.write(f"Qtd: **{cav.get('quantidade', 1)} cjs**")
-
-                # --- DESENHO VISUAL DO CAVALETE (ICONES REALISTAS E SEM ERRO) ---
-                import graphviz
-                import re
-                
-                with st.expander("Ver Representação Visual Completa (P&ID)", expanded=False):
-                    dot = graphviz.Digraph(node_attr={'shape': 'box', 'style': 'rounded,filled', 'fillcolor': '#ffffff', 'color': '#1C8590', 'fontname': 'Arial', 'fontsize': '10'})
-                    dot.attr(rankdir='LR', splines='ortho')
-                    
-                    has_filtro, has_bal, has_retencao, valv_controle = None, None, None, None
-                    juntas_exp = []
-                    bloqueios = []
-                    
-                    for c in cav.get("composicao", []):
-                        nome, qtd = c["nome"], int(c["qtd"])
-                        nome_low = nome.lower()
-                        match = re.search(r'Ø\s*([\d\./"]+)', nome)
-                        b_str = f"Ø {match.group(1)}" if match else ""
-                        
-                        if "filtro" in nome_low: has_filtro = f"🔽 Filtro Y\n{b_str}"
-                        elif "balanceadora" in nome_low: has_bal = f"⚖️ Balanceadora\n{b_str}"
-                        elif "retenção" in nome_low: has_retencao = f"🛑 Retenção\n{b_str}"
-                        elif "motorizada" in nome_low or "proporcional" in nome_low or "on/off" in nome_low:
-                            t = "🎛️ Válv. 3 Vias" if "3 vias" in nome_low else "🎛️ Válv. Controle"
-                            valv_controle = f"{t}\n{b_str}"
-                        elif "junta de expansão" in nome_low:
-                            juntas_exp.extend([f"〰️ Junta Expansão\n{b_str}"] * qtd)
-                        elif "gaveta" in nome_low or "borboleta" in nome_low or "esfera" in nome_low:
-                            t = "🦋 Borboleta" if "borboleta" in nome_low else ("⚙️ Gaveta" if "gaveta" in nome_low else "⚽ Esfera")
-                            bloqueios.extend([f"{t}\n{b_str}"] * qtd)
-
-                    seq = [('IN', '🔵 Entrada Água', 'rarrow', '#e0f2f1')]
-                    
-                    if len(bloqueios) > 0: seq.append(('B1', bloqueios[0], 'box', '#f9f9f9'))
-                    if has_filtro: seq.append(('FY', has_filtro, 'invhouse', '#f9f9f9'))
-                    if len(juntas_exp) > 0: seq.append(('JE1', juntas_exp[0], 'cds', '#f9f9f9'))
-                    
-                    eq_nome = cav.get("equipamento", "Equipamento").upper()
-                    eq_lbl = f"❄️ CHILLER" if eq_nome=="CHILLER" else (f"⚙️ BOMBA" if eq_nome=="BOMBA" else f"🌬️ {eq_nome}")
-                    eq_shape = 'box3d' if eq_nome in ["CHILLER", "UTA", "FANCOIL"] else 'cylinder'
-                    seq.append(('EQ', eq_lbl, eq_shape, '#cce4f7'))
-                    
-                    if len(juntas_exp) > 1: seq.append(('JE2', juntas_exp[1], 'cds', '#f9f9f9'))
-                    if has_retencao: seq.append(('VR', has_retencao, 'box', '#f9f9f9'))
-                    if valv_controle: seq.append(('VC', valv_controle, 'component', '#f9f9f9'))
-                    if has_bal: seq.append(('VB', has_bal, 'box', '#f9f9f9'))
-                    if len(bloqueios) > 1: seq.append(('B2', bloqueios[1], 'box', '#f9f9f9'))
-                    
-                    seq.append(('OUT', '🔴 Retorno Água', 'rarrow', '#fce4e4'))
-                    
-                    for nid, lbl, shp, clr in seq: dot.node(nid, lbl, shape=shp, fillcolor=clr)
-                    for i in range(len(seq) - 1): dot.edge(seq[i][0], seq[i+1][0])
-                        
-                    if valv_controle and "3" in valv_controle:
-                        dot.node('BP', '🔄 By-pass', shape='parallelogram', fillcolor='#fff3cd')
-                        no_saida_bp = 'FY' if has_filtro else ('B1' if len(bloqueios) > 0 else 'IN')
-                        dot.edge(no_saida_bp, 'BP')
-                        if len(bloqueios) > 2:
-                            dot.node('B3', bloqueios[2], shape='box', fillcolor='#f9f9f9')
-                            dot.edge('BP', 'B3')
-                            dot.edge('B3', 'VC')
-                        else:
-                            dot.edge('BP', 'VC')
-                            
-                    st.graphviz_chart(dot)
-                
-                if c_rm.button("🗑️", key=f"rm_h_cv_{cav.get('id', idx)}"):
-                    st.session_state.cavaletes_selecionados.pop(idx)
-                    st.rerun()
-                    
-            if st.button("🗑️ Excluir Todos", type="secondary"):
-                st.session_state.cavaletes_selecionados = []
-                st.rerun()
-                # ------------------------------------
                 
                 if regra["Qtd"] > 0:
                     composicao_kit.append({"nome": nome_final, "qtd": regra["Qtd"]})
