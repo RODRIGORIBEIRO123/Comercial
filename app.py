@@ -2970,8 +2970,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                             dot.edge('BP', 'VC')
                             
                     st.graphviz_chart(dot)
-                
-                if c_rm.button("🗑️", key=f"rm_h_cv_{cav.get('id', idx)}"):
+                           
+                if c_rm.button("🗑️", key=f"btn_del_cavalete_{idx}_{cav.get('id', 'antigo')}"):
                     st.session_state.cavaletes_selecionados.pop(idx)
                     st.rerun()
                     
