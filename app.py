@@ -3383,7 +3383,24 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                             df_up['Preço Unitário (R$)'] = df_up['Preço Unitário (R$)'].apply(limpar_e_converter_preco)
                             df_up = df_up.fillna("")
                             
-                            st.session_state.banco_precos_hidraulica = df_up.to_dict('records')
+                            # --- MERGE INTELIGENTE (NÃO APAGA PEÇAS FALTANTES) ---
+                            novos_precos = {normalizar_string_busca(row["Item / Componente"]): row for row in df_up.to_dict('records')}
+                            banco_atual = st.session_state.banco_precos_hidraulica
+                            
+                            for item in banco_atual:
+                                chave = normalizar_string_busca(item["Item / Componente"])
+                                if chave in novos_precos:
+                                    item["Preço Unitário (R$)"] = novos_precos[chave]["Preço Unitário (R$)"]
+                                    if "Unidade" in novos_precos[chave] and novos_precos[chave]["Unidade"] != "":
+                                        item["Unidade"] = novos_precos[chave]["Unidade"]
+                                    del novos_precos[chave] # Remove os que já foram atualizados
+                                    
+                            # Adiciona qualquer peça extra que veio no Excel e não estava no banco
+                            for item_novo in novos_precos.values():
+                                banco_atual.append(item_novo)
+                                
+                            st.session_state.banco_precos_hidraulica = banco_atual
+                            # -----------------------------------------------------
                             
                             import datetime
                             st.session_state['data_ultima_atualizacao'] = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
@@ -3393,12 +3410,13 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                                 sh_cloud = conectar_google_sheets()
                                 ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
                                 ws_ci.clear()
-                                linhas = [df_up.columns.tolist()] + df_up.values.tolist()
+                                # Converte o banco_atual em dataframe para salvar
+                                df_final = pd.DataFrame(banco_atual).fillna("")
+                                linhas = [df_final.columns.tolist()] + df_final.values.tolist()
                                 ws_ci.append_rows(linhas)
                                 
-                                # TRAVA ANTI-CACHE: Diz ao sistema que não precisa reler da nuvem agora!
                                 st.session_state.versao_banco_hidro = 'v22_SUPER_BLINDADA'
-                                st.success("✅ Valores gravados com sucesso na Nuvem!")
+                                st.success("✅ Valores atualizados com sucesso na Nuvem sem perder peças das receitas!")
                                 st.rerun()
                                 
                             except Exception as e:
