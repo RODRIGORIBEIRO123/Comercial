@@ -2979,6 +2979,226 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 st.session_state.cavaletes_selecionados = []
                 st.rerun()
 
+    # AS 4 ABAS DO APLICATIVO
+    aba_cadastro_hidro, aba_precos_hidro, aba_padroes_hidro, aba_resumo_hidro = st.tabs([
+        "🔧 Dimensionamento", "💲 Tabela de Preços", "📝 Central de Padrões (Templates)", "📊 Resumos / BOM"
+    ])
+
+    with aba_cadastro_hidro:
+        st.subheader("Configuração Estrutural de Hidráulica")
+        
+        tipo_sistema = st.radio("Tipo de Sistema da Instalação:", ["Fechado (Água Gelada/Quente)", "Aberto (Água de Condensação/Torre)"], horizontal=True)
+        st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+        metodo_dimensionamento = st.radio("Método de dimensionamento:", ["📏 Definir diretamente por Bitola comercial", "🌊 Dimensionar automaticamente por Vazão"], horizontal=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns(3)
+        tipo_equip = col1.selectbox("Tipo de Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"])
+        if tipo_equip in ["Chiller", "Bomba"]: 
+            tipo_vias = col2.selectbox("Válvula:", ["2 Vias"], disabled=True)
+        else: 
+            tipo_vias = col2.selectbox("Válvula:", ["2 Vias", "3 Vias"])
+        
+        if "Bitola comercial" in metodo_dimensionamento:
+            bitola_final = col3.selectbox("Bitola comercial:", todas_bitolas)
+            vazao_calculada = 0.0
+        else:
+            vazao_calculada = col3.number_input("Vazão de Água (m³/h):", min_value=0.1, step=0.5, value=5.0)
+            tipo_aplicacao = st.radio("Exigência Acústica:", ["Escritório / Áreas Críticas", "Indústria / Áreas Técnicas"], horizontal=True)
+            perda_carga = st.slider("Perda de Carga (mmCA/m):", 10, 40, 25) if "Escritório" in tipo_aplicacao else st.slider("Perda de Carga (mmCA/m):", 41, 90 if "Aberto" in tipo_sistema else 100, 70)
+            bitola_final = dimensionar_bitola_pelo_abaco(vazao_calculada, perda_carga, tipo_sistema)
+            st.info(f"📈 Bitola comercial recomendada: **{bitola_final}**.")
+            
+        col_q, col_t = st.columns([1, 2])
+        qtd = col_q.number_input("Quantidade de conjuntos:", min_value=1, step=1, value=1)
+        tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: UTA-01, CH-01...")
+        
+        # --- OPÇÕES ESPECÍFICAS DO CHILLER ---
+        chiller_inc_bal = True
+        chiller_tipo_valv = "Proporcional"
+        
+        if tipo_equip == "Chiller":
+            st.markdown("""
+            <div style='background-color: rgba(28, 133, 144, 0.05); padding: 15px; border-radius: 8px; border-left: 4px solid #1C8590; margin-top: 10px; margin-bottom: 15px;'>
+                <h5 style='margin-top: 0; margin-bottom: 15px; color: #1C8590;'>⚙️ Configurações Específicas do Chiller</h5>
+            """, unsafe_allow_html=True)
+            cc1, cc2 = st.columns(2)
+            chiller_inc_bal = cc1.checkbox("Incluir Válvula de Balanceamento?", value=True)
+            chiller_tipo_valv = cc2.radio("Válvula de Controle Motorizada:", ["Proporcional", "ON/OFF", "Sem Válvula"], horizontal=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+        # ---------------------------------------
+        
+        if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary", use_container_width=True):
+            dict_pol = {"1/4\"": 0.25, "3/8\"": 0.375, "1/2\"": 0.5, "3/4\"": 0.75, "1\"": 1.0, "1.1/4\"": 1.25, "1.1/2\"": 1.5, "2\"": 2.0, "2.1/2\"": 2.5, "3\"": 3.0, "4\"": 4.0, "5\"": 5.0, "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0}
+            pol_dec = dict_pol.get(bitola_final, 1.0)
+            
+            is_aberto = "Aberto" in tipo_sistema
+            ligacao = "Roscado" if bitola_final in bitolas_roscadas else "Flangeado"
+            
+            composicao_kit = []
+            regras_ativas = [t for t in st.session_state.matriz_templates if t["Equipamento"] == tipo_equip and t["Vias"] == tipo_vias and t["Ligação"] == ligacao]
+            
+            tem_bal = False
+            tem_ctrl = False
+            
+            for regra in regras_ativas:
+                nome_final = construir_nome_peca(regra["Item Base"], regra["Medida"], bitola_final)
+                if is_aberto and ("Isolamento" in nome_final or "Rechapeamento" in nome_final): continue
+                
+                # --- APLICANDO A REGRA DO CHILLER ---
+                if tipo_equip == "Chiller":
+                    nome_low = nome_final.lower()
+                    if "balanceadora" in nome_low:
+                        if not chiller_inc_bal: continue
+                        tem_bal = True
+                    if "motorizada" in nome_low or "proporcional" in nome_low or "on/off" in nome_low:
+                        if chiller_tipo_valv == "Sem Válvula": continue
+                        elif chiller_tipo_valv == "ON/OFF":
+                            nome_final = construir_nome_peca("Válvula de controle 2 vias, ON/OFF", regra["Medida"], bitola_final)
+                        tem_ctrl = True
+                
+                if regra["Qtd"] > 0:
+                    composicao_kit.append({"nome": nome_final, "qtd": regra["Qtd"]})
+
+            # --- FORÇAR INCLUSÃO SE FALTAR NA RECEITA DO CHILLER ---
+            if tipo_equip == "Chiller":
+                if chiller_inc_bal and not tem_bal:
+                    composicao_kit.append({"nome": construir_nome_peca("Válvula balanceadora", "Variável {b}", bitola_final), "qtd": 1.0})
+                if chiller_tipo_valv != "Sem Válvula" and not tem_ctrl:
+                    v_str = "Válvula de controle 2 vias, ON/OFF" if chiller_tipo_valv == "ON/OFF" else "Válvula 2 vias, motorizada com atuador proporcional"
+                    composicao_kit.append({"nome": construir_nome_peca(v_str, "Variável {b-1}", bitola_final), "qtd": 1.0})
+            
+            # --- CÁLCULO DE CUSTOS DESENROLADO (BLINDADO) ---
+            dict_precos_memoria = {}
+            for row in st.session_state.banco_precos_hidraulica:
+                chave_n = normalizar_string_busca(row.get("Item / Componente", ""))
+                try: val = float(row.get("Preço Unitário (R$)", 0.0))
+                except: val = 0.0
+                dict_precos_memoria[chave_n] = val
+
+            custo_material_total_kit = 0.0
+            for comp in composicao_kit:
+                n_busca = normalizar_string_busca(comp["nome"])
+                pr_u = dict_precos_memoria.get(n_busca, 0.0)
+                custo_material_total_kit += pr_u * comp["qtd"]
+            
+            mo_mont_calculado = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0) * pol_dec * 12.0
+            
+            if is_aberto:
+                mo_isol_calculado = 0.0
+            else:
+                preco_base_isol_metro = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0) * pol_dec
+                
+                qtd_tubos_linear = 0.0
+                qtd_conexoes = 0.0
+                qtd_valvulas = 0.0
+                
+                for c in composicao_kit:
+                    nome_low = c["nome"].lower()
+                    if "tubo" in nome_low: 
+                        qtd_tubos_linear += c["qtd"]
+                    elif any(x in nome_low for x in ["curva", "conexão t", "redução", "cotovelo"]): 
+                        qtd_conexoes += c["qtd"]
+                    elif any(x in nome_low for x in ["válvula", "filtro"]): 
+                        qtd_valvulas += c["qtd"]
+                
+                metragem_equivalente = qtd_tubos_linear + (qtd_conexoes * 1.5) + (qtd_valvulas * 2.0)
+                mo_isol_calculado = preco_base_isol_metro * metragem_equivalente
+            
+            st.session_state.cavaletes_selecionados.append({
+                "id": str(uuid.uuid4()), "tag": tag_equip if tag_equip else "S/ TAG",
+                "equipamento": tipo_equip, "vias": tipo_vias, "bitola": bitola_final, "quantidade": qtd,
+                "vazao": vazao_calculada, "sistema": tipo_sistema, "custo_mat_unit": custo_material_total_kit,
+                "mo_mont_unit": mo_mont_calculado, "mo_isol_unit": mo_isol_calculado, "composicao": composicao_kit
+            })
+            st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
+            st.rerun()
+
+        st.markdown("---")
+        st.markdown("### 📋 Cavaletes Adicionados no Projeto")
+        if not st.session_state.cavaletes_selecionados: 
+            st.info("Nenhum item adicionado no levantamento.")
+        else:
+            for idx, cav in enumerate(st.session_state.cavaletes_selecionados):
+                c_inf, c_tg, c_qt, c_rm = st.columns([4, 3, 2, 2])
+                sys_lbl = " [Aberto]" if "Aberto" in cav.get("sistema", "") else ""
+                c_inf.write(f"**Cavalete {cav.get('equipamento', 'EQ')} ({cav.get('vias', 'N/A')})** - Ø {cav.get('bitola', '')}{sys_lbl}")
+                c_tg.write(f"TAG: `{cav.get('tag', 'S/ TAG')}`")
+                c_qt.write(f"Qtd: **{cav.get('quantidade', 1)} cjs**")
+
+                # --- DESENHO VISUAL DO CAVALETE ---
+                import graphviz
+                import re
+                
+                with st.expander("Ver Representação Visual Completa (P&ID)", expanded=False):
+                    dot = graphviz.Digraph(node_attr={'shape': 'box', 'style': 'rounded,filled', 'fillcolor': '#ffffff', 'color': '#1C8590', 'fontname': 'Arial', 'fontsize': '10'})
+                    dot.attr(rankdir='LR', splines='ortho')
+                    
+                    has_filtro, has_bal, has_retencao, valv_controle = None, None, None, None
+                    juntas_exp = []
+                    bloqueios = []
+                    
+                    for c in cav.get("composicao", []):
+                        nome, qtd = c["nome"], int(c["qtd"])
+                        nome_low = nome.lower()
+                        match = re.search(r'Ø\s*([\d\./"]+)', nome)
+                        b_str = f"Ø {match.group(1)}" if match else ""
+                        
+                        if "filtro" in nome_low: has_filtro = f"🔽 Filtro Y\n{b_str}"
+                        elif "balanceadora" in nome_low: has_bal = f"⚖️ Balanceadora\n{b_str}"
+                        elif "retenção" in nome_low: has_retencao = f"🛑 Retenção\n{b_str}"
+                        elif "motorizada" in nome_low or "proporcional" in nome_low or "on/off" in nome_low:
+                            t = "🎛️ Válv. 3 Vias" if "3 vias" in nome_low else "🎛️ Válv. Controle"
+                            valv_controle = f"{t}\n{b_str}"
+                        elif "junta de expansão" in nome_low:
+                            juntas_exp.extend([f"〰️ Junta Expansão\n{b_str}"] * qtd)
+                        elif "gaveta" in nome_low or "borboleta" in nome_low or "esfera" in nome_low:
+                            t = "🦋 Borboleta" if "borboleta" in nome_low else ("⚙️ Gaveta" if "gaveta" in nome_low else "⚽ Esfera")
+                            bloqueios.extend([f"{t}\n{b_str}"] * qtd)
+
+                    seq = [('IN', '🔵 Entrada Água', 'rarrow', '#e0f2f1')]
+                    
+                    if len(bloqueios) > 0: seq.append(('B1', bloqueios[0], 'box', '#f9f9f9'))
+                    if has_filtro: seq.append(('FY', has_filtro, 'invhouse', '#f9f9f9'))
+                    if len(juntas_exp) > 0: seq.append(('JE1', juntas_exp[0], 'cds', '#f9f9f9'))
+                    
+                    eq_nome = cav.get("equipamento", "Equipamento").upper()
+                    eq_lbl = f"❄️ CHILLER" if eq_nome=="CHILLER" else (f"⚙️ BOMBA" if eq_nome=="BOMBA" else f"🌬️ {eq_nome}")
+                    eq_shape = 'box3d' if eq_nome in ["CHILLER", "UTA", "FANCOIL"] else 'cylinder'
+                    seq.append(('EQ', eq_lbl, eq_shape, '#cce4f7'))
+                    
+                    if len(juntas_exp) > 1: seq.append(('JE2', juntas_exp[1], 'cds', '#f9f9f9'))
+                    if has_retencao: seq.append(('VR', has_retencao, 'box', '#f9f9f9'))
+                    if valv_controle: seq.append(('VC', valv_controle, 'component', '#f9f9f9'))
+                    if has_bal: seq.append(('VB', has_bal, 'box', '#f9f9f9'))
+                    if len(bloqueios) > 1: seq.append(('B2', bloqueios[1], 'box', '#f9f9f9'))
+                    
+                    seq.append(('OUT', '🔴 Retorno Água', 'rarrow', '#fce4e4'))
+                    
+                    for nid, lbl, shp, clr in seq: dot.node(nid, lbl, shape=shp, fillcolor=clr)
+                    for i in range(len(seq) - 1): dot.edge(seq[i][0], seq[i+1][0])
+                        
+                    if valv_controle and "3" in valv_controle:
+                        dot.node('BP', '🔄 By-pass', shape='parallelogram', fillcolor='#fff3cd')
+                        no_saida_bp = 'FY' if has_filtro else ('B1' if len(bloqueios) > 0 else 'IN')
+                        dot.edge(no_saida_bp, 'BP')
+                        if len(bloqueios) > 2:
+                            dot.node('B3', bloqueios[2], shape='box', fillcolor='#f9f9f9')
+                            dot.edge('BP', 'B3')
+                            dot.edge('B3', 'VC')
+                        else:
+                            dot.edge('BP', 'VC')
+                            
+                    st.graphviz_chart(dot)
+                
+                if c_rm.button("🗑️", key=f"rm_h_cv_{cav.get('id', idx)}"):
+                    st.session_state.cavaletes_selecionados.pop(idx)
+                    st.rerun()
+                    
+            if st.button("🗑️ Excluir Todos", type="secondary"):
+                st.session_state.cavaletes_selecionados = []
+                st.rerun()
+
     with aba_padroes_hidro:
         st.header("⚙️ Central de Padrões e Receitas (Templates)")
         st.caption("Selecione o equipamento e a variação que deseja editar. Suas alterações serão gravadas na nuvem (Google Sheets).")
