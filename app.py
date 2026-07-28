@@ -3327,16 +3327,31 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         if "Item / Componente" in df_up.columns:
                             df_up = df_up.dropna(subset=["Item / Componente"])
                             
-                            def limpar_preco(val):
-                                if isinstance(val, str):
-                                    try: return float(val.replace("R$", "").replace(".", "").replace(",", ".").strip())
-                                    except: return 0.0
-                                return float(val) if pd.notnull(val) else 0.0
+                            # --- TRATAMENTO SÊNIOR DE CONVERSÃO DE MOEDA (ANTI-DISTORÇÃO) ---
+                            def limpar_e_converter_preco(val):
+                                if pd.isna(val) or str(val).strip() in ["", "-", "nan"]:
+                                    return 0.0
+                                if isinstance(val, (int, float)):
+                                    return float(val)
                                 
-                            df_up['Preço Unitário (R$)'] = df_up['Preço Unitário (R$)'].apply(limpar_preco)
+                                # Se vier como texto (ex: "R$ 162,00" ou "162,00")
+                                val_str = str(val).upper().replace("R$", "").strip()
+                                
+                                # Se tiver pontos e vírgulas no padrão BR (ex: 1.250,50 ou 162,00)
+                                if "," in val_str:
+                                    if "." in val_str:
+                                        val_str = val_str.replace(".", "").replace(",", ".")
+                                    else:
+                                        val_str = val_str.replace(",", ".")
+                                        
+                                try:
+                                    return float(val_str)
+                                except:
+                                    return 0.0
+                                
+                            df_up['Preço Unitário (R$)'] = df_up['Preço Unitário (R$)'].apply(limpar_e_converter_preco)
                             df_up = df_up.fillna("")
                             
-                            # Atualiza a memória ativa do sistema
                             st.session_state.banco_precos_hidraulica = df_up.to_dict('records')
                             
                             import datetime
@@ -3349,11 +3364,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                                 linhas = [df_up.columns.tolist()] + df_up.values.tolist()
                                 ws_ci.append_rows(linhas)
                                 
-                                # TRAVA DE SEGURANÇA: Força o banco a atualizar a versão e limpa o cache da tela anterior
-                                st.session_state.versao_banco_hidro = 'forcar_recalculo_apos_upload'
+                                st.session_state.versao_banco_hidro = 'forcar_recalculo_apos_upload_limpo'
                                 st.success("✅ Valores gravados com sucesso na Nuvem!")
-                                
-                                # Força o Streamlit a recarregar a página lendo os novos dados limpos da nuvem
                                 st.rerun()
                                 
                             except Exception as e:
