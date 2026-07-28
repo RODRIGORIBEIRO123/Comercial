@@ -3326,6 +3326,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         
                         if "Item / Componente" in df_up.columns:
                             df_up = df_up.dropna(subset=["Item / Componente"])
+                            
                             def limpar_preco(val):
                                 if isinstance(val, str):
                                     try: return float(val.replace("R$", "").replace(".", "").replace(",", ".").strip())
@@ -3335,6 +3336,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                             df_up['Preço Unitário (R$)'] = df_up['Preço Unitário (R$)'].apply(limpar_preco)
                             df_up = df_up.fillna("")
                             
+                            # Atualiza a memória ativa do sistema
                             st.session_state.banco_precos_hidraulica = df_up.to_dict('records')
                             
                             import datetime
@@ -3346,7 +3348,14 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                                 ws_ci.clear()
                                 linhas = [df_up.columns.tolist()] + df_up.values.tolist()
                                 ws_ci.append_rows(linhas)
+                                
+                                # TRAVA DE SEGURANÇA: Força o banco a atualizar a versão e limpa o cache da tela anterior
+                                st.session_state.versao_banco_hidro = 'forcar_recalculo_apos_upload'
                                 st.success("✅ Valores gravados com sucesso na Nuvem!")
+                                
+                                # Força o Streamlit a recarregar a página lendo os novos dados limpos da nuvem
+                                st.rerun()
+                                
                             except Exception as e:
                                 st.warning(f"⚠️ Valores atualizados na tela, mas falha ao sincronizar com o Google: {e}")
                     except Exception as e:
