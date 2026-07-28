@@ -3141,7 +3141,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         
         if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary", use_container_width=True):
             if st.button("➕ Adicionar Cavalete ao Levantamento", type="primary", use_container_width=True):
-            # NOVA CURVA DE ESFORÇO: Cria um "Piso" financeiro para bitolas pequenas
             dict_fator_mo = {
                 "1/4\"": 1.4, "3/8\"": 1.5, "1/2\"": 1.6, "3/4\"": 1.8, 
                 "1\"": 2.0, "1.1/4\"": 2.2, "1.1/2\"": 2.4, "2\"": 2.6, 
