@@ -3154,17 +3154,40 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 if regra["Qtd"] > 0:
                     composicao_kit.append({"nome": nome_final, "qtd": regra["Qtd"]})
             
-            dict_precos_memoria = {normalizar_string_busca(row["Item / Componente"]): float(row["Preço Unitário (R$)"]) for row in st.session_state.banco_precos_hidraulica}
-            custo_material_total_kit = sum(dict_precos_memoria.get(normalizar_string_busca(comp["nome"]), 0.0) * comp["qtd"] for comp in composicao_kit)
+            # --- CÁLCULO DE CUSTOS DESENROLADO (BLINDADO CONTRA NAMEERROR) ---
+            dict_precos_memoria = {}
+            for row in st.session_state.banco_precos_hidraulica:
+                chave_n = normalizar_string_busca(row.get("Item / Componente", ""))
+                try: val = float(row.get("Preço Unitário (R$)", 0.0))
+                except: val = 0.0
+                dict_precos_memoria[chave_n] = val
+
+            custo_material_total_kit = 0.0
+            for comp in composicao_kit:
+                n_busca = normalizar_string_busca(comp["nome"])
+                pr_u = dict_precos_memoria.get(n_busca, 0.0)
+                custo_material_total_kit += pr_u * comp["qtd"]
+            
             mo_mont_calculado = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0) * pol_dec * 12.0
             
             if is_aberto:
                 mo_isol_calculado = 0.0
             else:
                 preco_base_isol_metro = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0) * pol_dec
-                qtd_tubos_linear = sum(c["qtd"] for c in composicao_kit if "tubo" in c["nome"].lower())
-                qtd_conexoes = sum(c["qtd"] for c in composicao_kit if any(x in c["nome"].lower() for x in ["curva", "conexão t", "redução", "cotovelo"]))
-                qtd_valvulas = sum(c["qtd"] for c in composicao_kit if any(x in c["nome"].lower() for x in ["válvula", "filtro"]))
+                
+                qtd_tubos_linear = 0.0
+                qtd_conexoes = 0.0
+                qtd_valvulas = 0.0
+                
+                for c in composicao_kit:
+                    nome_low = c["nome"].lower()
+                    if "tubo" in nome_low: 
+                        qtd_tubos_linear += c["qtd"]
+                    elif any(x in nome_low for x in ["curva", "conexão t", "redução", "cotovelo"]): 
+                        qtd_conexoes += c["qtd"]
+                    elif any(x in nome_low for x in ["válvula", "filtro"]): 
+                        qtd_valvulas += c["qtd"]
+                
                 metragem_equivalente = qtd_tubos_linear + (qtd_conexoes * 1.5) + (qtd_valvulas * 2.0)
                 mo_isol_calculado = preco_base_isol_metro * metragem_equivalente
             
