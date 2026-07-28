@@ -3064,9 +3064,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             })
             st.toast(f"✅ Conjunto Ø {bitola_final} adicionado!", icon="👍")
             st.rerun()
-
-        st.markdown("---")
-        st.markdown("### 📋 Cavaletes Adicionados no Projeto")
         if not st.session_state.cavaletes_selecionados: 
             st.info("Nenhum item adicionado no levantamento.")
         else:
