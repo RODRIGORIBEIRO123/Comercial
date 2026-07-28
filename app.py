@@ -3072,11 +3072,12 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             ligacao = "Roscado" if bitola_final in bitolas_roscadas else "Flangeado"
             composicao_kit = []
             
-            # --- LÓGICA DE INJEÇÃO DO KIT NA BOM ---
+            # --- LÓGICA DE INJEÇÃO DO KIT NA BOM (COM MANGUEIRAS E MO FIXA) ---
             if tipo_equip == "Fancolete" and "Danfoss" in fancolete_tipo_montagem:
                 bitola_final = "1/2\"" if "DN 15" in kit_danfoss_final else "3/4\""
                 pol_dec = dict_pol.get(bitola_final, 0.5)
                 composicao_kit.append({"nome": kit_danfoss_final, "qtd": 1.0})
+                composicao_kit.append({"nome": f"Par de Mangueiras Flexíveis Danfoss - Ø {bitola_final}", "qtd": 1.0})
             else:
                 regras_ativas = [t for t in st.session_state.matriz_templates if t["Equipamento"] == tipo_equip and t["Vias"] == tipo_vias and t["Ligação"] == ligacao]
                 tem_bal = False
@@ -3116,29 +3117,43 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 dict_precos_memoria[chave_n] = val
 
             custo_material_total_kit = 0.0
+            
+            # Injeta peças novas no banco se não existirem
             for comp in composicao_kit:
                 n_busca = normalizar_string_busca(comp["nome"])
-                pr_u = dict_precos_memoria.get(n_busca, 0.0)
-                custo_material_total_kit += pr_u * comp["qtd"]
+                if n_busca not in dict_precos_memoria:
+                    st.session_state.banco_precos_hidraulica.append({"Item / Componente": comp["nome"], "Preço Unitário (R$)": 0.0, "Unidade": "pç"})
+                    dict_precos_memoria[n_busca] = 0.0
+                custo_material_total_kit += dict_precos_memoria.get(n_busca, 0.0) * comp["qtd"]
             
-            mo_mont_calculado = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0) * pol_dec * 12.0
-            
-            if is_aberto:
-                mo_isol_calculado = 0.0
+            # --- CÁLCULO DE MÃO DE OBRA MISTA (FLEXO VS TRADICIONAL) ---
+            if tipo_equip == "Fancolete" and "Danfoss" in fancolete_tipo_montagem:
+                mo_danfoss_nome = "Mão de Obra FIXA - Instalação Kit Danfoss Flexo (Por Conjunto)"
+                iso_danfoss_nome = "Isolamento Térmico FIXO - Kit Danfoss Flexo (Por Conjunto)"
+                
+                # Se não existir no banco, cria para poder editar
+                if normalizar_string_busca(mo_danfoss_nome) not in dict_precos_memoria:
+                    st.session_state.banco_precos_hidraulica.append({"Item / Componente": mo_danfoss_nome, "Preço Unitário (R$)": 0.0, "Unidade": "cj"})
+                    dict_precos_memoria[normalizar_string_busca(mo_danfoss_nome)] = 0.0
+                if normalizar_string_busca(iso_danfoss_nome) not in dict_precos_memoria:
+                    st.session_state.banco_precos_hidraulica.append({"Item / Componente": iso_danfoss_nome, "Preço Unitário (R$)": 0.0, "Unidade": "cj"})
+                    dict_precos_memoria[normalizar_string_busca(iso_danfoss_nome)] = 0.0
+                    
+                mo_mont_calculado = dict_precos_memoria.get(normalizar_string_busca(mo_danfoss_nome), 0.0)
+                mo_isol_calculado = dict_precos_memoria.get(normalizar_string_busca(iso_danfoss_nome), 0.0)
             else:
-                preco_base_isol_metro = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0) * pol_dec
-                qtd_tubos_linear = 0.0
-                qtd_conexoes = 0.0
-                qtd_valvulas = 0.0
-                
-                for c in composicao_kit:
-                    nome_low = c["nome"].lower()
-                    if "tubo" in nome_low: qtd_tubos_linear += c["qtd"]
-                    elif any(x in nome_low for x in ["curva", "conexão t", "redução", "cotovelo"]): qtd_conexoes += c["qtd"]
-                    elif any(x in nome_low for x in ["válvula", "filtro", "danfoss"]): qtd_valvulas += c["qtd"]
-                
-                metragem_equivalente = qtd_tubos_linear + (qtd_conexoes * 1.5) + (qtd_valvulas * 2.0)
-                mo_isol_calculado = preco_base_isol_metro * metragem_equivalente
+                mo_mont_calculado = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0) * pol_dec * 12.0
+                if is_aberto:
+                    mo_isol_calculado = 0.0
+                else:
+                    preco_base_isol_metro = dict_precos_memoria.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0) * pol_dec
+                    qtd_tubos_linear = 0.0; qtd_conexoes = 0.0; qtd_valvulas = 0.0
+                    for c in composicao_kit:
+                        nome_low = c["nome"].lower()
+                        if "tubo" in nome_low: qtd_tubos_linear += c["qtd"]
+                        elif any(x in nome_low for x in ["curva", "conexão t", "redução", "cotovelo"]): qtd_conexoes += c["qtd"]
+                        elif any(x in nome_low for x in ["válvula", "filtro", "danfoss"]): qtd_valvulas += c["qtd"]
+                    mo_isol_calculado = preco_base_isol_metro * (qtd_tubos_linear + (qtd_conexoes * 1.5) + (qtd_valvulas * 2.0))
             
             st.session_state.cavaletes_selecionados.append({
                 "id": str(uuid.uuid4()), "tag": tag_equip if tag_equip else "S/ TAG",
@@ -3146,6 +3161,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 "vazao": vazao_calculada, "sistema": tipo_sistema, "custo_mat_unit": custo_material_total_kit,
                 "mo_mont_unit": mo_mont_calculado, "mo_isol_unit": mo_isol_calculado, "composicao": composicao_kit
             })
+            
             st.toast(f"✅ Conjunto adicionado com sucesso!", icon="👍")
             st.rerun()
 
@@ -3244,6 +3260,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         with aba_padroes_hidro:
         st.header("⚙️ Central de Padrões e Receitas (Templates)")
         st.caption("Selecione o equipamento e a variação que deseja editar. Suas alterações serão gravadas na nuvem (Google Sheets).")
+        
+        f_eq, f_vi, f_li = st.columns(3)
         
         f_eq, f_vi, f_li = st.columns(3)
         sel_eq = f_eq.selectbox("1. Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"], key="tpl_eq")
