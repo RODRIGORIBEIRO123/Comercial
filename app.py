@@ -3240,7 +3240,136 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             if st.button("🗑️ Excluir Todos", type="secondary", key="btn_excluir_absolutamente_todos_cavaletes"):
                 st.session_state.cavaletes_selecionados = []
                 st.rerun()
+                
+        with aba_padroes_hidro:
+        st.header("⚙️ Central de Padrões e Receitas (Templates)")
+        st.caption("Selecione o equipamento e a variação que deseja editar. Suas alterações serão gravadas na nuvem (Google Sheets).")
+        
+        f_eq, f_vi, f_li = st.columns(3)
+        sel_eq = f_eq.selectbox("1. Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"], key="tpl_eq")
+        sel_vi = f_vi.selectbox("2. Vias:", ["2 Vias"] if sel_eq in ["Chiller", "Bomba"] else ["2 Vias", "3 Vias"], key="tpl_vi")
+        sel_li = f_li.selectbox("3. Ligação (Tamanho):", ["Roscado", "Flangeado"], help="Roscado (1/2\" a 2\") | Flangeado (2.1/2\" a 12\")", key="tpl_li")
+        
+        st.markdown(f"#### Editando Receita: **{sel_eq} | {sel_vi} | {sel_li}**")
+        
+        df_templates = pd.DataFrame(st.session_state.matriz_templates)
+        filtro = (df_templates["Equipamento"] == sel_eq) & (df_templates["Vias"] == sel_vi) & (df_templates["Ligação"] == sel_li)
+        df_editavel = df_templates[filtro][["Grupo", "Item Base", "Medida", "Qtd"]].copy()
+        
+        df_editado = st.data_editor(
+            df_editavel,
+            column_config={
+                "Grupo": st.column_config.SelectboxColumn("Grupo do Kit", options=["Kit Dinâmico", "Kit Fixo"], required=True),
+                "Item Base": st.column_config.TextColumn("Descrição Base (sem o diâmetro)", required=True),
+                "Medida": st.column_config.SelectboxColumn("Medida (Bitola)", options=["Variável {b}", "Variável {b-1}", "Variável {b-2}", "Variável {b} x {b-1}", "Variável {b} x {b-2}", "Variável {b-1} x {b-2}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"], required=True),
+                "Qtd": st.column_config.NumberColumn("Quantidade", min_value=0.0, format="%.2f")
+            },
+            num_rows="dynamic", use_container_width=True, key=f"grid_tpl_{sel_eq}_{sel_vi}_{sel_li}_{st.session_state.get('trigger_refresh', 0)}"
+        )
+        
+        if st.button("💾 Salvar Esta Tabela na Nuvem", type="primary"):
+            nova_matriz = [row for row in st.session_state.matriz_templates if not (row["Equipamento"] == sel_eq and row["Vias"] == sel_vi and row["Ligação"] == sel_li)]
+            for _, row in df_editado.iterrows():
+                if pd.notna(row["Item Base"]) and str(row["Item Base"]).strip() != "":
+                    nova_matriz.append({"Equipamento": sel_eq, "Vias": sel_vi, "Ligação": sel_li, "Grupo": row["Grupo"], "Item Base": str(row["Item Base"]).strip(), "Medida": row["Medida"], "Qtd": float(row["Qtd"]) if pd.notna(row["Qtd"]) else 1.0})
+            
+            st.session_state.matriz_templates = nova_matriz
+            st.session_state.versao_banco_hidro = 'forcar_recalculo'
+            st.session_state.trigger_refresh = st.session_state.get('trigger_refresh', 0) + 1 
+            
+            with st.spinner("Gravando no Google Sheets..."):
+                if salvar_templates_no_banco(nova_matriz):
+                    st.toast("✅ Padrão salvo com sucesso no Banco de Dados!")
+                    st.rerun() 
+            
+        st.markdown("---")
+        with st.expander("➕ Inserir Novo Item nesta Receita", expanded=False):
+            nomes_base_existentes = set()
+            for item in st.session_state.banco_precos_hidraulica:
+                nome_bruto = item["Item / Componente"]
+                base = nome_bruto.split("- Ø")[0].strip() if "- Ø" in nome_bruto else nome_bruto
+                nomes_base_existentes.add(base)
+            nomes_base_existentes = sorted(list(nomes_base_existentes))
 
+            with st.form("form_add_item_template"):
+                c_a1, c_a2, c_a3 = st.columns(3)
+                add_grp = c_a1.selectbox("Grupo", ["Kit Dinâmico", "Kit Fixo"], help="Kit Dinâmico para peças que mudam a bitola. Fixo para peças estáticas.")
+                add_base = c_a2.selectbox("1. Selecionar Existente", ["-- Selecione --"] + nomes_base_existentes)
+                add_novo = c_a3.text_input("2. OU Digite um Nome Novo")
+                
+                c_a4, c_a5, c_a6 = st.columns(3)
+                add_med = c_a4.selectbox("Medida", ["Variável {b}", "Variável {b-1}", "Variável {b-2}", "Variável {b} x {b-1}", "Variável {b} x {b-2}", "Variável {b-1} x {b-2}", "Variável {b} x 1/2\"", "Variável {b} x 3/4\"", "1/2\"", "3/4\"", "3/8\"", "1/4\"", "Nenhum"])
+                add_qtd = c_a5.number_input("Quantidade", min_value=0.01, value=1.0)
+                
+                if st.form_submit_button("Inserir na Receita Atual"):
+                    nome_escolhido = add_novo if add_novo.strip() != "" else (add_base if add_base != "-- Selecione --" else "")
+                    if nome_escolhido != "":
+                        st.session_state.matriz_templates.append({"Equipamento": sel_eq, "Vias": sel_vi, "Ligação": sel_li, "Grupo": add_grp, "Item Base": nome_escolhido, "Medida": add_med, "Qtd": add_qtd})
+                        st.session_state.versao_banco_hidro = 'forcar_recalculo'
+                        st.session_state.trigger_refresh = st.session_state.get('trigger_refresh', 0) + 1 
+                        
+                        with st.spinner("Gravando no Google Sheets..."):
+                            if salvar_templates_no_banco(st.session_state.matriz_templates):
+                                st.toast(f"Item inserido e salvo na nuvem!", icon="✅")
+                                st.rerun()
+                    else:
+                        st.error("Selecione um item do banco ou digite um nome novo.")
+
+        st.markdown("---")
+        st.markdown("#### 🔄 Clonar Padrão")
+        st.caption("Gostou de como ficou essa receita? Copie-a idêntica para outro cenário para não ter que refazer tudo.")
+        
+        c_clon1, c_clon2, c_clon3 = st.columns(3)
+        clon_eq = c_clon1.selectbox("Copiar PARA Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"], index=["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"].index(sel_eq), key="clon_eq")
+        clon_vi = c_clon2.selectbox("Copiar PARA Vias:", ["2 Vias", "3 Vias"], index=["2 Vias", "3 Vias"].index(sel_vi) if sel_vi in ["2 Vias", "3 Vias"] else 0, key="clon_vi")
+        clon_li = c_clon3.selectbox("Copiar PARA Ligação:", ["Roscado", "Flangeado"], index=["Roscado", "Flangeado"].index(sel_li), key="clon_li")
+        
+        if st.button("📋 Executar Clonagem e Salvar na Nuvem", type="secondary"):
+            if clon_eq in ["Chiller", "Bomba"] and clon_vi == "3 Vias":
+                st.error("⚠️ Atenção: Chiller e Bomba só trabalham com configuração de 2 Vias no sistema.")
+            else:
+                matriz_sem_alvo = [row for row in st.session_state.matriz_templates if not (row["Equipamento"] == clon_eq and row["Vias"] == clon_vi and row["Ligação"] == clon_li)]
+                for _, row in df_editado.iterrows():
+                    matriz_sem_alvo.append({"Equipamento": clon_eq, "Vias": clon_vi, "Ligação": clon_li, "Grupo": row["Grupo"], "Item Base": row["Item Base"], "Medida": row["Medida"], "Qtd": row["Qtd"]})
+                
+                st.session_state.matriz_templates = matriz_sem_alvo
+                st.session_state.trigger_refresh = st.session_state.get('trigger_refresh', 0) + 1 
+                
+                with st.spinner("Clonando no Google Sheets..."):
+                    if salvar_templates_no_banco(matriz_sem_alvo):
+                        st.toast(f"Receita clonada com sucesso para {clon_eq} | {clon_vi} | {clon_li}!", icon="📋")
+                        st.rerun()
+
+        # ====================================================================
+        # FERRAMENTA DE SANEAMENTO: UNIFICADOR DE DUPLICATAS (DE-PARA)
+        # ====================================================================
+        st.markdown("---")
+        st.subheader("🔗 Unificador de Nomes (De-Para)")
+        st.caption("Tem itens com nomes diferentes que são a mesma coisa? Selecione o nome que está na sua receita e o nome oficial. O sistema corrigirá todas as matrizes de uma só vez.")
+        
+        # Puxa os itens que estão em uso nas receitas
+        itens_em_uso = sorted(list(set(row["Item Base"] for row in st.session_state.matriz_templates)))
+        
+        col_de, col_para = st.columns(2)
+        item_errado = col_de.selectbox("1. Substituir este nome (O que está nas receitas):", ["-- Selecione --"] + itens_em_uso, key="unif_de")
+        item_correto = col_para.selectbox("2. Por este nome oficial (O que está no Banco de Preços):", ["-- Selecione --"] + nomes_base_existentes, key="unif_para")
+        
+        if st.button("🔄 Executar Unificação e Salvar na Nuvem", type="secondary"):
+            if item_errado != "-- Selecione --" and item_correto != "-- Selecione --" and item_errado != item_correto:
+                for row in st.session_state.matriz_templates:
+                    if row["Item Base"] == item_errado:
+                        row["Item Base"] = item_correto
+                
+                with st.spinner("Unificando no Google Sheets..."):
+                    salvar_templates_no_banco(st.session_state.matriz_templates)
+                    st.session_state.versao_banco_hidro = 'forcar_recalculo'
+                    st.session_state.trigger_refresh = st.session_state.get('trigger_refresh', 0) + 1
+                    st.success(f"✅ Todos os '{item_errado}' foram trocados por '{item_correto}' com sucesso!")
+                    st.rerun()
+            else:
+                st.warning("Selecione um nome de origem e um destino válido e diferente.")
+
+    
     with aba_precos_hidro:
         st.header("Gestão Sênior de Preços (Componentes Abertos)")
         st.markdown("### ⚖️ Precificação Inteligente de Tubos (Por Kg)")
