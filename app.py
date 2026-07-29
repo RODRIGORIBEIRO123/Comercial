@@ -3556,160 +3556,89 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
 
     
     with aba_precos_hidro:
-        st.header("Gestão Sênior de Preços (Componentes Abertos)")
-        st.markdown("### ⚖️ Precificação Inteligente de Tubos (Por Kg)")
-        col_kg1, col_kg2 = st.columns([1, 2])
-        novo_preco_kg = col_kg1.number_input("Preço do Aço Carbono (R$/kg):", min_value=0.1, value=12.50, step=0.50)
+        st.subheader("💲 Gestão de Tabela de Preços e Base Hidráulica")
+        st.markdown("Faça o upload de uma planilha Excel para atualizar os custos unitários de todos os componentes hidráulicos.")
         
-        if col_kg2.button("🔄 Converter R$/kg para R$/m e Atualizar Tubos", type="secondary"):
-            for item in st.session_state.banco_precos_hidraulica:
-                if "Tubo em aço carbono" in item["Item / Componente"] and "sem costura" in item["Item / Componente"]:
-                    bitola_str = item["Item / Componente"].split("Ø ")[-1].strip()
-                    if bitola_str in PESOS_SCH40:
-                        item["Preço Unitário (R$)"] = round(PESOS_SCH40[bitola_str] * novo_preco_kg, 2)
-            st.toast("✅ Preços convertidos com sucesso!", icon="👍")
-            st.rerun()
-            
+        # 1. Tabela atual exibida na tela
+        df_exibicao_precos = pd.DataFrame(st.session_state.banco_precos_hidraulica)
+        if not df_exibicao_precos.empty and "Preço Unitário (R$)" in df_exibicao_precos.columns:
+            df_exibicao_precos["Preço Unitário (R$)"] = df_exibicao_precos["Preço Unitário (R$)"].apply(
+                lambda x: f"R$ {converter_preco_blindado(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            )
+        st.dataframe(df_exibicao_precos, use_container_width=True, hide_index=True)
+        
         st.markdown("---")
-        st.markdown("### 🔄 Sincronização em Lote (Excel)")
+        col_up1, col_up2 = st.columns(2)
         
-        ch1, ch2 = st.columns(2)
-        
-        with ch1:
-            st.markdown("#### 📥 Exportar para Cotar")
-            def gerar_planilha_itens_hidro(com_precos):
-                buf = io.BytesIO(); wb = openpyxl.Workbook(); ws = wb.active
-                ws.append(["Item / Componente", "Preço Unitário (R$)", "Unidade"])
-                for r in st.session_state.banco_precos_hidraulica:
-                    ws.append([r["Item / Componente"], r["Preço Unitário (R$)"] if com_precos else "", r["Unidade"]])
-                wb.save(buf); buf.seek(0); return buf
-            st.download_button("Baixar Planilha (Excel)", data=gerar_planilha_itens_hidro(True), file_name="Precos_Hidro.xlsx", use_container_width=True)
+        # 2. Botão de Download do Modelo Excel
+        with col_up1:
+            st.markdown("#### 1️⃣ Baixar Modelo Atual")
+            df_down = pd.DataFrame(st.session_state.banco_precos_hidraulica)
+            if not df_down.empty and "Preço Unitário (R$)" in df_down.columns:
+                df_down["Preço Unitário (R$)"] = df_down["Preço Unitário (R$)"].apply(converter_preco_blindado)
             
-        with ch2:
-            st.markdown("#### 📂 Devolver Planilha Cotada")
-            upl_hidro = st.file_uploader("Selecione a planilha:", type=["xlsx", "xls"], label_visibility="collapsed")
+            buf_mod = io.BytesIO()
+            with pd.ExcelWriter(buf_mod, engine='openpyxl') as writer:
+                df_down.to_excel(writer, index=False, sheet_name='Precos_Hidraulica')
+            buf_mod.seek(0)
             
-            if st.button("💾 Salvar Planilha no Banco", type="primary", use_container_width=True):
-                if upl_hidro is not None:
+            st.download_button(
+                label="📥 Baixar Planilha de Preços (.xlsx)",
+                data=buf_mod.getvalue(),
+                file_name="Precos_Hidro2525.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+            
+        # 3. Upload e Atualização Blindada
+        with col_up2:
+            st.markdown("#### 2️⃣ Subir Planilha Atualizada")
+            arquivo_excel_precos = st.file_uploader("Selecione o arquivo Excel atualizado:", type=["xlsx", "xls"], key="up_excel_precos_v25")
+            
+            if arquivo_excel_precos is not None:
+                if st.button("🔄 Processar e Salvar Preços na Nuvem", type="primary", use_container_width=True, key="btn_salvar_precos_v25"):
                     try:
-                        df_up = pd.read_excel(upl_hidro)
-                        df_up.rename(columns=lambda x: str(x).strip(), inplace=True)
+                        df_novo = pd.read_excel(arquivo_excel_precos)
                         
-                        if "Item / Componente" in df_up.columns:
-                            df_up = df_up.dropna(subset=["Item / Componente"])
-                            
-                            def limpar_e_converter_preco(val):
-                                if pd.isna(val) or str(val).strip() in ["", "-", "nan"]: return 0.0
-                                if isinstance(val, (int, float)): return float(val)
-                                val_str = str(val).upper().replace("R$", "").strip()
-                                if "," in val_str:
-                                    if "." in val_str: val_str = val_str.replace(".", "").replace(",", ".")
-                                    else: val_str = val_str.replace(",", ".")
-                                try: return float(val_str)
-                                except: return 0.0
-                                
-                            df_up['Preço Unitário (R$)'] = df_up['Preço Unitário (R$)'].apply(limpar_e_converter_preco)
-                            df_up = df_up.fillna("")
-                            
-                            # --- MERGE INTELIGENTE (NÃO APAGA PEÇAS FALTANTES) ---
-                            novos_precos = {normalizar_string_busca(row["Item / Componente"]): row for row in df_up.to_dict('records')}
-                            banco_atual = st.session_state.banco_precos_hidraulica
-                            
-                            for item in banco_atual:
-                                chave = normalizar_string_busca(item["Item / Componente"])
-                                if chave in novos_precos:
-                                    item["Preço Unitário (R$)"] = novos_precos[chave]["Preço Unitário (R$)"]
-                                    if "Unidade" in novos_precos[chave] and novos_precos[chave]["Unidade"] != "":
-                                        item["Unidade"] = novos_precos[chave]["Unidade"]
-                                    del novos_precos[chave] # Remove os que já foram atualizados
+                        if "Item / Componente" in df_novo.columns and "Preço Unitário (R$)" in df_novo.columns:
+                            nova_lista_banco = []
+                            for _, linha in df_novo.iterrows():
+                                item_nm = str(linha.get("Item / Componente", "")).strip()
+                                if item_nm and item_nm.lower() not in ["nan", "none", ""]:
+                                    # CONVERSÃO BLINDADA APLICADA DIRETO NA LEITURA DO EXCEL
+                                    preco_limpo = converter_preco_blindado(linha.get("Preço Unitário (R$)", 0.0))
+                                    unid_limpa = str(linha.get("Unidade", "pç")).strip()
+                                    if not unid_limpa or unid_limpa.lower() == "nan": unid_limpa = "pç"
                                     
-                            # Adiciona qualquer peça extra que veio no Excel e não estava no banco
-                            for item_novo in novos_precos.values():
-                                banco_atual.append(item_novo)
-                                
-                            st.session_state.banco_precos_hidraulica = banco_atual
-                            # -----------------------------------------------------
+                                    nova_lista_banco.append({
+                                        "Item / Componente": item_nm,
+                                        "Preço Unitário (R$)": preco_limpo,
+                                        "Unidade": unid_limpa
+                                    })
                             
-                            import datetime
-                            st.session_state['data_ultima_atualizacao'] = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
-                            st.session_state['trigger_tabela'] = st.session_state.get('trigger_tabela', 0) + 1
+                            # Atualiza a Memória Instantaneamente
+                            st.session_state.banco_precos_hidraulica = nova_lista_banco
                             
+                            # Grava no Google Sheets de forma segura
                             try:
-                                sh_cloud = conectar_google_sheets()
-                                ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
-                                ws_ci.clear()
-                                # Converte o banco_atual em dataframe para salvar
-                                df_final = pd.DataFrame(banco_atual).fillna("")
-                                linhas = [df_final.columns.tolist()] + df_final.values.tolist()
-                                ws_ci.append_rows(linhas)
-                                
-                                st.session_state.versao_banco_hidro = 'v22_SUPER_BLINDADA'
-                                st.success("✅ Valores atualizados com sucesso na Nuvem sem perder peças das receitas!")
-                                st.rerun()
-                                
-                            except Exception as e:
-                                st.warning(f"⚠️ Valores atualizados na tela, mas falha ao sincronizar com o Google: {e}")
-                    except Exception as e:
-                        st.error(f"Erro na leitura do arquivo: {e}")
-                else:
-                    st.warning("⚠️ Anexe um arquivo antes de salvar.")
-
-        st.markdown("---")
-        st.subheader("📚 Itens Cadastrados no Banco de Dados")
-        
-        if 'data_ultima_atualizacao' in st.session_state:
-            st.caption(f"🕒 **Última atualização:** {st.session_state['data_ultima_atualizacao']}")
-        else:
-            st.caption("🕒 **Última atualização:** Não registrada nesta sessão")
-
-        if st.session_state.get('banco_precos_hidraulica'):
-            df_display = pd.DataFrame(st.session_state.banco_precos_hidraulica)
-            
-            if not df_display.empty and "Preço Unitário (R$)" in df_display.columns:
-                st.info("💡 Você pode editar os preços dando dois cliques nos valores da tabela abaixo!")
-                
-                # CHAVE DINÂMICA: Força a tabela visual a resetar sempre que um upload for feito!
-                chave_tabela = f"editor_manual_precos_{st.session_state.get('trigger_tabela', 0)}"
-                
-                df_editado_preco = st.data_editor(
-                    df_display, 
-                    use_container_width=True, 
-                    hide_index=True, 
-                    height=500,
-                    column_config={
-                        "Preço Unitário (R$)": st.column_config.NumberColumn(
-                            "Preço Unitário (R$)",
-                            help="Edite o preço aqui",
-                            format="R$ %.2f",
-                            step=0.01
-                        ),
-                        "Item / Componente": st.column_config.TextColumn(disabled=True),
-                        "Unidade": st.column_config.TextColumn(disabled=True)
-                    },
-                    key=chave_tabela
-                )
-                
-                if st.button("💾 Salvar Edições Manuais", type="secondary"):
-                    st.session_state.banco_precos_hidraulica = df_editado_preco.to_dict('records')
-                    import datetime
-                    st.session_state['data_ultima_atualizacao'] = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
-                    st.session_state['trigger_tabela'] = st.session_state.get('trigger_tabela', 0) + 1
-                    
-                    try:
-                        sh_cloud = conectar_google_sheets()
-                        ws_ci = sh_cloud.worksheet("Precos_Hidraulica_Itens")
-                        ws_ci.clear()
-                        linhas = [df_editado_preco.columns.tolist()] + df_editado_preco.values.tolist()
-                        ws_ci.append_rows(linhas)
-                        st.session_state.versao_banco_hidro = 'v22_SUPER_BLINDADA'
-                        st.success("✅ Edições manuais gravadas no sistema!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao salvar na nuvem: {e}")
-            else:
-                st.warning("Colunas 'Item / Componente' ou 'Preço Unitário (R$)' não encontradas.")
-        else:
-            st.warning("Banco de dados vazio.")
+                                sh_p = conectar_google_sheets()
+                                try: ws_p = sh_p.worksheet("Precos_Hidraulica_Itens")
+                                except: ws_p = sh_p.add_worksheet(title="Precos_Hidraulica_Itens", rows="2000", cols="10")
+                                ws_p.clear()
+                                df_gravar = pd.DataFrame(nova_lista_banco).fillna("")
+                                ws_p.append_rows([df_gravar.columns.tolist()] + df_gravar.values.tolist())
+                                st.toast("✅ Preços atualizados na Nuvem e na Memória com sucesso!", icon="☁️")
+                            except Exception as e_nuvem:
+                                st.warning("⚠️ Preços atualizados apenas na memória local desta sessão (Sem conexão com a nuvem).")
+                            
+                            # --- TRAVA ANTI-QUEDA DE TELA ---
+                            # Garante que o Streamlit não jogue você de volta para a Tela Inicial no rerun!
+                            st.session_state.menu_selecionado = "💧 Levantamento de Hidráulica"
+                            st.rerun()
+                        else:
+                            st.error("❌ O arquivo Excel precisa ter as colunas 'Item / Componente' e 'Preço Unitário (R$)'!")
+                    except Exception as e_up:
+                        st.error(f"❌ Erro ao ler a planilha: {e_up}")
 
     with aba_resumo_hidro:
         st.header("📊 Resumo e Listas de Materiais (BOM)")
