@@ -20,6 +20,43 @@ from openpyxl.utils import get_column_letter
 import google.generativeai as genai
 from PIL import Image
 
+# ====================================================================
+# CONVERSOR UNIVERSAL E BLINDADO DE PREÇOS / MOEDA
+# ====================================================================
+def converter_preco_blindado(val):
+    if val is None:
+        return 0.0
+    # Se já for número (int ou float), retorna direto sem tocar!
+    if isinstance(val, (int, float)):
+        return float(val)
+        
+    # Limpa caracteres de moeda e espaços
+    s = str(val).replace("R$", "").replace("$", "").strip()
+    if not s or s.lower() == "nan" or s.lower() == "none":
+        return 0.0
+        
+    # Caso 1: Tem ponto E vírgula (ex: "1.187,40" ou "1,187.40")
+    if "." in s and "," in s:
+        # Descobre qual está por último (o último é sempre o separador decimal)
+        if s.rfind(",") > s.rfind("."):
+            # Padrão Brasileiro ("1.187,40"): tira o ponto de milhar e troca vírgula por ponto
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            # Padrão Americano ("1,187.40"): tira a vírgula de milhar
+            s = s.replace(",", "")
+            
+    # Caso 2: Tem APENAS vírgula (ex: "16,20" ou "1187,40")
+    elif "," in s:
+        s = s.replace(",", ".")
+        
+    # Caso 3: Tem APENAS ponto (ex: "16.20" ou "1187.40")
+    # NÃO fazemos nada! Deixamos como está para não transformar "16.20" em 1620.
+    
+    try:
+        return float(s)
+    except ValueError:
+        return 0.0
+
 # --- CONFIGURAÇÃO DA TELA (DEVE SER O PRIMEIRO COMANDO STREAMLIT) ---
 st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide", page_icon="📄")
 
@@ -2689,6 +2726,25 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
 
     def normalizar_string_busca(texto):
         return re.sub(r'[\s\-\"°Ø\’\']+', '', str(texto)).lower().strip()
+    def converter_preco_blindado(val):
+        if val is None:
+            return 0.0
+        if isinstance(val, (int, float)):
+            return float(val)
+        s = str(val).replace("R$", "").replace("$", "").strip()
+        if not s or s.lower() in ["nan", "none", ""]:
+            return 0.0
+        if "." in s and "," in s:
+            if s.rfind(",") > s.rfind("."):
+                s = s.replace(".", "").replace(",", ".")
+            else:
+                s = s.replace(",", "")
+        elif "," in s:
+            s = s.replace(",", ".")
+        try:
+            return float(s)
+        except ValueError:
+            return 0.0
 
     PESOS_SCH40 = {"1/2\"": 1.27, "3/4\"": 1.69, "1\"": 2.50, "1.1/4\"": 3.39, "1.1/2\"": 4.05, "2\"": 5.44, "2.1/2\"": 8.63, "3\"": 11.29, "4\"": 16.07, "5\"": 21.77, "6\"": 28.26, "8\"": 42.55, "10\"": 60.31, "12\"": 79.70}
     bitolas_roscadas = ["1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\""]
@@ -2806,9 +2862,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         return f"{item_base} - Ø {medida_final}"
 
 # ====================================================================
-    # 🔄 SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS (v22 - ANTI-CACHE E ANTI-DISTORÇÃO)
+    # 🔄 SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS (v23 - 100% BLINDADA)
     # ====================================================================
-    if st.session_state.get('versao_banco_hidro') != 'v22_SUPER_BLINDADA':
+    if st.session_state.get('versao_banco_hidro') != 'v23_SUPER_BLINDADA':
         banco_geral = {}
         leitura_nuvem_sucesso = False
         
@@ -2822,20 +2878,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     nome_orig = str(row.get("Item / Componente", "")).strip()
                     if nome_orig:
                         chave = normalizar_string_busca(nome_orig)
-                        # Leitura Sênior (Lida com R$, vírgulas e floats puros do Google Sheets sem distorcer)
-                        val_bruto = row.get("Preço Unitário (R$)", 0.0)
-                        if isinstance(val_bruto, (int, float)):
-                            preco = float(val_bruto)
-                        else:
-                            try:
-                                v_str = str(val_bruto).upper().replace("R$", "").strip()
-                                if "," in v_str:
-                                    if "." in v_str: v_str = v_str.replace(".", "").replace(",", ".")
-                                    else: v_str = v_str.replace(",", ".")
-                                preco = float(v_str)
-                            except:
-                                preco = 0.0
-                                
+                        # --- LEITURA BLINDADA ---
+                        preco = converter_preco_blindado(row.get("Preço Unitário (R$)", 0.0))
+                        
                         banco_geral[chave] = {
                             "Item / Componente": nome_orig,
                             "Preço Unitário (R$)": preco,
@@ -2849,6 +2894,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         if not leitura_nuvem_sucesso and 'banco_precos_hidraulica' in st.session_state and st.session_state.banco_precos_hidraulica:
             for row in st.session_state.banco_precos_hidraulica:
                 chave = normalizar_string_busca(row.get("Item / Componente", ""))
+                # --- PROTEÇÃO TAMBÉM NA MEMÓRIA LOCAL ---
+                row["Preço Unitário (R$)"] = converter_preco_blindado(row.get("Preço Unitário (R$)", 0.0))
                 banco_geral[chave] = row
             st.toast("⚠️ Atraso na nuvem. Usando preços da memória local.", icon="⏳")
             leitura_nuvem_sucesso = True
@@ -2878,7 +2925,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     houve_adicao_nova = True
 
         st.session_state.banco_precos_hidraulica = list(banco_geral.values())
-        st.session_state.versao_banco_hidro = 'v22_SUPER_BLINDADA'
+        st.session_state.versao_banco_hidro = 'v23_SUPER_BLINDADA'
         
         # 5. Só grava na nuvem automaticamente se tiver lido tudo com sucesso E criado uma peça nova.
         if leitura_nuvem_sucesso and houve_adicao_nova:
