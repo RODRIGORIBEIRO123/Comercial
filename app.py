@@ -2767,7 +2767,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Isolamento Espuma elastomérica, espessura 25 mm", "Medida": "Variável {b}", "Qtd": 2.0})
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Rechapeamento chapa de alumínio liso, espessura 0,5 mm", "Medida": "Variável {b}", "Qtd": 2.0})
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Válvula balanceadora", "Medida": "Variável {b}", "Qtd": 1.0})
-                    templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": f"Válvula {vias[0]} vias, motorizada com atuador proporcional", "Medida": "Variável {b-1}", "Qtd": 1.0})
+                    medida_valv_ctrl = "Variável {b}" if eq == "Chiller" else "Variável {b-1}"
+                    templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": f"Válvula {vias[0]} vias, motorizada com atuador proporcional", "Medida": medida_valv_ctrl, "Qtd": 1.0})
                     
                     if ligacao == "Roscado":
                         templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Dinâmico", "Item Base": "Curva 90° Ferro maleável galvanizado", "Medida": "Variável {b}", "Qtd": 6.0 if vias == "3 Vias" else 4.0})
@@ -2863,13 +2864,13 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         return f"{item_base} - Ø {medida_final}"
 
 # ====================================================================
-    # 🔄 SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS (v23 - 100% BLINDADA)
+    # 🔄 SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS (v24 - MULTI-USER BLINDADA)
     # ====================================================================
-    if st.session_state.get('versao_banco_hidro') != 'v23_SUPER_BLINDADA':
+    if st.session_state.get('versao_banco_hidro') != 'v24_MULTI_USER_BLINDADA':
         banco_geral = {}
         leitura_nuvem_sucesso = False
         
-        # 1. Tenta puxar da nuvem primeiro
+        # 1. Tenta puxar do Google Sheets na nuvem (Aplicando conversão blindada item a item)
         try:
             sh_hidro = conectar_google_sheets()
             ws_h = sh_hidro.worksheet("Precos_Hidraulica_Itens")
@@ -2877,25 +2878,26 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             if len(aba_h) > 0:
                 for row in aba_h:
                     nome_orig = str(row.get("Item / Componente", "")).strip()
-                    if nome_orig:
+                    if nome_orig and nome_orig.lower() not in ["nan", "none", ""]:
                         chave = normalizar_string_busca(nome_orig)
-                        # --- LEITURA BLINDADA ---
-                        preco = converter_preco_blindado(row.get("Preço Unitário (R$)", 0.0))
+                        # --- BLINDAGEM OBRIGATÓRIA PARA TODOS OS USUÁRIOS ---
+                        preco_limpo = converter_preco_blindado(row.get("Preço Unitário (R$)", 0.0))
+                        unid_limpa = str(row.get("Unidade", "pç")).strip()
+                        if not unid_limpa or unid_limpa.lower() == "nan": unid_limpa = "pç"
                         
                         banco_geral[chave] = {
                             "Item / Componente": nome_orig,
-                            "Preço Unitário (R$)": preco,
-                            "Unidade": str(row.get("Unidade", "pç"))
+                            "Preço Unitário (R$)": preco_limpo,
+                            "Unidade": unid_limpa
                         }
                 leitura_nuvem_sucesso = True
         except Exception as e:
             pass
 
-        # 2. Se a nuvem falhou, puxa da memória local para não perder o que você digitou
+        # 2. Se a nuvem falhou, puxa da memória local para não perder o que foi digitado
         if not leitura_nuvem_sucesso and 'banco_precos_hidraulica' in st.session_state and st.session_state.banco_precos_hidraulica:
             for row in st.session_state.banco_precos_hidraulica:
                 chave = normalizar_string_busca(row.get("Item / Componente", ""))
-                # --- PROTEÇÃO TAMBÉM NA MEMÓRIA LOCAL ---
                 row["Preço Unitário (R$)"] = converter_preco_blindado(row.get("Preço Unitário (R$)", 0.0))
                 banco_geral[chave] = row
             st.toast("⚠️ Atraso na nuvem. Usando preços da memória local.", icon="⏳")
@@ -2926,9 +2928,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     houve_adicao_nova = True
 
         st.session_state.banco_precos_hidraulica = list(banco_geral.values())
-        st.session_state.versao_banco_hidro = 'v23_SUPER_BLINDADA'
+        st.session_state.versao_banco_hidro = 'v24_MULTI_USER_BLINDADA'
         
-        # 5. Só grava na nuvem automaticamente se tiver lido tudo com sucesso E criado uma peça nova.
+        # 5. Se houve adição de item novo, atualiza o Google Sheets com os números limpos
         if leitura_nuvem_sucesso and houve_adicao_nova:
             try:
                 df_bg = pd.DataFrame(st.session_state.banco_precos_hidraulica).fillna("")
@@ -3237,7 +3239,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         composicao_kit.append({"nome": construir_nome_peca("Válvula balanceadora", "Variável {b}", bitola_final), "qtd": 1.0})
                     if chiller_tipo_valv != "Sem Válvula" and not tem_ctrl:
                         v_str = "Válvula de controle 2 vias, ON/OFF" if chiller_tipo_valv == "ON/OFF" else "Válvula 2 vias, motorizada com atuador proporcional"
-                        composicao_kit.append({"nome": construir_nome_peca(v_str, "Variável {b-1}", bitola_final), "qtd": 1.0})
+                        composicao_kit.append({"nome": construir_nome_peca(v_str, "Variável {b}", bitola_final), "qtd": 1.0})
                 
                 # --- NOVAS REGRAS DE INJEÇÃO: CAMBOTAS E PARAFUSOS ---
                 # 1. Cambotas de Madeira Tratada (4 por cavalete base)
