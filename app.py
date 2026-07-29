@@ -3019,12 +3019,12 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     st.graphviz_chart(dot)
                            
                 # ... (final do bloco do P&ID e do botão da lixeira individual)
-                if c_rm.button("🗑️", key=f"btn_del_cavalete_{idx}_{cav.get('id', 'antigo')}"):
+                if c_rm.button("🗑️", key=f"btn_del_cav_v23_{idx}_{cav.get('id', 'antigo')}"):
                     st.session_state.cavaletes_selecionados.pop(idx)
                     st.rerun()
                     
             # O botão de excluir todos ganha uma chave única e fica alinhado com o "for" (fora da repetição)
-            if st.button("🗑️ Excluir Todos", type="secondary", key="btn_excluir_absolutamente_todos_cavaletes"):
+            if st.button("🗑️ Excluir Todos", type="secondary", key="btn_excluir_todos_cav_v23"):
                 st.session_state.cavaletes_selecionados = []
                 st.rerun()
 
