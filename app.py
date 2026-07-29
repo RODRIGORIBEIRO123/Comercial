@@ -3799,7 +3799,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             for col in ["Materiais", "Mão de Obra", "Subtotal"]: df_res_quadros_disp[col] = df_res_quadros_disp[col].apply(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             st.dataframe(df_res_quadros_disp, use_container_width=True, hide_index=True)
             
-            st.markdown("---")
+          st.markdown("---")
             st.subheader("📋 Lista Explodida (Por Equipamento)")
             for cav in st.session_state.cavaletes_selecionados:
                 st.markdown(f"#### {cav.get('tag', 'S/ TAG')} - {cav.get('equipamento', '')} (Ø {cav.get('bitola', '')})")
@@ -3813,7 +3813,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     
                     # --- A MÁSCARA COSMÉTICA PARA AS VERBAS ---
                     if "Verba Dinâmica" in comp["nome"]:
-                        # Para verbas, o valor total é o próprio valor calculado, e na tela mostramos como 1 vb
                         valor_total_verba = comp["qtd"] * qtd_conjuntos
                         lista_itens_cav.append({
                             "Componente": comp["nome"],
@@ -3824,7 +3823,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                             "Valor Total": f"R$ {valor_total_verba:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                         })
                     else:
-                        # Para itens normais, faz o cálculo padrão
                         pr_t = pr_u * comp["qtd"] * qtd_conjuntos
                         unidade_item = dict_lookup_unidades.get(n_busca, "un")
                         lista_itens_cav.append({
@@ -3879,55 +3877,155 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             df_bom_final = pd.DataFrame(lista_bom).sort_values(by=["Bitola", "Item / Componente"])
             st.dataframe(df_bom_final, use_container_width=True, hide_index=True)
             
+            # ====================================================================
+            # 📐 NOVA SEÇÃO: PRANCHAS TÉCNICAS DE CARIMBOS PARA AUTOCAD (3 COLUNAS)
+            # ====================================================================
             st.markdown("---")
-            buf_excel_hidro = io.BytesIO()
-            wb_export_h = openpyxl.Workbook()
+            st.subheader("📐 Prancha Técnica de Carimbos para AutoCAD / Projetos")
+            st.caption("Formato padrão de 3 colunas (ITEM | DESCRIÇÃO | QTD) pronto para inserção no desenho técnico do AutoCAD.")
             
-            ws_f = wb_export_h.active; ws_f.title = "Resumo Comercial"
-            ws_f.views.sheetView[0].showGridLines = True
-            ws_f.row_dimensions[1].height = 35
-            ws_f.merge_cells("A1:G1")
-            ws_f.cell(row=1, column=1, value="PLANILHA DE FECHAMENTO DE CUSTOS - CAVALETES HIDRÁULICOS").font = Font(name="Arial", size=12, bold=True, color="1C8590")
-            ws_f.cell(row=1, column=1).alignment = Alignment(horizontal="center", vertical="center")
+            blocos_cad_export = {}
             
-            f_head_ex = PatternFill(start_color="1C8590", end_color="1C8590", fill_type="solid")
-            font_head_ex = Font(name="Arial", size=11, bold=True, color="FFFFFF")
-            b_thin = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
-            
-            df_res_quadros_excel = pd.DataFrame(resumo_financeiro_quadros)
-            for r_i, r_data in enumerate(dataframe_to_rows(df_res_quadros_excel, index=False, header=True), start=3):
-                for c_i, val_cell in enumerate(r_data, start=1):
-                    celula_ex = ws_f.cell(row=r_i, column=c_i, value=val_cell)
-                    celula_ex.border = b_thin
-                    if r_i == 3: 
-                        celula_ex.fill = f_head_ex; celula_ex.font = font_head_ex; celula_ex.alignment = Alignment(horizontal="center")
-                    elif c_i >= 4: 
-                        celula_ex.number_format = '"R$" #,##0.00'; celula_ex.alignment = Alignment(horizontal="right")
-                            
-            custo_total_geral_hidraulica = total_hidro_material + total_hidro_montagem + total_hidro_isolamento
-            linha_tot_f = len(df_res_quadros_excel) + 4
-            ws_f.merge_cells(start_row=linha_tot_f, start_column=1, end_row=linha_tot_f, end_column=6)
-            ws_f.cell(row=linha_tot_f, column=1, value="TOTAL CONSOLIDADO DO ESCOPO HIDRÁULICO:").font = Font(bold=True)
-            ws_f.cell(row=linha_tot_f, column=1).alignment = Alignment(horizontal="right")
-            ws_f_tot_val = ws_f.cell(row=linha_tot_f, column=7, value=custo_total_geral_hidraulica)
-            ws_f_tot_val.font = Font(bold=True, size=11); ws_f_tot_val.number_format = '"R$" #,##0.00'; ws_f_tot_val.border = b_thin
-            
-            ws_b = wb_export_h.create_sheet(title="Lista de Materiais (BOM)")
-            ws_b.views.sheetView[0].showGridLines = True
-            for r_i, r_data in enumerate(dataframe_to_rows(df_bom_final, index=False, header=True), start=1):
-                for c_i, val_cell in enumerate(r_data, start=1):
-                    celula_ex = ws_b.cell(row=r_i, column=c_i, value=val_cell)
-                    celula_ex.border = b_thin
-                    if r_i == 1: 
-                        celula_ex.fill = f_head_ex; celula_ex.font = font_head_ex; celula_ex.alignment = Alignment(horizontal="center")
-            
-            for sheet_obj in [ws_f, ws_b]:
-                for col_obj in sheet_obj.columns:
-                    max_len_val = max(len(str(c_val.value or '')) for c_val in col_obj if c_val.row <= 100)
-                    sheet_obj.column_dimensions[get_column_letter(col_obj[0].column)].width = max(max_len_val + 3, 12)
+            for cav in st.session_state.cavaletes_selecionados:
+                tag_cad = cav.get('tag', 'S/ TAG')
+                eq_cad = cav.get('equipamento', 'EQ')
+                vias_cad = cav.get('vias', '')
+                bit_cad = cav.get('bitola', '')
+                sys_lbl = " [Aberto]" if "Aberto" in cav.get("sistema", "") else ""
+                
+                titulo_carimbo = f"TAG: {tag_cad} | {eq_cad.upper()} ({vias_cad}) - Ø {bit_cad}{sys_lbl}"
+                st.markdown(f"##### 🏷️ `{titulo_carimbo}`")
+                
+                lista_tabela_cad = []
+                num_item = 1
+                
+                for comp in cav['composicao']:
+                    nome_comp = comp["nome"]
+                    if "Verba Dinâmica" in nome_comp:
+                        continue
+                        
+                    n_busca = normalizar_string_busca(nome_comp)
+                    unid_item = dict_lookup_unidades.get(n_busca, "pç")
+                    qtd_cad = comp["qtd"]
+                    qtd_str = f"{int(qtd_cad)}" if qtd_cad == int(qtd_cad) else f"{qtd_cad:.2f}"
                     
-            wb_export_h.save(buf_excel_hidro); buf_excel_hidro.seek(0)
-            st.download_button(label="📥 Exportar Relatório Consolidado para Excel", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidro_v18")
+                    lista_tabela_cad.append({
+                        "ITEM": num_item,
+                        "DESCRIÇÃO DO COMPONENTE": nome_comp,
+                        "QTD": f"{qtd_str} {unid_item}"
+                    })
+                    num_item += 1
+                
+                df_cad_visual = pd.DataFrame(lista_tabela_cad)
+                st.dataframe(df_cad_visual, use_container_width=True, hide_index=True)
+                blocos_cad_export[titulo_carimbo] = df_cad_visual
+
+            # ====================================================================
+            # 📥 EXPORTAÇÕES EXCEL (COMERCIAL VS AUTOCAD)
+            # ====================================================================
+            st.markdown("---")
+            st.subheader("📥 Exportação dos Dados do Projeto")
+            col_exp_com, col_exp_cad = st.columns(2)
+            
+            with col_exp_com:
+                st.markdown("#### 📊 Orçamento & Comercial")
+                st.caption("Planilha contendo preços unitários, resumo financeiro, Mão de Obra e BOM geral.")
+                
+                buf_excel_hidro = io.BytesIO()
+                wb_export_h = openpyxl.Workbook()
+                
+                ws_f = wb_export_h.active; ws_f.title = "Resumo Comercial"
+                ws_f.views.sheetView[0].showGridLines = True
+                ws_f.row_dimensions[1].height = 35
+                ws_f.merge_cells("A1:G1")
+                ws_f.cell(row=1, column=1, value="PLANILHA DE FECHAMENTO DE CUSTOS - CAVALETES HIDRÁULICOS").font = Font(name="Arial", size=12, bold=True, color="1C8590")
+                ws_f.cell(row=1, column=1).alignment = Alignment(horizontal="center", vertical="center")
+                
+                f_head_ex = PatternFill(start_color="1C8590", end_color="1C8590", fill_type="solid")
+                font_head_ex = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+                b_thin = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
+                
+                df_res_quadros_excel = pd.DataFrame(resumo_financeiro_quadros)
+                for r_i, r_data in enumerate(dataframe_to_rows(df_res_quadros_excel, index=False, header=True), start=3):
+                    for c_i, val_cell in enumerate(r_data, start=1):
+                        celula_ex = ws_f.cell(row=r_i, column=c_i, value=val_cell)
+                        celula_ex.border = b_thin
+                        if r_i == 3: 
+                            celula_ex.fill = f_head_ex; celula_ex.font = font_head_ex; celula_ex.alignment = Alignment(horizontal="center")
+                        elif c_i >= 4: 
+                            celula_ex.number_format = '"R$" #,##0.00'; celula_ex.alignment = Alignment(horizontal="right")
+                                
+                custo_total_geral_hidraulica = total_hidro_material + total_hidro_montagem + total_hidro_isolamento
+                linha_tot_f = len(df_res_quadros_excel) + 4
+                ws_f.merge_cells(start_row=linha_tot_f, start_column=1, end_row=linha_tot_f, end_column=6)
+                ws_f.cell(row=linha_tot_f, column=1, value="TOTAL CONSOLIDADO DO ESCOPO HIDRÁULICO:").font = Font(bold=True)
+                ws_f.cell(row=linha_tot_f, column=1).alignment = Alignment(horizontal="right")
+                ws_f_tot_val = ws_f.cell(row=linha_tot_f, column=7, value=custo_total_geral_hidraulica)
+                ws_f_tot_val.font = Font(bold=True, size=11); ws_f_tot_val.number_format = '"R$" #,##0.00'; ws_f_tot_val.border = b_thin
+                
+                ws_b = wb_export_h.create_sheet(title="Lista de Materiais (BOM)")
+                ws_b.views.sheetView[0].showGridLines = True
+                for r_i, r_data in enumerate(dataframe_to_rows(df_bom_final, index=False, header=True), start=1):
+                    for c_i, val_cell in enumerate(r_data, start=1):
+                        celula_ex = ws_b.cell(row=r_i, column=c_i, value=val_cell)
+                        celula_ex.border = b_thin
+                        if r_i == 1: 
+                            celula_ex.fill = f_head_ex; celula_ex.font = font_head_ex; celula_ex.alignment = Alignment(horizontal="center")
+                
+                for sheet_obj in [ws_f, ws_b]:
+                    for col_obj in sheet_obj.columns:
+                        max_len_val = max(len(str(c_val.value or '')) for c_val in col_obj if c_val.row <= 100)
+                        sheet_obj.column_dimensions[get_column_letter(col_obj[0].column)].width = max(max_len_val + 3, 12)
+                        
+                wb_export_h.save(buf_excel_hidro); buf_excel_hidro.seek(0)
+                st.download_button(label="📥 Exportar Relatório Comercial (.xlsx)", data=buf_excel_hidro.getvalue(), file_name="Orcamento_Cavaletes_Consolidado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_hidro_comercial")
+
+            with col_exp_cad:
+                st.markdown("#### 📐 Pranchas AutoCAD / Revit")
+                st.caption("Planilha limpa no padrão de desenho técnico (sem preços) pronta para importar no CAD via Data Link ou Copiar/Colar.")
+                
+                buf_excel_cad = io.BytesIO()
+                wb_export_cad = openpyxl.Workbook()
+                
+                ws_cad = wb_export_cad.active
+                ws_cad.title = "Tabelas_AutoCAD"
+                ws_cad.views.sheetView[0].showGridLines = True
+                
+                f_head_cad = PatternFill(start_color="333333", end_color="333333", fill_type="solid")
+                font_head_cad = Font(name="Arial", size=10, bold=True, color="FFFFFF")
+                font_tag_cad = Font(name="Arial", size=11, bold=True, color="000000")
+                b_thin_cad = Border(left=Side(style='thin', color='000000'), right=Side(style='thin', color='000000'), top=Side(style='thin', color='000000'), bottom=Side(style='thin', color='000000'))
+                
+                linha_atual_cad = 1
+                for titulo_tag, df_tabela in blocos_cad_export.items():
+                    ws_cad.merge_cells(start_row=linha_atual_cad, start_column=1, end_row=linha_atual_cad, end_column=3)
+                    cel_tag = ws_cad.cell(row=linha_atual_cad, column=1, value=titulo_tag)
+                    cel_tag.font = font_tag_cad
+                    cel_tag.alignment = Alignment(horizontal="left", vertical="center")
+                    linha_atual_cad += 1
+                    
+                    for r_i, r_data in enumerate(dataframe_to_rows(df_tabela, index=False, header=True), start=linha_atual_cad):
+                        for c_i, val_cell in enumerate(r_data, start=1):
+                            cel = ws_cad.cell(row=r_i, column=c_i, value=val_cell)
+                            cel.border = b_thin_cad
+                            cel.font = Font(name="Arial", size=9)
+                            if r_i == linha_atual_cad:
+                                cel.fill = f_head_cad
+                                cel.font = font_head_cad
+                                cel.alignment = Alignment(horizontal="center")
+                            elif c_i == 1 or c_i == 3:
+                                cel.alignment = Alignment(horizontal="center")
+                            else:
+                                cel.alignment = Alignment(horizontal="left")
+                                
+                    linha_atual_cad += len(df_tabela) + 3
+                
+                ws_cad.column_dimensions["A"].width = 10  # ITEM
+                ws_cad.column_dimensions["B"].width = 58  # DESCRIÇÃO DO COMPONENTE
+                ws_cad.column_dimensions["C"].width = 16  # QTD
+                
+                wb_export_cad.save(buf_excel_cad); buf_excel_cad.seek(0)
+                st.download_button(label="📥 Exportar Pranchas para AutoCAD (.xlsx)", data=buf_excel_cad.getvalue(), file_name="Tabelas_Cavaletes_AutoCAD.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="btn_export_excel_cad_prancha")
             
             st.markdown("---")
             st.markdown("### 📝 Descritivo Comercial Automático")
