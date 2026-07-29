@@ -3799,7 +3799,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             for col in ["Materiais", "Mão de Obra", "Subtotal"]: df_res_quadros_disp[col] = df_res_quadros_disp[col].apply(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             st.dataframe(df_res_quadros_disp, use_container_width=True, hide_index=True)
             
-          st.markdown("---")
+            st.markdown("---")
             st.subheader("📋 Lista Explodida (Por Equipamento)")
             for cav in st.session_state.cavaletes_selecionados:
                 st.markdown(f"#### {cav.get('tag', 'S/ TAG')} - {cav.get('equipamento', '')} (Ø {cav.get('bitola', '')})")
