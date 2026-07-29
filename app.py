@@ -2870,18 +2870,25 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         banco_geral = {}
         leitura_nuvem_sucesso = False
         
-        # 1. Tenta puxar do Google Sheets na nuvem (Aplicando conversão blindada item a item)
+        # 1. Tenta puxar do Google Sheets na nuvem (Lendo o valor matemático puro, sem formatação visual)
         try:
             sh_hidro = conectar_google_sheets()
             ws_h = sh_hidro.worksheet("Precos_Hidraulica_Itens")
-            aba_h = ws_h.get_all_records()
+            # UNFORMATTED_VALUE é a chave: impede que o Google Sheets transforme 16.2 em 162 por causa do idioma!
+            aba_h = ws_h.get_all_records(value_render_option='UNFORMATTED_VALUE')
             if len(aba_h) > 0:
                 for row in aba_h:
                     nome_orig = str(row.get("Item / Componente", "")).strip()
                     if nome_orig and nome_orig.lower() not in ["nan", "none", ""]:
                         chave = normalizar_string_busca(nome_orig)
-                        # --- BLINDAGEM OBRIGATÓRIA PARA TODOS OS USUÁRIOS ---
-                        preco_limpo = converter_preco_blindado(row.get("Preço Unitário (R$)", 0.0))
+                        
+                        # Converte de forma direta e segura para float
+                        val_bruto = row.get("Preço Unitário (R$)", 0.0)
+                        try:
+                            preco_limpo = float(val_bruto)
+                        except (ValueError, TypeError):
+                            preco_limpo = converter_preco_blindado(val_bruto)
+                            
                         unid_limpa = str(row.get("Unidade", "pç")).strip()
                         if not unid_limpa or unid_limpa.lower() == "nan": unid_limpa = "pç"
                         
@@ -2893,7 +2900,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 leitura_nuvem_sucesso = True
         except Exception as e:
             pass
-
         # 2. Se a nuvem falhou, puxa da memória local para não perder o que foi digitado
         if not leitura_nuvem_sucesso and 'banco_precos_hidraulica' in st.session_state and st.session_state.banco_precos_hidraulica:
             for row in st.session_state.banco_precos_hidraulica:
@@ -3562,7 +3568,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         st.subheader("💲 Gestão de Tabela de Preços e Base Hidráulica")
         st.markdown("Você pode **editar os preços manually direto na tabela abaixo** ou usar as opções de **Upload/Download via Excel**.")
         
-        # FUNÇÃO BLINDADA: Grava números matemáticos puros (RAW) sem conflito de idioma EUA/Brasil
+        # FUNÇÃO BLINDADA: Grava decimais de forma universal compatível com qualquer navegador
         def gravar_sheets_numerico_puro(lista_banco):
             sh_p = conectar_google_sheets()
             try: ws_p = sh_p.worksheet("Precos_Hidraulica_Itens")
@@ -3572,19 +3578,18 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             linhas_gravar = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]]
             for item in lista_banco:
                 nm = str(item.get("Item / Componente", "")).strip()
-                # Converte para FLOAT puro numérico (ex: 16.2)
                 pr_num = float(converter_preco_blindado(item.get("Preço Unitário (R$)", 0.0)))
                 un = str(item.get("Unidade", "pç")).strip()
                 
+                # Envia o float puro nativo para o Google Sheets
                 linhas_gravar.append([nm, pr_num, un])
                 
-            # O modo RAW obriga o Google Sheets a gravar o valor matemático real sem alterar casas decimais
-            ws_p.append_rows(linhas_gravar, value_input_option='RAW')
+            # USER_ENTERED faz o Google Sheets interpretar o float corretamente no idioma da planilha
+            ws_p.append_rows(linhas_gravar, value_input_option='USER_ENTERED')
             
-            # Limpa todo o cache do servidor para que qualquer navegador/usuário leia os dados novos na hora
+            # Limpa o cache de todas as sessões para que Firefox, Edge e Chrome atualizem na hora
             st.cache_data.clear()
             st.cache_resource.clear()
-
         # 1. Edição Manual Direta na Tela
         df_exibicao_precos = pd.DataFrame(st.session_state.banco_precos_hidraulica)
         
