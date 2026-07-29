@@ -3560,10 +3560,10 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
     
     with aba_precos_hidro:
         st.subheader("💲 Gestão de Tabela de Preços e Base Hidráulica")
-        st.markdown("Você pode **editar os preços manualmente direto na tabela abaixo** ou usar as opções de **Upload/Download via Excel**.")
+        st.markdown("Você pode **editar os preços manually direto na tabela abaixo** ou usar as opções de **Upload/Download via Excel**.")
         
-        # Função interna para gravar no Google Sheets no formato pt-BR sem multiplicar por 10
-        def gravar_sheets_ptbr_seguro(lista_banco):
+        # FUNÇÃO BLINDADA: Grava números matemáticos puros (RAW) sem conflito de idioma EUA/Brasil
+        def gravar_sheets_numerico_puro(lista_banco):
             sh_p = conectar_google_sheets()
             try: ws_p = sh_p.worksheet("Precos_Hidraulica_Itens")
             except: ws_p = sh_p.add_worksheet(title="Precos_Hidraulica_Itens", rows="2000", cols="10")
@@ -3572,17 +3572,16 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             linhas_gravar = [["Item / Componente", "Preço Unitário (R$)", "Unidade"]]
             for item in lista_banco:
                 nm = str(item.get("Item / Componente", "")).strip()
-                pr = float(item.get("Preço Unitário (R$)", 0.0))
+                # Converte para FLOAT puro numérico (ex: 16.2)
+                pr_num = float(converter_preco_blindado(item.get("Preço Unitário (R$)", 0.0)))
                 un = str(item.get("Unidade", "pç")).strip()
                 
-                # Formata com VÍRGULA para o Google Sheets pt-BR nunca multiplicar por 10!
-                pr_str_ptbr = f"{pr:.2f}".replace(".", ",")
-                linhas_gravar.append([nm, pr_str_ptbr, un])
+                linhas_gravar.append([nm, pr_num, un])
                 
-            # USER_ENTERED força o Sheets a respeitar a vírgula como decimal exato
-            ws_p.append_rows(linhas_gravar, value_input_option='USER_ENTERED')
+            # O modo RAW obriga o Google Sheets a gravar o valor matemático real sem alterar casas decimais
+            ws_p.append_rows(linhas_gravar, value_input_option='RAW')
             
-            # LIMPA O CACHE DO STREAMLIT PARA TODOS OS USUÁRIOS E NAVEGADORES
+            # Limpa todo o cache do servidor para que qualquer navegador/usuário leia os dados novos na hora
             st.cache_data.clear()
             st.cache_resource.clear()
 
@@ -3593,7 +3592,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             df_exibicao_precos,
             use_container_width=True,
             hide_index=True,
-            key="editor_precos_hidro_v28",
+            key="editor_precos_hidro_v29",
             num_rows="dynamic",
             column_config={
                 "Preço Unitário (R$)": st.column_config.NumberColumn(
@@ -3605,7 +3604,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             }
         )
         
-        if st.button("💾 Salvar Alterações Manuais na Nuvem", type="primary", use_container_width=True, key="btn_salvar_manuais_v28"):
+        if st.button("💾 Salvar Alterações Manuais na Nuvem", type="primary", use_container_width=True, key="btn_salvar_manuais_v29"):
             try:
                 nova_lista_manual = []
                 for _, linha in df_editado_precos.iterrows():
@@ -3617,15 +3616,15 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         
                         nova_lista_manual.append({
                             "Item / Componente": item_nm,
-                            "Preço Unitário (R$)": preco_limpo,
+                            "Preço Unitário (R$)": float(preco_limpo),
                             "Unidade": unid_limpa
                         })
                 
                 st.session_state.banco_precos_hidraulica = nova_lista_manual
                 
                 try:
-                    gravar_sheets_ptbr_seguro(nova_lista_manual)
-                    st.toast("✅ Preços salvos na Nuvem (formato pt-BR) com sucesso!", icon="💾")
+                    gravar_sheets_numerico_puro(nova_lista_manual)
+                    st.toast("✅ Preços salvas na Nuvem (Modo RAW Numérico) com sucesso!", icon="💾")
                 except Exception as e_nuvem:
                     st.warning("⚠️ Alterações salvas apenas na memória local (Sem conexão com a nuvem).")
                 
@@ -3660,10 +3659,10 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         # 3. Upload e Atualização Blindada via Excel
         with col_up2:
             st.markdown("#### 2️⃣ Subir Planilha Atualizada")
-            arquivo_excel_precos = st.file_uploader("Selecione o arquivo Excel atualizado:", type=["xlsx", "xls"], key="up_excel_precos_v28")
+            arquivo_excel_precos = st.file_uploader("Selecione o arquivo Excel atualizado:", type=["xlsx", "xls"], key="up_excel_precos_v29")
             
             if arquivo_excel_precos is not None:
-                if st.button("🔄 Processar e Salvar Preços na Nuvem", type="primary", use_container_width=True, key="btn_salvar_precos_v28"):
+                if st.button("🔄 Processar e Salvar Preços na Nuvem", type="primary", use_container_width=True, key="btn_salvar_precos_v29"):
                     try:
                         df_novo = pd.read_excel(arquivo_excel_precos)
                         
@@ -3678,15 +3677,15 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                                     
                                     nova_lista_banco.append({
                                         "Item / Componente": item_nm,
-                                        "Preço Unitário (R$)": preco_limpo,
+                                        "Preço Unitário (R$)": float(preco_limpo),
                                         "Unidade": unid_limpa
                                     })
                             
                             st.session_state.banco_precos_hidraulica = nova_lista_banco
                             
                             try:
-                                gravar_sheets_ptbr_seguro(nova_lista_banco)
-                                st.toast("✅ Preços atualizados via Excel na Nuvem com sucesso!", icon="☁️")
+                                gravar_sheets_numerico_puro(nova_lista_banco)
+                                st.toast("✅ Preços atualizados via Excel (Modo RAW) com sucesso!", icon="☁️")
                             except Exception as e_nuvem:
                                 st.warning("⚠️ Preços atualizados apenas na memória local (Sem conexão com a nuvem).")
                             
