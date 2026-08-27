@@ -355,7 +355,7 @@ REGRA_IO = {
     "Transmissor de temperatura e umidade ambiente com display (TIT/MIT)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
     "Transmissor de CO2 ambiente (AT/AIT)": {"AI": 1, "AO": 1, "DI": 0, "DO": 1},
     "Transmissor de temperatura de imersão (TT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-    "Transmissor de temperatura de imersão com display (TIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0}
+    "Transmissor de temperatura de imersão com display (TIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
     "Integração de chiller (via rede)": {"AI": 0, "AO": 0, "DI": 0, "DO": 0},
     "Bomba de água gelada - Partida direta": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
     "Bomba de água gelada - Inversor de frequência": {"AI": 0, "AO": 1, "DI": 1, "DO": 1},
