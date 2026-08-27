@@ -449,7 +449,7 @@ banco_padrao_precos = {
     "Serviço de Calibração (Por Ponto Analógico)": 180.00,
     "IHM Padrão 7\"": 3400.00,
     "IHM Premium 10\"": 8500.00,
-    "Sem Interface (Cego)": 0.00
+    "Sem Interface (Cego)": 0.00,
     "Integração de chiller (via rede)": 1800.00,
     "Bomba de água gelada - Partida direta": 0.00, # Apenas mapeia I/O, custo vai pro painel/serviço
     "Bomba de água gelada - Inversor de frequência": 0.00, # Apenas mapeia I/O
