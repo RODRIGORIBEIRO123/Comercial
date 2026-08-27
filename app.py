@@ -519,7 +519,6 @@ GRUPOS_INSTRUMENTOS = {
         "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", 
         "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)", 
         "Chave de fluxo para água (FS/CF)"
-        "Chave de fluxo chiller"
     ],
     "🟢 Monitoramento e Controle de Ambientes": [
         "Transmissor de pressão diferencial entre salas (PDT)",
@@ -529,6 +528,19 @@ GRUPOS_INSTRUMENTOS = {
         "Transmissor de temperatura e umidade ambiente (TT/MT)",
         "Transmissor de temperatura e umidade ambiente com display (TIT/MIT)",
         "Transmissor de CO2 ambiente (AT/AIT)"
+    ],
+    "🧊 Equipamentos CAG (Água Gelada)": [
+        "Integração de chiller (via rede)",
+        "Chave de fluxo chiller (FS/CF)",
+        "Bomba de água gelada - Partida direta",
+        "Bomba de água gelada - Inversor de frequência",
+        "Transmissor de temperatura para água (TT)",
+        "Transmissor de pressão pontual para água (PIT)",
+        "Transmissor de Vazão para água ultrassônico (FIT)",
+        "Válvula proporcional para By pass - Até 2\"",
+        "Válvula proporcional para By pass - 2.1/2\"",
+        "Válvula proporcional para By pass - 3\"",
+        "Válvula proporcional para By pass - 4\""
     ]
 }
 
