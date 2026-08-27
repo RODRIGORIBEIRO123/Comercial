@@ -2506,6 +2506,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
             # Geração do Arquivo Excel Separado por Abas
             def gerar_excel_por_painel(df_inst, df_hw, df_sw, df_serv, total_geral):
+                import re # Importação necessária para limpar os caracteres inválidos
+                
                 wb = openpyxl.Workbook()
                 aba_padrao = wb.active
                 wb.remove(aba_padrao)
@@ -2523,11 +2525,15 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 
                 df_completo = pd.concat(lista_dfs, ignore_index=True) if lista_dfs else pd.DataFrame()
                 
-                # Obtem a lista de painéis únicos
+                # Obtém a lista de painéis únicos
                 paineis_unicos = df_completo['Painel_Origem'].unique().tolist() if not df_completo.empty else []
                 
                 for painel_nome in paineis_unicos:
-                    nome_aba_seguro = str(painel_nome)[:30]
+                    # BLINDAGEM: Troca caracteres proibidos no Excel (\, /, *, ?, :, [, ]) por hífen
+                    nome_aba_seguro = str(painel_nome)
+                    nome_aba_seguro = re.sub(r'[\\/*?:\[\]]', '-', nome_aba_seguro)
+                    nome_aba_seguro = nome_aba_seguro[:30] # Limite estrito do Excel
+                    
                     ws = wb.create_sheet(title=nome_aba_seguro)
                     
                     df_painel = df_completo[df_completo['Painel_Origem'] == painel_nome]
