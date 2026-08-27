@@ -2074,14 +2074,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         
         softwares_incluidos = {}
         
-        total_ai_schneider = total_ao_schneider = total_di_schneider = total_do_schneider = 0
-        total_ai_siemens = total_ao_siemens = total_di_siemens = total_do_siemens = 0
-        total_io_mercato = 0
-        
-        custo_base_schneider = 0.0
-        custo_base_siemens = 0.0
-        custo_base_mercato = 0.0
-
         descritivo_linhas_excel = ["DESCRIÇÃO TÉCNICA DO ESCOPO CONTEMPLADO:\n"]
         descritivo_comercial_linhas = []
 
@@ -2100,6 +2092,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
             qtd_equipamentos_painel = 0
             total_pontos_calibracao = 0
+            
+            custo_base_schneider_painel = 0.0
+            custo_base_siemens_painel = 0.0
+            custo_base_mercato_painel = 0.0
             
             lista_equip_nomes = []
             tem_resistencia = False
@@ -2206,26 +2202,24 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         if "Integração de chiller" in inst:
                             custo_tot_inst = qtd_final * preco_item
                             linhas_servicos.append({
-                                "Painel_Origem": p['nome'],
-                                "Categoria": "Serviços de Lógica",
-                                "Item": f"Desenvolvimento de Integração via Rede: Chiller ({nome_equip_inst} - {p['nome']})",
+                                "Painel_Origem": p['nome'], "Categoria": "Serviços de Lógica",
+                                "Item": f"Desenvolvimento de Integração via Rede: Chiller ({nome_equip_inst})",
                                 "Preço Unit.": preco_item, "Qtd": qtd_final, "Custo Total": custo_tot_inst
                             })
                         else:
                             custo_tot_inst = qtd_final * preco_item
                             linhas_inst_campo.append({
-                                "Painel_Origem": p['nome'],
-                                "Categoria": "Instrumentação de Campo", 
-                                "Item": f"{item_nome_real} ({nome_equip_inst} - {p['nome']})", 
+                                "Painel_Origem": p['nome'], "Categoria": "Instrumentação de Campo", 
+                                "Item": f"{item_nome_real} ({nome_equip_inst})", 
                                 "Preço Unit.": preco_item, "Qtd": qtd_final, "Custo Total": custo_tot_inst
                             })
                             
                         linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": nome_equip_inst, "Instrumento": item_nome_real, "Quantidade Total": qtd_final, "Entrada Digital (DI)": qtd_final * io_vals["DI"], "Saída Digital (DO)": qtd_final * io_vals["DO"], "Entrada Analógica (AI)": qtd_final * io_vals["AI"], "Saída Analógica (AO)": qtd_final * io_vals["AO"]})
                         
                         if "Integração de chiller" not in inst:
-                            if is_siemens: custo_base_siemens += custo_tot_inst
-                            elif is_mercato: custo_base_mercato += custo_tot_inst
-                            else: custo_base_schneider += custo_tot_inst
+                            if is_siemens: custo_base_siemens_painel += custo_tot_inst
+                            elif is_mercato: custo_base_mercato_painel += custo_tot_inst
+                            else: custo_base_schneider_painel += custo_tot_inst
                 
                 if tem_motor and not is_monitoramento:
                     raw_di_painel += (2 * mult)
@@ -2244,17 +2238,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     if modelo_mcp:
                         controladores_desc_lista.append(f"{mult}x {modelo_mcp.replace('Mercato - ', '')}")
                         p_hw = st.session_state.precos_banco.get(modelo_mcp, 1650.0)
-                        linhas_hardware.append({"Painel_Origem": p['nome'], "Categoria": "Hardware e Painéis", "Item": f"{modelo_mcp} ({g['nome_grupo']} - {p['nome']})", "Preço Unit.": p_hw, "Qtd": mult, "Custo Total": mult * p_hw})
-                        custo_base_mercato += (mult * p_hw)
+                        linhas_hardware.append({"Painel_Origem": p['nome'], "Categoria": "Hardware e Painéis", "Item": f"{modelo_mcp} ({g['nome_grupo']})", "Preço Unit.": p_hw, "Qtd": mult, "Custo Total": mult * p_hw})
+                        custo_base_mercato_painel += (mult * p_hw)
 
             if total_pontos_calibracao > 0:
                 pr_calib = st.session_state.precos_banco.get("Serviço de Calibração (Por Ponto Analógico)", 180.0)
-                linhas_servicos.append({
-                    "Painel_Origem": p['nome'],
-                    "Categoria": "Serviços de Lógica", 
-                    "Item": f"Calibração de Instrumentos Analógicos ({p['nome']})", 
-                    "Preço Unit.": pr_calib, "Qtd": total_pontos_calibracao, "Custo Total": total_pontos_calibracao * pr_calib
-                })
+                linhas_servicos.append({"Painel_Origem": p['nome'], "Categoria": "Serviços de Lógica", "Item": f"Calibração de Instrumentos Analógicos ({p['nome']})", "Preço Unit.": pr_calib, "Qtd": total_pontos_calibracao, "Custo Total": total_pontos_calibracao * pr_calib})
 
             reserva_ai_painel = math.ceil(raw_ai_painel * 0.2) if tem_sobra_20 else 0
             reserva_ao_painel = math.ceil(raw_ao_painel * 0.2) if tem_sobra_20 else 0
@@ -2271,25 +2260,17 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             if reserva_ai_painel > 0 or reserva_ao_painel > 0 or reserva_di_painel > 0 or reserva_do_painel > 0:
                 linhas_pontos.append({"Painel": p['nome'], "Grupo/Equipamento": "Reserva Técnica (20%)", "Instrumento": "Pontos de Sobra Física do Quadro", "Quantidade Total": "-", "Entrada Digital (DI)": reserva_di_painel, "Saída Digital (DO)": reserva_do_painel, "Entrada Analógica (AI)": reserva_ai_painel, "Saída Analógica (AO)": reserva_ao_painel})
 
-            if is_siemens:
-                total_ai_siemens += raw_ai_painel; total_ao_siemens += raw_ao_painel; total_di_siemens += raw_di_painel; total_do_siemens += raw_do_painel
-            elif is_mercato:
-                total_io_mercato += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel)
-            else:
-                total_ai_schneider += raw_ai_painel; total_ao_schneider += raw_ao_painel; total_di_schneider += raw_di_painel; total_do_schneider += raw_do_painel
-            
             if tot_io_painel_hw > 0:
                 if is_mercato:
                     nome_caixa, preco_caixa = calcular_painel_fisico(qtd_equipamentos_painel)
                     linhas_hardware.append({"Painel_Origem": p['nome'], "Categoria": "Hardware e Painéis", "Item": f"Estrutura Física: {nome_caixa} ({p['nome']})", "Preço Unit.": preco_caixa, "Qtd": 1, "Custo Total": preco_caixa})
-                    custo_base_mercato += preco_caixa
-                        
+                    custo_base_mercato_painel += preco_caixa
                 else:
                     nome_caixa, preco_caixa = calcular_painel_fisico(tot_io_painel_hw/15)
                     linhas_hardware.append({"Painel_Origem": p['nome'], "Categoria": "Hardware e Painéis", "Item": f"Estrutura Física: {nome_caixa} ({p['nome']})", "Preço Unit.": preco_caixa, "Qtd": 1, "Custo Total": preco_caixa})
                     
                     if is_siemens:
-                        custo_base_siemens += preco_caixa
+                        custo_base_siemens_painel += preco_caixa
                         if is_siemens_1200: hw_s = dimensionar_siemens_1200(hw_ai_painel, hw_ao_painel, hw_di_painel, hw_do_painel)
                         else: hw_s = dimensionar_siemens_1500(hw_ai_painel, hw_ao_painel, hw_di_painel, hw_do_painel)
                         for i_hw, q_hw in hw_s.items():
@@ -2297,34 +2278,61 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 controladores_desc_lista.append(f"{q_hw}x {i_hw.replace('Siemens - ', '')}")
                                 pr = st.session_state.precos_banco.get(i_hw, 0.0)
                                 linhas_hardware.append({"Painel_Origem": p['nome'], "Categoria": "Hardware e Painéis", "Item": f"{i_hw} ({p['nome']})", "Preço Unit.": pr, "Qtd": q_hw, "Custo Total": q_hw * pr})
-                                custo_base_siemens += (q_hw * pr)
+                                custo_base_siemens_painel += (q_hw * pr)
                     else:
-                        custo_base_schneider += preco_caixa
+                        custo_base_schneider_painel += preco_caixa
                         c36, c24, c18, c15 = dimensionar_controladores(tot_io_painel_hw)
                         if c36 > 0: 
                             controladores_desc_lista.append(f"{c36}x Controlador MP-C-36A")
                             linhas_hardware.append({"Painel_Origem": p['nome'], "Categoria": "Hardware e Painéis", "Item": f"Controlador MP-C-36A ({p['nome']})", "Preço Unit.": st.session_state.precos_banco.get("MP-C-36A", 9459.0), "Qtd": c36, "Custo Total": c36 * st.session_state.precos_banco.get("MP-C-36A", 9459.0)})
-                            custo_base_schneider += (c36 * st.session_state.precos_banco.get("MP-C-36A", 9459.0))
+                            custo_base_schneider_painel += (c36 * st.session_state.precos_banco.get("MP-C-36A", 9459.0))
                         if c24 > 0: 
                             controladores_desc_lista.append(f"{c24}x Controlador MP-C-24A")
                             linhas_hardware.append({"Painel_Origem": p['nome'], "Categoria": "Hardware e Painéis", "Item": f"Controlador MP-C-24A ({p['nome']})", "Preço Unit.": st.session_state.precos_banco.get("MP-C-24A", 7290.0), "Qtd": c24, "Custo Total": c24 * st.session_state.precos_banco.get("MP-C-24A", 7290.0)})
-                            custo_base_schneider += (c24 * st.session_state.precos_banco.get("MP-C-24A", 7290.0))
+                            custo_base_schneider_painel += (c24 * st.session_state.precos_banco.get("MP-C-24A", 7290.0))
                         if c18 > 0: 
                             controladores_desc_lista.append(f"{c18}x Controlador MP-C-18A")
                             linhas_hardware.append({"Painel_Origem": p['nome'], "Categoria": "Hardware e Painéis", "Item": f"Controlador MP-C-18A ({p['nome']})", "Preço Unit.": st.session_state.precos_banco.get("MP-C-18A", 5185.0), "Qtd": c18, "Custo Total": c18 * st.session_state.precos_banco.get("MP-C-18A", 5185.0)})
-                            custo_base_schneider += (c18 * st.session_state.precos_banco.get("MP-C-18A", 5185.0))
+                            custo_base_schneider_painel += (c18 * st.session_state.precos_banco.get("MP-C-18A", 5185.0))
                         if c15 > 0: 
                             controladores_desc_lista.append(f"{c15}x Controlador MP-C-15A")
                             linhas_hardware.append({"Painel_Origem": p['nome'], "Categoria": "Hardware e Painéis", "Item": f"Controlador MP-C-15A ({p['nome']})", "Preço Unit.": st.session_state.precos_banco.get("MP-C-15A", 4649.0), "Qtd": c15, "Custo Total": c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0)})
-                            custo_base_schneider += (c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0))
+                            custo_base_schneider_painel += (c15 * st.session_state.precos_banco.get("MP-C-15A", 4649.0))
                 
                 if p.get('ihm') and "Cego" not in p['ihm']:
                     preco_ihm = st.session_state.precos_banco.get(p['ihm'], 0.0)
                     if preco_ihm > 0: 
                         linhas_hardware.append({"Painel_Origem": p['nome'], "Categoria": "Hardware e Painéis", "Item": f"Interface: {p['ihm']} ({p['nome']})", "Preço Unit.": preco_ihm, "Qtd": 1, "Custo Total": preco_ihm})
-                        if is_mercato: custo_base_mercato += preco_ihm
-                        elif is_siemens: custo_base_siemens += preco_ihm
-                        else: custo_base_schneider += preco_ihm
+                        if is_mercato: custo_base_mercato_painel += preco_ihm
+                        elif is_siemens: custo_base_siemens_painel += preco_ihm
+                        else: custo_base_schneider_painel += preco_ihm
+
+                # -------------------------------------------------------------
+                # CÁLCULO DA LÓGICA E M.O. POR PAINEL (NOVA REGRA)
+                # -------------------------------------------------------------
+                if is_schneider:
+                    if (raw_ai_painel + raw_ao_painel) > 0:
+                        pr_ai_sch = st.session_state.precos_banco.get("Custo AI/AO", 565.0)
+                        linhas_servicos.append({"Painel_Origem": p['nome'], "Categoria": "Serviços de Lógica", "Item": "Serviços de lógica: Pontos Analógicos (Base Schneider)", "Preço Unit.": pr_ai_sch, "Qtd": (raw_ai_painel + raw_ao_painel), "Custo Total": (raw_ai_painel + raw_ao_painel) * pr_ai_sch})
+                    if (raw_di_painel + raw_do_painel) > 0:
+                        pr_di_sch = st.session_state.precos_banco.get("Custo DI/DO", 120.0)
+                        linhas_servicos.append({"Painel_Origem": p['nome'], "Categoria": "Serviços de Lógica", "Item": "Serviços de lógica: Pontos Digitais (Base Schneider)", "Preço Unit.": pr_di_sch, "Qtd": (raw_di_painel + raw_do_painel), "Custo Total": (raw_di_painel + raw_do_painel) * pr_di_sch})
+                elif is_siemens:
+                    if (raw_ai_painel + raw_ao_painel) > 0:
+                        pr_ai_siem = st.session_state.precos_banco.get("Siemens - Serviço Custo AI/AO", 750.0)
+                        linhas_servicos.append({"Painel_Origem": p['nome'], "Categoria": "Serviços de Lógica", "Item": "Serviços de lógica (Siemens): Pontos Analógicos", "Preço Unit.": pr_ai_siem, "Qtd": (raw_ai_painel + raw_ao_painel), "Custo Total": (raw_ai_painel + raw_ao_painel) * pr_ai_siem})
+                    if (raw_di_painel + raw_do_painel) > 0:
+                        pr_di_siem = st.session_state.precos_banco.get("Siemens - Serviço Custo DI/DO", 180.0)
+                        linhas_servicos.append({"Painel_Origem": p['nome'], "Categoria": "Serviços de Lógica", "Item": "Serviços de lógica (Siemens): Pontos Digitais", "Preço Unit.": pr_di_siem, "Qtd": (raw_di_painel + raw_do_painel), "Custo Total": (raw_di_painel + raw_do_painel) * pr_di_siem})
+                elif is_mercato:
+                    tot_io_m = raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel
+                    if tot_io_m > 0:
+                        pr_serv_merc = st.session_state.precos_banco.get("Mercato - Serviço Parametrização por Ponto", 80.0)
+                        linhas_servicos.append({"Painel_Origem": p['nome'], "Categoria": "Serviços de Lógica", "Item": "Parametrização de Pontos (Mercato)", "Preço Unit.": pr_serv_merc, "Qtd": tot_io_m, "Custo Total": tot_io_m * pr_serv_merc})
+
+                mo_extra_painel = (custo_base_schneider_painel * 0.25) + (custo_base_siemens_painel * 0.35) + (custo_base_mercato_painel * 0.10)
+                if mo_extra_painel > 0:
+                    linhas_servicos.append({"Painel_Origem": p['nome'], "Categoria": "Serviços de Lógica", "Item": "Demais programações e desenvolvimentos em Automação", "Preço Unit.": mo_extra_painel, "Qtd": 1, "Custo Total": mo_extra_painel})
 
                 s_type = p.get('supervisorio', "Sem Supervisório")
                 if s_type != "Sem Supervisório":
@@ -2332,20 +2340,16 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         pr_as = st.session_state.precos_banco.get("Schneider - Servidor de Automação (SpaceLogic AS-P/AS-B)", 9500.0)
                         controladores_desc_lista.append("1x Servidor de Automação AS-P/AS-B")
                         linhas_hardware.append({"Painel_Origem": p['nome'], "Categoria": "Hardware e Painéis", "Item": f"Servidor de Automação AS-P/AS-B ({p['nome']})", "Preço Unit.": pr_as, "Qtd": 1, "Custo Total": pr_as})
-                        custo_base_schneider += pr_as
                         
                     chave_soft = (s_type, tipo_cfr_painel)
                     if chave_soft not in softwares_incluidos: softwares_incluidos[chave_soft] = 0
                     softwares_incluidos[chave_soft] += (raw_ai_painel + raw_ao_painel + raw_di_painel + raw_do_painel)
 
+            # DESCRIÇÃO TEXTUAL DA PROPOSTA
             ihm_desc = f"com IHM instalada na porta, com display de {p['ihm'].replace('Mercato - ', '').replace('IHM Padrão ', '').replace('IHM Premium ', '').replace('IHM Básica ', '')}" if "Cego" not in p['ihm'] else "sem interface IHM instalada"
-            
-            if "Sem" in str(p.get('supervisorio', 'Sem')): 
-                sup_desc = "Stand-alone (sem supervisório)"
-            elif "EBO" in str(p.get('supervisorio', '')): 
-                sup_desc = "integrado ao sistema supervisório EBO"
-            else: 
-                sup_desc = "integrado ao sistema supervisório"
+            if "Sem" in str(p.get('supervisorio', 'Sem')): sup_desc = "Stand-alone (sem supervisório)"
+            elif "EBO" in str(p.get('supervisorio', '')): sup_desc = "integrado ao sistema supervisório EBO"
+            else: sup_desc = "integrado ao sistema supervisório"
             
             texto_filtro = ""
             bullet_filtros = ""
@@ -2357,7 +2361,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 bullet_filtros = "• Monitoramento para alarme devido à saturação de filtros.\n"
                 
             res_desc_intro = "controle da resistência elétrica de aquecimento" if tem_resistencia else ""
-            
             componentes_intro = []
             if texto_filtro: componentes_intro.append(texto_filtro)
             if res_desc_intro: componentes_intro.append(res_desc_intro)
@@ -2366,57 +2369,34 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             str_eqs_nome = ", ".join(lista_equip_nomes) if lista_equip_nomes else "Equipamentos do Quadro"
             str_ctrls_desc = ", ".join(controladores_desc_lista) if controladores_desc_lista else "Controladores"
             
-            txt_p = (
-                f"Sistema de automação dedicado para controle de {str_eqs_nome}{texto_intro_extra}.\n\n"
-                f"O sistema contempla quadro de automação [TAG: {p['nome']}] {ihm_desc}, "
-                f"baseado na tecnologia {arquitetura_atual.replace(' - Linha mais econômica', '')} ({str_ctrls_desc}), operando no modo {sup_desc}, "
-                f"permitindo a visualização em tempo real e o controle dos seguintes parâmetros operacionais gerais:\n\n"
-                f"• Status de operação dos equipamentos.\n"
-                f"{bullet_filtros}"
-            )
-            
-            if tem_resistencia: 
-                txt_p += "• Status e acionamento da resistência elétrica.\n"
-                
+            txt_p = (f"Sistema de automação dedicado para controle de {str_eqs_nome}{texto_intro_extra}.\n\n"
+                     f"O sistema contempla quadro de automação [TAG: {p['nome']}] {ihm_desc}, "
+                     f"baseado na tecnologia {arquitetura_atual.replace(' - Linha mais econômica', '')} ({str_ctrls_desc}), operando no modo {sup_desc}, "
+                     f"permitindo a visualização em tempo real e o controle dos seguintes parâmetros operacionais gerais:\n\n"
+                     f"• Status de operação dos equipamentos.\n{bullet_filtros}")
+            if tem_resistencia: txt_p += "• Status e acionamento da resistência elétrica.\n"
             str_insts = ", ".join(list(lista_instrumentos_nomes)) if lista_instrumentos_nomes else "Instrumentos diversos"
-            txt_p += (
-                f"• Leitura de instrumentos de campo diversos ({str_insts}).\n"
-                f"• Condições gerais de funcionamento.\n\n"
-                f"A solução proporciona maior confiabilidade operacional, facilidade de manutenção e gestão eficiente dos ativos térmicos e de controle de ar."
-            )
+            txt_p += (f"• Leitura de instrumentos de campo diversos ({str_insts}).\n• Condições gerais de funcionamento.\n\n"
+                      f"A solução proporciona maior confiabilidade operacional, facilidade de manutenção e gestão eficiente dos ativos térmicos e de controle de ar.")
             
-            if calibracao_ativa:
-                txt_p += "\n\nDestaca-se que somente os instrumentos analógicos de medição passarão por processo de calibração aferida."
-            
-            if tipo_cfr_painel == 'CFR21 Part 11 - Qualificável':
-                txt_p += "\n\nO sistema será fornecido de forma Qualificável conforme normas CFR 21 Part 11, atendendo a todos os requisitos técnicos e de software para que o cliente realize a qualificação posterior."
-            elif tipo_cfr_painel == 'CFR21 Part 11 - Qualificado':
-                txt_p += "\n\nO sistema será integralmente Qualificado conforme normas CFR 21 Part 11, com a entrega de todos os protocolos pela equipe especializada da SIARCON."
+            if calibracao_ativa: txt_p += "\n\nDestaca-se que somente os instrumentos analógicos de medição passarão por processo de calibração aferida."
+            if tipo_cfr_painel == 'CFR21 Part 11 - Qualificável': txt_p += "\n\nO sistema será fornecido de forma Qualificável conforme normas CFR 21 Part 11, atendendo a todos os requisitos técnicos e de software para que o cliente realize a qualificação posterior."
+            elif tipo_cfr_painel == 'CFR21 Part 11 - Qualificado': txt_p += "\n\nO sistema será integralmente Qualificado conforme normas CFR 21 Part 11, com a entrega de todos os protocolos pela equipe especializada da SIARCON."
 
             descritivo_linhas_excel.append(txt_p)
             
             txt_com = f"**Sistema completo de automação [TAG: {p['nome']}]**, construído com arquitetura de controladores **{arquitetura_atual.replace(' - Linha mais econômica', '')}** ({str_ctrls_desc}). O sistema operará de forma **{sup_desc}**, {ihm_desc}.\n\n"
-            
-            if tipo_cfr_painel == 'CFR21 Part 11 - Qualificável':
-                txt_com += "O sistema fornecido possuirá as licenças e os parâmetros necessários para ser totalmente **Qualificável (CFR 21 Part 11)**. A SIARCON garantirá todos os requisitos técnicos de software, deixando o ambiente pronto para que a qualificação final seja realizada por empresa à escolha do cliente.\n\n"
-            elif tipo_cfr_painel == 'CFR21 Part 11 - Qualificado':
-                txt_com += "O sistema contemplado será integralmente **Qualificado (CFR 21 Part 11)**. A SIARCON executará e entregará toda a documentação comprobatória e a execução dos protocolos e validações pertinentes, garantindo a certificação total do ambiente de supervisão.\n\n"
-            
+            if tipo_cfr_painel == 'CFR21 Part 11 - Qualificável': txt_com += "O sistema fornecido possuirá as licenças e os parâmetros necessários para ser totalmente **Qualificável (CFR 21 Part 11)**. A SIARCON garantirá todos os requisitos técnicos de software, deixando o ambiente pronto para que a qualificação final seja realizada por empresa à escolha do cliente.\n\n"
+            elif tipo_cfr_painel == 'CFR21 Part 11 - Qualificado': txt_com += "O sistema contemplado será integralmente **Qualificado (CFR 21 Part 11)**. A SIARCON executará e entregará toda a documentação comprobatória e a execução dos protocolos e validações pertinentes, garantindo a certificação total do ambiente de supervisão.\n\n"
             txt_com += "O quadro de automação será responsável pela aquisição de dados e controle da seguinte instrumentação de campo:\n\n"
-            
-            for desc_inst, qt_inst, func_inst in lista_instrumentos_detalhados:
-                txt_com += f"• **{qt_inst}x {func_inst}:** {desc_inst}\n"
-                
-            txt_com += "\n**Lógica de Operação do Sistema:**\n"
-            txt_com += "O sistema realizará o controle da vazão de ar de forma constante, efetuando os ajustes necessários no inversor para que a vazão volumétrica seja mantida, independentemente do nível de saturação dos filtros no tempo. O controlador modulará proporcionalmente a válvula da serpentina (ou estágios do compressor) para atingir os parâmetros exatos de setpoint térmico demandados pelo ambiente."
-            
-            if tem_resistencia:
-                txt_com += " A resistência elétrica de aquecimento será acionada por malha de controle PID dedicada, permitindo ajuste fino de temperatura e desumidificação, possuindo intertravamento de segurança via termostato mecânico de proteção e confirmação de fluxo de ar."
-                
+            for desc_inst, qt_inst, func_inst in lista_instrumentos_detalhados: txt_com += f"• **{qt_inst}x {func_inst}:** {desc_inst}\n"
+            txt_com += "\n**Lógica de Operação do Sistema:**\nO sistema realizará o controle da vazão de ar de forma constante, efetuando os ajustes necessários no inversor para que a vazão volumétrica seja mantida, independentemente do nível de saturação dos filtros no tempo. O controlador modulará proporcionalmente a válvula da serpentina (ou estágios do compressor) para atingir os parâmetros exatos de setpoint térmico demandados pelo ambiente."
+            if tem_resistencia: txt_com += " A resistência elétrica de aquecimento será acionada por malha de controle PID dedicada, permitindo ajuste fino de temperatura e desumidificação, possuindo intertravamento de segurança via termostato mecânico de proteção e confirmação de fluxo de ar."
             descritivo_comercial_linhas.append(txt_com)
 
         texto_descritivo_final = "\n\n----------------------------------------------------\n\n".join(descritivo_linhas_excel)
 
+        # ADICIONA LICENÇAS DE SOFTWARE GLOBAIS NO BLOCO "GERAL / RATEADO"
         for (s_name, t_cfr), pts_total in softwares_incluidos.items():
             b_k, p_k = "", ""
             if "SEM certificação" in s_name: 
@@ -2428,10 +2408,10 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             
             p_base = st.session_state.precos_banco.get(b_k, 23000.0)
             p_pto = st.session_state.precos_banco.get(p_k, 100.0)
-            linhas_software.append({"Painel_Origem": "Geral / Licenciamento Único", "Categoria": "Software de Supervisão", "Item": f"Licença Base: {s_name}", "Preço Unit.": p_base, "Qtd": 1, "Custo Total": p_base})
+            linhas_software.append({"Painel_Origem": "GERAL / RATEADO", "Categoria": "Software de Supervisão", "Item": f"Licença Base: {s_name}", "Preço Unit.": p_base, "Qtd": 1, "Custo Total": p_base})
             
             if p_pto > 0 and pts_total > 0:
-                linhas_software.append({"Painel_Origem": "Geral / Licenciamento Único", "Categoria": "Software de Supervisão", "Item": f"Pontos Licenciados no Software ({pts_total} canais ativos)", "Preço Unit.": p_pto, "Qtd": pts_total, "Custo Total": pts_total * p_pto})
+                linhas_software.append({"Painel_Origem": "GERAL / RATEADO", "Categoria": "Software de Supervisão", "Item": f"Pontos Licenciados no Software ({pts_total} canais ativos)", "Preço Unit.": p_pto, "Qtd": pts_total, "Custo Total": pts_total * p_pto})
 
             if "COM certificação" in s_name:
                 custo_cfr_unit = 0.0
@@ -2439,8 +2419,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     if pts_total <= 100: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificável - Até 100 pts", 70.0)
                     elif pts_total <= 250: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificável - 101 a 250 pts", 50.0)
                     else: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificável - Acima de 250 pts", 30.0)
-                    
-                    linhas_servicos.append({"Painel_Origem": "Geral / Licenciamento Único", "Categoria": "Serviços de Lógica", "Item": f"Preparação do Sistema Qualificável (CFR21) - Por Ponto", "Preço Unit.": custo_cfr_unit, "Qtd": pts_total, "Custo Total": pts_total * custo_cfr_unit})
+                    linhas_servicos.append({"Painel_Origem": "GERAL / RATEADO", "Categoria": "Serviços de Lógica", "Item": f"Preparação do Sistema Qualificável (CFR21) - Por Ponto", "Preço Unit.": custo_cfr_unit, "Qtd": pts_total, "Custo Total": pts_total * custo_cfr_unit})
                     
                 elif t_cfr == "CFR21 Part 11 - Qualificado":
                     if pts_total <= 30: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificado - Até 30 pts", 400.0)
@@ -2450,41 +2429,19 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     elif pts_total <= 200: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificado - 151 a 200 pts", 250.0)
                     elif pts_total <= 250: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificado - 201 a 250 pts", 220.0)
                     else: custo_cfr_unit = st.session_state.precos_banco.get("CFR21 Qualificado - Acima de 250 pts", 200.0)
-
-                    linhas_servicos.append({"Painel_Origem": "Geral / Licenciamento Único", "Categoria": "Serviços de Lógica", "Item": f"Execução de Qualificação Integral (CFR21) - Por Ponto", "Preço Unit.": custo_cfr_unit, "Qtd": pts_total, "Custo Total": pts_total * custo_cfr_unit})
+                    linhas_servicos.append({"Painel_Origem": "GERAL / RATEADO", "Categoria": "Serviços de Lógica", "Item": f"Execução de Qualificação Integral (CFR21) - Por Ponto", "Preço Unit.": custo_cfr_unit, "Qtd": pts_total, "Custo Total": pts_total * custo_cfr_unit})
 
         for av in st.session_state.orcamento:
-            linhas_inst_campo.append({"Painel_Origem": "Infraestrutura Avulsa", "Categoria": "Instrumentação de Campo", "Item": av['Item'], "Preço Unit.": av['Custo_Total']/av['Quantidade'] if av['Quantidade']>0 else 0, "Qtd": av['Quantidade'], "Custo Total": av['Custo_Total']})
+            linhas_inst_campo.append({"Painel_Origem": "GERAL / RATEADO", "Categoria": "Instrumentação de Campo", "Item": av['Item'], "Preço Unit.": av['Custo_Total']/av['Quantidade'] if av['Quantidade']>0 else 0, "Qtd": av['Quantidade'], "Custo Total": av['Custo_Total']})
 
         df_inst = pd.DataFrame(linhas_inst_campo)
         df_hw = pd.DataFrame(linhas_hardware)
         df_sw = pd.DataFrame(linhas_software)
+        df_serv = pd.DataFrame(linhas_servicos)
         
         subtotal_inst = df_inst['Custo Total'].sum() if not df_inst.empty else 0
         subtotal_hw = df_hw['Custo Total'].sum() if not df_hw.empty else 0
         subtotal_sw = df_sw['Custo Total'].sum() if not df_sw.empty else 0
-        
-        if (total_ai_schneider + total_ao_schneider) > 0:
-            pr_ai_sch = st.session_state.precos_banco.get("Custo AI/AO", 565.0)
-            linhas_servicos.append({"Painel_Origem": "Geral / Rateado", "Categoria": "Serviços de Lógica", "Item": "Serviços de lógica: Pontos Analógicos (Base Schneider)", "Preço Unit.": pr_ai_sch, "Qtd": (total_ai_schneider + total_ao_schneider), "Custo Total": (total_ai_schneider + total_ao_schneider) * pr_ai_sch})
-        if (total_di_schneider + total_do_schneider) > 0:
-            pr_di_sch = st.session_state.precos_banco.get("Custo DI/DO", 120.0)
-            linhas_servicos.append({"Painel_Origem": "Geral / Rateado", "Categoria": "Serviços de Lógica", "Item": "Serviços de lógica: Pontos Digitais (Base Schneider)", "Preço Unit.": pr_di_sch, "Qtd": (total_di_schneider + total_do_schneider), "Custo Total": (total_di_schneider + total_do_schneider) * pr_di_sch})
-        if (total_ai_siemens + total_ao_siemens) > 0:
-            pr_ai_siem = st.session_state.precos_banco.get("Siemens - Serviço Custo AI/AO", 750.0)
-            linhas_servicos.append({"Painel_Origem": "Geral / Rateado", "Categoria": "Serviços de Lógica", "Item": "Serviços de lógica (Siemens): Pontos Analógicos", "Preço Unit.": pr_ai_siem, "Qtd": (total_ai_siemens + total_ao_siemens), "Custo Total": (total_ai_siemens + total_ao_siemens) * pr_ai_siem})
-        if (total_di_siemens + total_do_siemens) > 0:
-            pr_di_siem = st.session_state.precos_banco.get("Siemens - Serviço Custo DI/DO", 180.0)
-            linhas_servicos.append({"Painel_Origem": "Geral / Rateado", "Categoria": "Serviços de Lógica", "Item": "Serviços de lógica (Siemens): Pontos Digitais", "Preço Unit.": pr_di_siem, "Qtd": (total_di_siemens + total_do_siemens), "Custo Total": (total_di_siemens + total_do_siemens) * pr_di_siem})
-        if total_io_mercato > 0:
-            pr_serv_merc = st.session_state.precos_banco.get("Mercato - Serviço Parametrização por Ponto", 80.0)
-            linhas_servicos.append({"Painel_Origem": "Geral / Rateado", "Categoria": "Serviços de Lógica", "Item": "Parametrização de Pontos (Mercato)", "Preço Unit.": pr_serv_merc, "Qtd": total_io_mercato, "Custo Total": total_io_mercato * pr_serv_merc})
-
-        mao_de_obra_extra = (custo_base_schneider * 0.25) + (custo_base_siemens * 0.35) + (custo_base_mercato * 0.10)
-        if mao_de_obra_extra > 0:
-            linhas_servicos.append({"Painel_Origem": "Geral / Rateado", "Categoria": "Serviços de Lógica", "Item": "Demais programações e desenvolvimentos em Automação", "Preço Unit.": mao_de_obra_extra, "Qtd": 1, "Custo Total": mao_de_obra_extra})
-            
-        df_serv = pd.DataFrame(linhas_servicos)
         subtotal_serv = df_serv['Custo Total'].sum() if not df_serv.empty else 0
         total_geral = subtotal_inst + subtotal_hw + subtotal_sw + subtotal_serv
         
@@ -2499,7 +2456,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             # AGRUPAMENTO PARA VISUALIZAÇÃO E GERAÇÃO DA ABA ÚNICA (EXCEL)
             # -------------------------------------------------------------
             expl = []
-            
             lista_dfs = []
             if not df_inst.empty: lista_dfs.append(df_inst)
             if not df_hw.empty: lista_dfs.append(df_hw)
@@ -2510,46 +2466,24 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             
             if not df_completo.empty:
                 paineis_unicos = df_completo['Painel_Origem'].unique().tolist()
-                normais = sorted([p for p in paineis_unicos if "Geral /" not in p and "Infraestrutura" not in p])
-                gerais = sorted([p for p in paineis_unicos if "Geral /" in p or "Infraestrutura" in p])
+                normais = sorted([p for p in paineis_unicos if "GERAL" not in p])
+                gerais = sorted([p for p in paineis_unicos if "GERAL" in p])
                 paineis_ordenados = normais + gerais
                 
                 for p_nome in paineis_ordenados:
                     df_p = df_completo[df_completo['Painel_Origem'] == p_nome]
-                    
-                    df_inst_p = df_p[df_p['Categoria'] == 'Instrumentação de Campo']
-                    df_hw_p = df_p[df_p['Categoria'] == 'Hardware e Painéis']
-                    df_sw_p = df_p[df_p['Categoria'] == 'Software de Supervisão']
-                    df_serv_p = df_p[df_p['Categoria'] == 'Serviços de Lógica']
-                    
                     subtotal_painel = df_p['Custo Total'].sum()
                     
                     if len(paineis_ordenados) > 1:
                         expl.append(pd.DataFrame([{"Categoria": "", "Item": f"QUADRO / LOCAL: {p_nome}".upper(), "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}]))
 
-                    if not df_inst_p.empty:
-                        sub = df_inst_p['Custo Total'].sum()
-                        expl.append(pd.DataFrame([{"Categoria": "", "Item": "INSTRUMENTAÇÃO DE CAMPO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}]))
-                        expl.append(df_inst_p.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
-                        expl.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "INSTRUMENTAÇÃO DE CAMPO", "Preço Unit.": "-", "Qtd": "-", "Custo Total": sub}]))
-
-                    if not df_hw_p.empty:
-                        sub = df_hw_p['Custo Total'].sum()
-                        expl.append(pd.DataFrame([{"Categoria": "", "Item": "HARDWARE E PAINÉIS", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}]))
-                        expl.append(df_hw_p.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
-                        expl.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "HARDWARE E PAINÉIS", "Preço Unit.": "-", "Qtd": "-", "Custo Total": sub}]))
-
-                    if not df_sw_p.empty:
-                        sub = df_sw_p['Custo Total'].sum()
-                        expl.append(pd.DataFrame([{"Categoria": "", "Item": "SOFTWARE", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}]))
-                        expl.append(df_sw_p.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
-                        expl.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "SOFTWARE", "Preço Unit.": "-", "Qtd": "-", "Custo Total": sub}]))
-
-                    if not df_serv_p.empty:
-                        sub = df_serv_p['Custo Total'].sum()
-                        expl.append(pd.DataFrame([{"Categoria": "", "Item": "SERVIÇOS E LÓGICA", "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}]))
-                        expl.append(df_serv_p.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
-                        expl.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": "SERVIÇOS E LÓGICA", "Preço Unit.": "-", "Qtd": "-", "Custo Total": sub}]))
+                    for cat_nome, cat_lbl in [("Instrumentação de Campo", "INSTRUMENTAÇÃO DE CAMPO"), ("Hardware e Painéis", "HARDWARE E PAINÉIS"), ("Software de Supervisão", "SOFTWARE"), ("Serviços de Lógica", "SERVIÇOS E LÓGICA")]:
+                        df_cat = df_p[df_p['Categoria'] == cat_nome]
+                        if not df_cat.empty:
+                            sub_c = df_cat['Custo Total'].sum()
+                            expl.append(pd.DataFrame([{"Categoria": "", "Item": cat_lbl, "Preço Unit.": "-", "Qtd": "-", "Custo Total": "-"}]))
+                            expl.append(df_cat.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'}))
+                            expl.append(pd.DataFrame([{"Categoria": "SUBTOTAL", "Item": cat_lbl, "Preço Unit.": "-", "Qtd": "-", "Custo Total": sub_c}]))
                         
                     if len(paineis_ordenados) > 1:
                         expl.append(pd.DataFrame([{"Categoria": "TOTAL", "Item": f"TOTAL DO BLOCO: {p_nome}".upper(), "Preço Unit.": "-", "Qtd": "-", "Custo Total": subtotal_painel}]))
@@ -2560,10 +2494,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             df_exportacao = df_exportacao[['Categoria', 'Item', 'Preço Unit.', 'Qtd', 'Custo Total']]
 
             def format_currency(val):
-                try: 
-                    return f"R$ {float(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                except: 
-                    return val
+                try: return f"R$ {float(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                except: return val
                     
             df_display = df_exportacao.copy()
             df_display['Preço Unit.'] = df_display['Preço Unit.'].apply(format_currency)
@@ -2571,6 +2503,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             
             st.dataframe(df_display, use_container_width=True)
 
+            # =========================================================
+            # EXCEL EXATO AO MODELO: CORES, ESTILOS, PULO DE LINHA E ABA ÚNICA
+            # =========================================================
             buffer = io.BytesIO()
             wb = openpyxl.Workbook()
             ws1 = wb.active
@@ -2600,95 +2535,129 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             for r in range(2, 5): 
                 ws1.cell(row=r, column=3).alignment = Alignment(horizontal="center", vertical="center")
             
-            start_row = 6
             if ARQUIVO_LOGO:
                 try:
                     from openpyxl.drawing.image import Image as OpenpyxlImage
                     img = OpenpyxlImage(ARQUIVO_LOGO)
-                    img.width = 180
-                    img.height = 50
+                    img.width = 180; img.height = 50
                     ws1.add_image(img, "A1")
                 except: pass
                 
-            fill_header = PatternFill(start_color="1C8590", end_color="1C8590", fill_type="solid")
-            font_header = Font(name="Arial", size=11, bold=True, color="FFFFFF")
-            border_thin = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
+            linha_atual = 6
+            fill_teal = PatternFill(start_color="1C8590", end_color="1C8590", fill_type="solid")
+            fill_v_claro = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+            fill_v_forte = PatternFill(start_color="C6E0B4", end_color="C6E0B4", fill_type="solid")
+            font_teal = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+            font_bold = Font(name="Arial", size=10, bold=True)
+            font_norm = Font(name="Arial", size=10)
+            b_thin = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
+            b_thick = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='medium', color='B00050'))
             
-            for r_idx, row in enumerate(dataframe_to_rows(df_exportacao, index=False, header=True), start=start_row):
-                for c_idx, value in enumerate(row, start=1):
-                    cell = ws1.cell(row=r_idx, column=c_idx, value=value)
-                    cell.border = border_thin
+            for p_nome in paineis_ordenados:
+                df_p = df_completo[df_completo['Painel_Origem'] == p_nome]
+                subtotal_painel = df_p['Custo Total'].sum()
                 
-                if r_idx == start_row:
-                    for c in range(1, 6):
-                        ws1.cell(row=r_idx, column=c).fill = fill_header
-                        ws1.cell(row=r_idx, column=c).font = font_header
-                        ws1.cell(row=r_idx, column=c).alignment = Alignment(horizontal="center", vertical="center")
-                else:
-                    v1 = str(ws1.cell(row=r_idx, column=1).value)
-                    v2 = str(ws1.cell(row=r_idx, column=2).value)
+                if linha_atual > 6: linha_atual += 1 # Pula linha entre os painéis conforme imagem
                     
-                    is_subtotal = "SUBTOTAL" in v1 or "TOTAL GERAL" in v1 or v1 == "TOTAL"
-                    is_title = (v1 == "" and (
-                        v2 in ["INSTRUMENTAÇÃO DE CAMPO", "HARDWARE E PAINÉIS", "SOFTWARE", "SERVIÇOS E LÓGICA"] 
-                        or v2.startswith("QUADRO / LOCAL: ")
-                    ))
-                    
-                    for c_idx in range(1, 6):
-                        c_cell = ws1.cell(row=r_idx, column=c_idx)
-                        c_cell.font = Font(name="Arial", size=10, bold=(is_subtotal or is_title))
+                # CABEÇALHO DO PAINEL
+                if len(paineis_ordenados) > 1:
+                    ws1.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual, end_column=5)
+                    c_tit = ws1.cell(row=linha_atual, column=1, value=f"QUADRO / LOCAL: {p_nome}".upper())
+                    c_tit.fill = fill_v_forte; c_tit.font = font_bold; c_tit.alignment = Alignment(horizontal="center")
+                    for c in range(1, 6): ws1.cell(row=linha_atual, column=c).border = b_thin
+                    linha_atual += 1
+                
+                first_cat = True
+                for cat_nome, cat_lbl in [("Instrumentação de Campo", "INSTRUMENTAÇÃO DE CAMPO"), ("Hardware e Painéis", "HARDWARE E PAINÉIS"), ("Software de Supervisão", "SOFTWARE E SUPERVISÃO"), ("Serviços de Lógica", "SERVIÇOS E LÓGICA")]:
+                    df_cat = df_p[df_p['Categoria'] == cat_nome]
+                    if not df_cat.empty:
+                        # NOME DA CATEGORIA (VERDE FORTE)
+                        ws1.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual, end_column=5)
+                        c_cat = ws1.cell(row=linha_atual, column=1, value=cat_lbl)
+                        c_cat.fill = fill_v_forte; c_cat.font = font_bold; c_cat.alignment = Alignment(horizontal="center")
+                        for c in range(1, 6): ws1.cell(row=linha_atual, column=c).border = b_thin
+                        linha_atual += 1
                         
-                        if is_title:
-                            c_cell.fill = PatternFill(start_color="C6E0B4", end_color="C6E0B4", fill_type="solid")
-                            if c_idx == 2:
-                                c_cell.alignment = Alignment(horizontal="center", vertical="center")
-                            elif c_idx > 2:
-                                c_cell.value = ""
-                        elif is_subtotal:
-                            c_cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-                            if c_idx in [3, 5]:
-                                if str(c_cell.value).strip() != "-":
-                                    try: 
-                                        c_cell.value = float(c_cell.value)
-                                        c_cell.number_format = '"R$" #,##0.00'
-                                    except: pass
-                                c_cell.alignment = Alignment(horizontal="right")
-                        else:
-                            if c_idx in [3, 5]:
-                                if str(c_cell.value).strip() != "-":
-                                    try: 
-                                        c_cell.value = float(c_cell.value)
-                                        c_cell.number_format = '"R$" #,##0.00'
-                                    except: pass
-                                c_cell.alignment = Alignment(horizontal="right")
-                            elif c_idx == 4:
-                                c_cell.alignment = Alignment(horizontal="center")
-                                
-                    if is_title:
-                        ws1.merge_cells(start_row=r_idx, start_column=2, end_row=r_idx, end_column=5)
+                        # CABEÇALHO DAS COLUNAS (TEAL) APENAS NA PRIMEIRA CATEGORIA DO PAINEL
+                        if first_cat:
+                            headers = ["Categoria", "Item", "Preço Unit.", "Qtd", "Custo Total"]
+                            for c_i, h_v in enumerate(headers, start=1):
+                                cel_h = ws1.cell(row=linha_atual, column=c_i, value=h_v)
+                                cel_h.fill = fill_teal; cel_h.font = font_teal; cel_h.alignment = Alignment(horizontal="center", vertical="center"); cel_h.border = b_thin
+                            linha_atual += 1
+                            first_cat = False
+                            
+                        # LINHAS DE DADOS
+                        df_cat_g = df_cat.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'})
+                        for _, row_d in df_cat_g.iterrows():
+                            ws1.cell(row=linha_atual, column=1, value=row_d['Categoria']).font = font_norm
+                            ws1.cell(row=linha_atual, column=2, value=row_d['Item']).font = font_norm
+                            c3 = ws1.cell(row=linha_atual, column=3, value=row_d['Preço Unit.'])
+                            c3.number_format = '"R$" #,##0.00'; c3.alignment = Alignment(horizontal="right"); c3.font = font_norm
+                            c4 = ws1.cell(row=linha_atual, column=4, value=row_d['Qtd'])
+                            c4.alignment = Alignment(horizontal="center"); c4.font = font_norm
+                            c5 = ws1.cell(row=linha_atual, column=5, value=row_d['Custo Total'])
+                            c5.number_format = '"R$" #,##0.00'; c5.alignment = Alignment(horizontal="right"); c5.font = font_norm
+                            for c in range(1, 6): ws1.cell(row=linha_atual, column=c).border = b_thin
+                            linha_atual += 1
+                            
+                        # SUBTOTAL DA CATEGORIA (VERDE CLARO)
+                        ws1.cell(row=linha_atual, column=1, value="SUBTOTAL")
+                        ws1.cell(row=linha_atual, column=2, value=cat_lbl)
+                        ws1.cell(row=linha_atual, column=3, value="-").alignment = Alignment(horizontal="right")
+                        ws1.cell(row=linha_atual, column=4, value="-").alignment = Alignment(horizontal="center")
+                        c5_sub = ws1.cell(row=linha_atual, column=5, value=df_cat['Custo Total'].sum())
+                        c5_sub.number_format = '"R$" #,##0.00'; c5_sub.alignment = Alignment(horizontal="right")
+                        for c in range(1, 6): 
+                            ws1.cell(row=linha_atual, column=c).fill = fill_v_claro
+                            ws1.cell(row=linha_atual, column=c).font = font_bold
+                            ws1.cell(row=linha_atual, column=c).border = b_thin
+                        linha_atual += 1
+                        
+                # TOTAL DO BLOCO / QUADRO COM LINHA ROXA GROSSA
+                if len(paineis_ordenados) > 1:
+                    ws1.cell(row=linha_atual, column=1, value="TOTAL")
+                    ws1.cell(row=linha_atual, column=2, value=f"TOTAL DO BLOCO: {p_nome}")
+                    ws1.cell(row=linha_atual, column=3, value="-").alignment = Alignment(horizontal="right")
+                    ws1.cell(row=linha_atual, column=4, value="-").alignment = Alignment(horizontal="center")
+                    c5_tot = ws1.cell(row=linha_atual, column=5, value=subtotal_painel)
+                    c5_tot.number_format = '"R$" #,##0.00'; c5_tot.alignment = Alignment(horizontal="right")
+                    for c in range(1, 6): 
+                        ws1.cell(row=linha_atual, column=c).fill = fill_v_claro
+                        ws1.cell(row=linha_atual, column=c).font = font_bold
+                        ws1.cell(row=linha_atual, column=c).border = b_thick
+                    linha_atual += 1
+
+            # TOTAL GERAL DO ORÇAMENTO (TEAL)
+            linha_atual += 1
+            ws1.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual, end_column=4)
+            c_g_txt = ws1.cell(row=linha_atual, column=1, value="TOTAL GERAL DO ORÇAMENTO")
+            c_g_txt.fill = fill_teal; c_g_txt.font = font_teal; c_g_txt.alignment = Alignment(horizontal="right", vertical="center")
+            c_g_val = ws1.cell(row=linha_atual, column=5, value=total_geral)
+            c_g_val.fill = fill_teal; c_g_val.font = font_teal; c_g_val.alignment = Alignment(horizontal="right", vertical="center"); c_g_val.number_format = '"R$" #,##0.00'
+            for c in range(1, 6): ws1.cell(row=linha_atual, column=c).border = b_thin
             
-            end_row_table = start_row + len(df_exportacao) + 2
+            # DESCRIÇÃO TEXTUAL AO FUNDO
+            linha_atual += 2
             num_linhas_texto = len(texto_descritivo_final.split('\n'))
             tamanho_caixa = max(10, num_linhas_texto + 2) 
-            
-            ws1.merge_cells(start_row=end_row_table, start_column=1, end_row=end_row_table+tamanho_caixa, end_column=5)
-            cell_desc = ws1.cell(row=end_row_table, column=1, value=texto_descritivo_final)
-            cell_desc.font = Font(name="Arial", size=10, italic=False, color="333333")
-            cell_desc.alignment = Alignment(vertical="top", wrap_text=True)
+            ws1.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual+tamanho_caixa, end_column=5)
+            cell_desc = ws1.cell(row=linha_atual, column=1, value=texto_descritivo_final)
+            cell_desc.font = Font(name="Arial", size=10, color="333333"); cell_desc.alignment = Alignment(vertical="top", wrap_text=True)
             cell_desc.fill = PatternFill(start_color="F2F4F4", end_color="F2F4F4", fill_type="solid")
+            for r in range(linha_atual, linha_atual+tamanho_caixa+1):
+                for c in range(1, 6): ws1.cell(row=r, column=c).border = b_thin
             
-            for r in range(end_row_table, end_row_table+tamanho_caixa+1):
-                for c in range(1, 6): ws1.cell(row=r, column=c).border = border_thin
-            
+            # AJUSTE DE COLUNAS
             for col in ws1.columns:
-                max_len = max(len(str(cell.value or '')) for cell in col if cell.row <= start_row + len(df_exportacao))
+                max_len = max(len(str(cell.value or '')) for cell in col if cell.row <= linha_atual - 2)
                 ws1.column_dimensions[get_column_letter(col[0].column)].width = max(max_len + 4, 12)
-                
+            
             wb.save(buffer)
             buffer.seek(0)
             
             st.download_button(
-                label="📥 Baixar Orçamento em Excel",
+                label="📥 Baixar Orçamento em Excel (Layout Oficial)",
                 data=buffer,
                 file_name="Orcamento_Automacao.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
