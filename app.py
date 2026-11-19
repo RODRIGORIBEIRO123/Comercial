@@ -26,32 +26,21 @@ from PIL import Image
 def converter_preco_blindado(val):
     if val is None:
         return 0.0
-    # Se já for número (int ou float), retorna direto sem tocar!
     if isinstance(val, (int, float)):
         return float(val)
         
-    # Limpa caracteres de moeda e espaços
     s = str(val).replace("R$", "").replace("$", "").strip()
     if not s or s.lower() == "nan" or s.lower() == "none":
         return 0.0
         
-    # Caso 1: Tem ponto E vírgula (ex: "1.187,40" ou "1,187.40")
     if "." in s and "," in s:
-        # Descobre qual está por último (o último é sempre o separador decimal)
         if s.rfind(",") > s.rfind("."):
-            # Padrão Brasileiro ("1.187,40"): tira o ponto de milhar e troca vírgula por ponto
             s = s.replace(".", "").replace(",", ".")
         else:
-            # Padrão Americano ("1,187.40"): tira a vírgula de milhar
             s = s.replace(",", "")
-            
-    # Caso 2: Tem APENAS vírgula (ex: "16,20" ou "1187,40")
     elif "," in s:
         s = s.replace(",", ".")
         
-    # Caso 3: Tem APENAS ponto (ex: "16.20" ou "1187.40")
-    # NÃO fazemos nada! Deixamos como está para não transformar "16.20" em 1620.
-    
     try:
         return float(s)
     except ValueError:
@@ -60,18 +49,32 @@ def converter_preco_blindado(val):
 # --- CONFIGURAÇÃO DA TELA (DEVE SER O PRIMEIRO COMANDO STREAMLIT) ---
 st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide", page_icon="📄")
 
+# CSS Global para Interface Mais Moderna (Sugestão Visual Aplicada)
+st.markdown("""
+    <style>
+    .block-container { padding-top: 2rem !important; }
+    div[data-testid="stExpander"] {
+        border: 1px solid #E0E0E0;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        background-color: #FAFAFA;
+    }
+    div[data-testid="stExpander"] > details > summary {
+        background-color: #F0F4F8;
+        border-radius: 8px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # =========================================================================
 # 🧠 MOTOR PARAMÉTRICO DE ENGENHARIA (SINCRONIZADO COM O SEU EXCEL)
 # =========================================================================
 def gerar_composicao_cavalete(equipamento, vias, bitola):
-    # A MÁGICA DO TIPO DE LIGAÇÃO AUTOMÁTICA
     bitolas_roscadas = ["1/4\"", "3/8\"", "1/2\"", "3/4\"", "1\"", "1.1/4\"", "1.1/2\"", "2\""]
     is_roscado = bitola in bitolas_roscadas
-    
     composicao = []
     
     if equipamento == "UTA/FANCOIL":
-        # Periféricos Fixos (String exata do banco)
         composicao.extend([
             {"nome": "Poço para termômetro Latão haste = 38mm - Ø 1/2\"", "qtd": 2},
             {"nome": "Termômetro tipo capela. Escala 0° a 40°C - Ø 3/8\"", "qtd": 2},
@@ -82,7 +85,6 @@ def gerar_composicao_cavalete(equipamento, vias, bitola):
             {"nome": "Tubo em aço carbono Aço carbono preto - Ø 1/2\"", "qtd": 1},
         ])
         
-        # Isolamento padrão
         composicao.append({"nome": f"Isolamento Espuma elastomérica, espessura 25 mm - Ø {bitola}", "qtd": 2.0})
         composicao.append({"nome": f"Rechapeamento chapa de alumínio liso, espessura 0,5 mm - Ø {bitola}", "qtd": 2.0})
 
@@ -104,7 +106,7 @@ def gerar_composicao_cavalete(equipamento, vias, bitola):
                 {"nome": f"Conexão T 90° Ferro maleável galvanizado - Ø {bitola}", "qtd": qtd_te},
                 {"nome": f"Niple duplo Ferro maleável galvanizado - Ø {bitola}", "qtd": qtd_niple},
             ])
-        else: # Flangeado
+        else:
             qtd_flanges = 12 if vias == "2 Vias" else 14
             qtd_borboleta = 2 if vias == "2 Vias" else 3
             qtd_curva = 4 if vias == "2 Vias" else 6
@@ -225,7 +227,7 @@ if 'resultado_ia' not in st.session_state:
 if 'cavaletes_selecionados' not in st.session_state: 
     st.session_state.cavaletes_selecionados = []
 
-# DICIONÁRIO DE NOMES DO DIAGRAMA 
+# DICIONÁRIO DE NOMES DO DIAGRAMA COM ITENS CAG
 if 'de_para_diagrama' not in st.session_state:
     st.session_state.de_para_diagrama = {
         "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": {
@@ -309,9 +311,12 @@ if 'de_para_diagrama' not in st.session_state:
         "Chave Seletora Auto/Manual (Painel Elétrico)": {
             "in_agua": "Chave Auto / Manual", "in_comp": "Chave Auto / Manual", "out_agua": "Habilita Equipamento (TAG)", "out_comp": "Habilita Equipamento (TAG)"
         },
-        "Chave de fluxo para água (FS/CF)": {
-            "in_agua": "Status Fluxo de Água", "in_comp": "", "out_agua": "", "out_comp": ""
-        }
+        "Chave de fluxo para chiller (FS)": {
+            "in_agua": "Status Fluxo Água", "in_comp": "", "out_agua": "Comanda Bomba (DO) / Replica Status (DO)", "out_comp": ""
+        },
+        "VAG ON/OFF Bloqueio do chiller": {
+            "in_agua": "", "in_comp": "", "out_agua": "Comando Fechar Válvula", "out_comp": ""
+        },
     }
 
 REGRA_IO = {
@@ -332,8 +337,6 @@ REGRA_IO = {
     "Válvula motorizada Bypass Proporcional (5\") (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
     "Válvula motorizada Bypass Proporcional (6\") (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
     "Válvula motorizada Bypass Proporcional (8\") (TCV)": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-    "Transmissor de pressão para água (PIT)": {"AI": 1, "AO": 2, "DI": 0, "DO": 0},
-    "Transmissor de vazão para água (FIT)": {"AI": 1, "AO": 1, "DI": 0, "DO": 0},
     "Válvula bloqueio motorizada (XV)": {"AI": 0, "AO": 0, "DI": 0, "DO": 1},
     "Chave de fluxo para água (FS/CF)": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
     "Bombas (I/O para controlador)": {"AI": 0, "AO": 1, "DI": 1, "DO": 1},
@@ -359,14 +362,15 @@ REGRA_IO = {
     "Integração de chiller (via rede)": {"AI": 0, "AO": 0, "DI": 0, "DO": 0},
     "Bomba de água gelada - Partida direta": {"AI": 0, "AO": 0, "DI": 1, "DO": 1},
     "Bomba de água gelada - Inversor de frequência": {"AI": 0, "AO": 1, "DI": 1, "DO": 1},
-    "Transmissor de temperatura para água (TT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-    "Transmissor de pressão pontual para água (PIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-    "Transmissor de Vazão para água ultrassônico (FIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
-    "Válvula proporcional para By pass - Até 2\"": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-    "Válvula proporcional para By pass - 2.1/2\"": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-    "Válvula proporcional para By pass - 3\"": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-    "Válvula proporcional para By pass - 4\"": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
-    "Chave de fluxo chiller": {"AI": 0, "AO": 0, "DI": 1, "DO": 0},
+    # --- NOVOS ITENS DA CAG ---
+    "Chave de fluxo para chiller (FS)": {"AI": 0, "AO": 0, "DI": 1, "DO": 2},
+    "VAG ON/OFF Bloqueio do chiller": {"AI": 0, "AO": 0, "DI": 0, "DO": 1},
+    "Transmissor de pressão para água (PIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+    "Bomba Primária CAG (I/O)": {"AI": 0, "AO": 1, "DI": 1, "DO": 1},
+    "Bomba Secundária CAG (I/O)": {"AI": 0, "AO": 1, "DI": 1, "DO": 1},
+    "Transmissor de vazão ultrassônico (FIT)": {"AI": 1, "AO": 0, "DI": 0, "DO": 0},
+    "Válvula de by pass proporcional Até 2.1/2\"": {"AI": 0, "AO": 1, "DI": 0, "DO": 0},
+    "Transmissores de temperatura (Avanço e Retorno)": {"AI": 2, "AO": 0, "DI": 0, "DO": 0},
 }
 
 banco_padrao_precos = {
@@ -383,9 +387,6 @@ banco_padrao_precos = {
     "Resistência de aquecimento (Equipamento) (RAQ)": 0.00,
     "Resistência de aquecimento (Duto) (RAQ)": 0.00,
     "Válvula motorizada Bypass Proporcional (hasta 2.1/2\") (TCV)": 2690.00,
-    "Transmissor de pressão para água (PIT)": 1359.00,
-    "Transmissor de vazão para água (FIT)": 3550.00,
-    "Chave de fluxo para água (FS/CF)": 450.00,
     "Pressostato para monitorar os filtros G4 (PSH)": 349.00,
     "Pressostato para monitorar os filtros M5 (PSH)": 349.00,
     "Pressostato para monitorar os filtros F9 (PSH)": 349.00,
@@ -451,33 +452,23 @@ banco_padrao_precos = {
     "IHM Premium 10\"": 8500.00,
     "Sem Interface (Cego)": 0.00,
     "Integração de chiller (via rede)": 1800.00,
-    "Bomba de água gelada - Partida direta": 0.00, # Apenas mapeia I/O, custo vai pro painel/serviço
-    "Bomba de água gelada - Inversor de frequência": 0.00, # Apenas mapeia I/O
-    "Transmissor de temperatura para água (TT)": 800.00,
-    "Transmissor de pressão pontual para água (PIT)": 800.00,
-    "Transmissor de Vazão para água ultrassônico (FIT)": 3250.00,
-    "Válvula proporcional para By pass - Até 2\"": 1612.00,
-    "Válvula proporcional para By pass - 2.1/2\"": 2980.00,
-    "Válvula proporcional para By pass - 3\"": 3452.00,
-    "Válvula proporcional para By pass - 4\"": 4324.00,
-    "Chave de fluxo chiller": 320.00,
+    "Bomba de água gelada - Partida direta": 0.00, 
+    "Bomba de água gelada - Inversor de frequência": 0.00, 
+    # --- NOVOS PREÇOS DA CAG ---
+    "Chave de fluxo para chiller (FS)": 289.00,
+    "VAG ON/OFF Bloqueio do chiller": 0.00,
+    "Transmissor de pressão para água (PIT)": 895.00,
+    "Bomba Primária CAG (I/O)": 0.00,
+    "Bomba Secundária CAG (I/O)": 0.00,
+    "Transmissor de vazão ultrassônico (FIT)": 3450.00,
+    "Válvula de by pass proporcional Até 2.1/2\"": 3100.00,
+    "Transmissores de temperatura (Avanço e Retorno)": 1250.00,
 }
 
 banco_schneider_comum = {k:v for k,v in banco_padrao_precos.items() if "Siemens" not in k and "Mercato" not in k and "CFR" not in k and "IHM" not in k}
 banco_siemens = {k:v for k,v in banco_padrao_precos.items() if "Siemens" in k}
 banco_mercato = {k:v for k,v in banco_padrao_precos.items() if "Mercato" in k}
 banco_cfr_servicos = {k:v for k,v in banco_padrao_precos.items() if "CFR" in k or "Calibração" in k}
-
-if st.session_state.data_precos_atualizada == "Buscando metadados da nuvem...":
-    try:
-        sh_init = conectar_google_sheets()
-        linhas_h = sh_init.worksheet("Historico_Precos").get_all_values()
-        if len(linhas_h) > 1:
-            st.session_state.data_precos_atualizada = linhas_h[-1][0]
-        else:
-            st.session_state.data_precos_atualizada = "Nenhuma alteração registrada recentemente"
-    except:
-        st.session_state.data_precos_atualizada = "Não foi possível carregar a data de atualização"
 
 if 'precos_banco' not in st.session_state:
     st.session_state.precos_banco = banco_padrao_precos.copy()
@@ -517,8 +508,7 @@ GRUPOS_INSTRUMENTOS = {
         "Pressostato para monitorar os filtros H13/H14 (PSH)",
         "Transmissor de pressão diferencial (monitorar os filtros H13) (PDT)",
         "Status funcionamento ventilador ou exaustor (partida direta) (PSH)", 
-        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)", 
-        "Chave de fluxo para água (FS/CF)"
+        "Transmissor de pressão diferencial (monitorar os filtros G4) (PDT)"
     ],
     "🟢 Monitoramento e Controle de Ambientes": [
         "Transmissor de pressão diferencial entre salas (PDT)",
@@ -531,16 +521,16 @@ GRUPOS_INSTRUMENTOS = {
     ],
     "🧊 Equipamentos CAG (Água Gelada)": [
         "Integração de chiller (via rede)",
-        "Chave de fluxo chiller (FS/CF)",
+        "Chave de fluxo para chiller (FS)",
+        "VAG ON/OFF Bloqueio do chiller",
+        "Bomba Primária CAG (I/O)",
+        "Bomba Secundária CAG (I/O)",
+        "Transmissor de pressão para água (PIT)",
+        "Transmissor de vazão ultrassônico (FIT)",
+        "Válvula de by pass proporcional Até 2.1/2\"",
+        "Transmissores de temperatura (Avanço e Retorno)",
         "Bomba de água gelada - Partida direta",
-        "Bomba de água gelada - Inversor de frequência",
-        "Transmissor de temperatura para água (TT)",
-        "Transmissor de pressão pontual para água (PIT)",
-        "Transmissor de Vazão para água ultrassônico (FIT)",
-        "Válvula proporcional para By pass - Até 2\"",
-        "Válvula proporcional para By pass - 2.1/2\"",
-        "Válvula proporcional para By pass - 3\"",
-        "Válvula proporcional para By pass - 4\""
+        "Bomba de água gelada - Inversor de frequência"
     ]
 }
 
@@ -569,19 +559,15 @@ KITS_PADRAO = {
         "Pressostato diferencial para ar (PSH)": 1, 
         "Resistência de aquecimento (Equipamento) (RAQ)": 1
     },
-    "🔥 UTA Expansão Direta (2 Compressores) + Resistência (Salas e Exaustão)": {
-        "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1,
-        "Transmissor de temperatura e umidade para duto (TT/MT)": 1, 
-        "Relé de Corrente - Status Compressor (TC)": 2,
-        "Pressostato para monitorar os filtros G4 (PSH)": 1, 
-        "Pressostato para monitorar os filtros M5 (PSH)": 1, 
-        "Pressostato para monitorar os filtros F9 (PSH)": 1,
-        "Termostato de segurança (TSH)": 1, 
-        "Resistência de aquecimento (Equipamento) (RAQ)": 1,
-        "Transmissor de pressão diferencial entre salas (PDT)": 4, 
-        "Transmissor de temperatura e umidade ambiente (TT/MT)": 4,
-        "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 2,
-        "Pressostato diferencial para ar (PSH)": 1
+    "🧊 Central de Água Gelada (CAG Completa)": {
+        "Chave de fluxo para chiller (FS)": 1,
+        "VAG ON/OFF Bloqueio do chiller": 1,
+        "Transmissor de pressão para água (PIT)": 1,
+        "Bomba Primária CAG (I/O)": 1,
+        "Bomba Secundária CAG (I/O)": 1,
+        "Transmissor de vazão ultrassônico (FIT)": 1,
+        "Válvula de by pass proporcional Até 2.1/2\"": 1,
+        "Transmissores de temperatura (Avanço e Retorno)": 1
     },
     "💨 Adicional: Ventilador/Exaustor (Inversor)": { "Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)": 1 },
     "⚙️ Adicional: Ventilador/Exaustor (Partida Direta)": { "Status funcionamento ventilador ou exaustor (partida direta) (PSH)": 1 }
@@ -596,13 +582,13 @@ def obter_cabo(inst_nome, is_output=False):
             return "2x1,00mm²"
         if "VÁLVULA" in i_up or "TCV" in i_up or "INVERSOR" in i_up or "VAZÃO" in i_up: 
             return "3x0,75mm² + Shield"
-        if "CHAVE" in i_up: 
+        if "CHAVE" in i_up or "BOMBA" in i_up: 
             return "5x1,00mm²"
         if "EXAUSTOR" in i_up or "VENTILADOR" in i_up or "COMPRESSOR" in i_up: 
             return "2x1,00mm²"
         return "2x1,00mm²"
     else:
-        if "CHAVE" in i_up: 
+        if "CHAVE" in i_up or "BOMBA" in i_up: 
             return "5x1,00mm²"
         if "(TT/MT)" in i_up or "TIT/MIT" in i_up: 
             return "5x0,75mm² + Shield"
@@ -681,7 +667,6 @@ def get_specific_tags(inst_nome, tags_lista, is_compressor_sys):
             subset = [t for t in tags_validas if "UE" in t.upper() or "EVAP" in t.upper() or "UTA" in t.upper()]
             if subset: return "/".join(subset)
     return "/".join(tags_validas)
-
 # ==========================================
 # TELA DE LOGIN E MENU LATERAL
 # ==========================================
@@ -778,13 +763,13 @@ if menu_ui != st.session_state.menu_selecionado:
 # TELA 0: HOME
 # ==============================================================================
 if st.session_state.menu_selecionado == "🏠 Tela Inicial":
+    st.image("https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1600&q=80", use_container_width=True, caption="Exemplo de Layout - Você pode trocar o link por uma foto da sede ou laboratório da SIARCON")
     st.write("")
     st.markdown(f"<h1 style='text-align: center; color: #178B96;'>Bem-vindo(a), {st.session_state.nome_exibicao}!</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; font-size: 18px; color: #666;'>Portal Comercial e de Engenharia SIARCON. Selecione o módulo desejado para iniciar:</p>", unsafe_allow_html=True)
     st.write("")
     st.write("")
     
-    # NOVAS 3 COLUNAS PARA A TELA INICIAL (COM CSS RESPONSIVO)
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -822,9 +807,6 @@ if st.session_state.menu_selecionado == "🏠 Tela Inicial":
         if st.button("Acessar Módulo ➔", key="btn_home_hidro", type="primary", use_container_width=True):
             st.session_state.menu_selecionado = "💧 Levantamento de Hidráulica"
             st.rerun()
-
-# ==============================================================================
-# MÓDULO 1: GERADOR DE PROPOSTAS
 
 # ==============================================================================
 # MÓDULO 1: GERADOR DE PROPOSTAS
@@ -1155,7 +1137,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
     with aba_auto:
         
-        # BOTÃO MOVIDO PARA FORA DO EXPANDER (Para nunca mais sumir)
         if not st.session_state.wizard_ativo:
             if st.button("➕ Criar Novo Quadro Manualmente", type="primary"):
                 st.session_state.wizard_ativo = True
@@ -1319,16 +1300,13 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 quadros_agrupados[tag] = []
                             quadros_agrupados[tag].append(arq_name)
                             
-                        # Lógica Sênior de Separação (Lê os nomes dos arquivos para não gerar itens fantasmas/repetidos)
                         for tag_quadro, lista_arquivos in quadros_agrupados.items():
                             grupos_equip = []
                             
                             for idx_equip, arq_name in enumerate(lista_arquivos):
                                 nome_upper = arq_name.upper()
                                 
-                                # Análise Sênior Condicional do Arquivo
                                 if "FX-02" in nome_upper or "PRINCIPAL" in nome_upper:
-                                    # 1. UTA Principal
                                     inst_uta = {k: 0 for k in REGRA_IO.keys()}
                                     inst_uta["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
                                     inst_uta["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
@@ -1343,19 +1321,16 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                     inst_uta["Pressostato diferencial para ar (PSH)"] = 1
                                     grupos_equip.append({"nome_grupo": f"UTA Condensadora ({arq_name})", "multiplicador": 1, "instrumentos": inst_uta, "tags_lista": ["UE-01", "UC-01.1", "UC-01.2"]})
                                     
-                                    # 2. Exaustores (Multiplicador 6)
                                     inst_ex = {k: 0 for k in REGRA_IO.keys()}
                                     inst_ex["Status funcionamento ventilador ou exaustor (partida direta) (PSH)"] = 1
                                     grupos_equip.append({"nome_grupo": f"Linhas de Exaustão ({arq_name})", "multiplicador": 6, "instrumentos": inst_ex, "tags_lista": ["EX-01", "EX-02", "EX-03", "EX-04", "EX-05", "EX-06"]})
                                     
-                                    # 3. Salas Limpas (Multiplicador 4)
                                     inst_salas = {k: 0 for k in REGRA_IO.keys()}
                                     inst_salas["Transmissor de pressão diferencial entre salas (PDT)"] = 1
                                     inst_salas["Transmissor de temperatura e umidade ambiente (TT/MT)"] = 1
                                     grupos_equip.append({"nome_grupo": f"Monitoramento Salas ({arq_name})", "multiplicador": 4, "instrumentos": inst_salas, "tags_lista": ["SALA-01", "SALA-02", "SALA-03", "SALA-04"]})
                                     
                                 elif "FX-03" in nome_upper or "SECUNDARI" in nome_upper:
-                                    # UTA Secundária
                                     inst_uta = {k: 0 for k in REGRA_IO.keys()}
                                     inst_uta["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
                                     inst_uta["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
@@ -1366,14 +1341,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                     inst_uta["Pressostato para monitorar os filtros G4 (PSH)"] = 1
                                     grupos_equip.append({"nome_grupo": f"UTA Secundária ({arq_name})", "multiplicador": 1, "instrumentos": inst_uta, "tags_lista": ["UE-02"]})
                                     
-                                    # Exaustor Simples
                                     inst_ex = {k: 0 for k in REGRA_IO.keys()}
                                     inst_ex["Status funcionamento ventilador ou exaustor (partida direta) (PSH)"] = 1
                                     inst_ex["Pressostato para monitorar os filtros M5 (PSH)"] = 1
                                     grupos_equip.append({"nome_grupo": f"Exaustão ({arq_name})", "multiplicador": 1, "instrumentos": inst_ex, "tags_lista": ["EX-02"]})
                                     
                                 else:
-                                    # Fallback genérico para arquivos não mapeados acima
                                     inst_uta = {k: 0 for k in REGRA_IO.keys()}
                                     inst_uta["Transmissor de pressão dif. para ar (medição de vazão de ar) (PDT)"] = 1
                                     inst_uta["Transmissor de temperatura e umidade para duto (TT/MT)"] = 1
@@ -1452,13 +1425,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             st.rerun()
                 raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
 
-                # --- NAVEGAÇÃO DE ABAS POR EQUIPAMENTO ---
+                # --- NAVEGAÇÃO POR EQUIPAMENTO (CORREÇÃO DO BUG DE PULO DE ABA) ---
                 if p_data['grupos_equipamentos']:
-                    nomes_abas = [g.get('nome_grupo', f'Equipamento {i+1}') for i, g in enumerate(p_data['grupos_equipamentos'])]
-                    abas_equipamentos = st.tabs(nomes_abas)
-                    
                     for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
-                        with abas_equipamentos[g_idx]:
+                        nome_exib = g_data.get('nome_grupo', f'Equipamento {g_idx+1}')
+                        with st.expander(f"📦 {nome_exib} (Qtd: {g_data.get('multiplicador', 1)})", expanded=True):
                             
                             qtd_key = f"m_g_{p_data['id']}_{g_idx}"
                             qtd_atual = st.session_state.get(qtd_key, g_data.get('multiplicador', 1))
@@ -1481,7 +1452,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             if qtd_atual > 6: 
                                 st.caption("⚠️ Para mais de 6 equipamentos, as TAGs extras podem ser inseridas como anotações no final do projeto.")
 
-                            # Identificador Sênior de Motores (Nova Regra)
                             tem_motor = any(mot in g_data['nome_grupo'].upper() for mot in ["UTA", "EXAUST", "VENT", "FANCOIL", "SPLIT", "BOMBA", "SPLITÃO"])
                             auto_mon_default = False if tem_motor else True
                             if "SALA" in g_data['nome_grupo'].upper() or "MONITORAMENTO" in g_data['nome_grupo'].upper():
@@ -1503,7 +1473,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                     total_di_g_single = q * io_vals["DI"]
                                     total_do_g_single = q * io_vals["DO"]
                                     
-                                    # CHAVE SÓ CONTA SE FOR MOTOR E NÃO FOR MONITORAMENTO
                                     if tem_motor and not is_monitoramento:
                                         total_di_g_single += 2
                                         
@@ -1520,9 +1489,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                             st.success(f"✅ OK! Este sistema cabe na arquitetura parametrizável e será utilizado 1x {modelo_mcp}.")
 
                             # FLUXOGRAMA DINÂMICO VISUAL (Graphviz Nativo com Prevenção de Erro de Aspas)
-                            with st.expander("👁️ Visualizar Diagrama P&ID (Lógica e TAGs)", expanded=True):
+                            with st.expander("👁️ Visualizar Diagrama P&ID (Lógica e TAGs)", expanded=False):
                                 
-                                # FUNÇÃO PARA BLINDAR STRINGS CONTRA ERROS DO GRAPHVIZ
                                 def limpa_str(texto):
                                     return str(texto).replace('"', "''").replace('\n', ' ')
                                 
@@ -1544,10 +1512,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 has_outputs = False
                                 node_idx = 0
                                 
-                                # AGRUPAR CAIXAS SE FOR MONITORAMENTO OU EXAUSTÃO
                                 group_boxes = is_monitoramento or ("EXAUST" in grupo_nome.upper())
                                 
-                                # CRÍTICO: RENDERIZA O GRÁFICO 1 VEZ POR TIPO DE INSTRUMENTO
                                 for inst_f, q_f in g_data['instrumentos'].items():
                                     if q_f > 0:
                                         q_int = int(q_f)
@@ -1581,11 +1547,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                         
                                         if not has_in_pin and not has_out_pin: continue
                                         
-                                        # Agrupamento das TAGs do usuário
                                         tags_validas = [t for t in g_data['tags_lista'] if t.strip()]
                                         tags_inst = tags_validas
                                         
-                                        # Isolar UE e UC se for sistema de Expansão Direta integrado
                                         if is_compressor_sys and ("UTA" in grupo_nome.upper() or "SISTEMA" in grupo_nome.upper()):
                                             if "COMPRESSOR" in inst_f.upper() or "TC" in inst_f.upper() or "CONDENSADOR" in inst_f.upper():
                                                 tags_inst = [t for t in tags_validas if "UC" in t.upper() or "COND" in t.upper() or "COMP" in t.upper()]
@@ -1599,7 +1563,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                         if len(lbl_out_limpo) > 35: lbl_out_limpo = lbl_out_limpo[:35] + "..."
                                         
                                         if group_boxes:
-                                            # Desenha APENAS 1 CAIXA com prefixo quantitativo e as TAGs juntas
                                             node_name = f"N_{node_idx}_grp"
                                             prefix = f"{q_int}x "
                                             
@@ -1629,13 +1592,11 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                                     dot += f'  "Controlador" -> "{node_name}_out" [label="{cabo_out}", fontsize=8, color="#E14D2A"];\n'
                                                     has_outputs = True
                                         else:
-                                            # Desenha CAIXAS SEPARADAS
                                             for idx_q in range(q_int):
                                                 node_name = f"N_{node_idx}_{idx_q}"
                                                 lbl_suf = f" {idx_q+1}" if q_int > 1 else ""
                                                 
                                                 tag_contexto = tags_inst[idx_q % len(tags_inst)] if tags_inst else ""
-                                                # Correção para PDIT/Vazão herdar só a primeira TAG principal (UE-01) ao invés da string combinada
                                                 if "vazão de ar" in inst_f.lower() and "/" in tag_contexto:
                                                     tag_contexto = tag_contexto.split('/')[0].strip()
                                                     
@@ -1691,8 +1652,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 
                                 try:
                                     st.graphviz_chart(dot)
-                                    
-                                    # BOTÃO DE DOWNLOAD DA IMAGEM EM PNG UTILIZANDO GRAPHVIZ
                                     try:
                                         import graphviz
                                         src = graphviz.Source(dot)
@@ -1738,7 +1697,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         raw_di_painel += q * io_vals["DI"] * qtd_atual_calc
                         raw_do_painel += q * io_vals["DO"] * qtd_atual_calc
 
-                    # CHAVE SÓ CONTA SE FOR MOTOR E NÃO FOR MONITORAMENTO
                     if tem_motor and not is_mon:
                         raw_di_painel += (2 * qtd_atual_calc)
 
@@ -1959,7 +1917,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         st.markdown("### 🏷️ Padronização de Nomes para o Diagrama P&ID")
         st.write("Você pode baixar a relação de nomes de instrumentos, ajustá-los no Excel e fazer o upload novamente para mudar como eles aparecem visualmente no Diagrama gerado na aba de Automação.")
         
-        # DOWNLOAD DA PLANILHA DE DICIONÁRIO
         buffer_nomes = io.BytesIO()
         df_nomes = pd.DataFrame([
             {"Nome Original (Base de Preços)": k, 
@@ -1973,7 +1930,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
         buffer_nomes.seek(0)
         st.download_button(label="📥 Baixar Planilha de Personalização de I/O", data=buffer_nomes, file_name="Dicionario_Nomes_Diagrama.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         
-        # UPLOAD DA PLANILHA EDITADA
         upload_nomes = st.file_uploader("📂 Faça o upload da planilha editada para atualizar os nomes no sistema", type=["xlsx", "csv"])
         if upload_nomes is not None:
             try:
@@ -2064,7 +2020,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             else:
                 st.info("Nenhuma alteração detectada para salvar.")
 
-    with aba_resumo:
+
+with aba_resumo:
         st.header("Consolidação Financeira do Orçamento")
         linhas_inst_campo = []
         linhas_hardware = []
@@ -2167,7 +2124,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         if "pressão dif. para ar" in inst.lower(): func_inst = "Medição da Vazão de Ar"
                         elif "temperatura e umidade" in inst.lower(): func_inst = "Medição de Temperatura e Umidade"
                         elif "temperatura" in inst.lower(): func_inst = "Medição de Temperatura"
-                        elif "on/off" in inst.lower() or "proporcional" in inst.lower(): func_inst = "Controle de Válvulas"
+                        elif "bloqueio do chiller" in inst.lower(): func_inst = "Bloqueio ON/OFF do Chiller"
+                        elif "on/off" in inst.lower() or "proporcional" in inst.lower() or "by pass" in inst.lower(): func_inst = "Controle de Válvulas"
                         elif "compressor" in inst.lower(): func_inst = "Status de Operação do Compressor"
                         elif "termostato" in inst.lower(): func_inst = "Segurança de Sobreaquecimento"
                         elif "resistência" in inst.lower() and "pressostato" not in inst.lower(): func_inst = "Aquecimento"
@@ -2178,7 +2136,9 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         elif "co2" in inst.lower(): func_inst = "Medição da Qualidade do Ar (CO2)"
                         elif "fluxo" in inst.lower() or "fs" in inst.lower() or "cf" in inst.lower(): func_inst = "Confirmação de Fluxo de Água"
                         elif "integração de chiller" in inst.lower(): func_inst = "Integração via Rede (Chiller)"
-                        elif "bomba de água gelada" in inst.lower(): func_inst = "Status/Acionamento Bomba CAG"
+                        elif "bomba" in inst.lower(): func_inst = "Status/Acionamento Bomba CAG"
+                        elif "pressão para água" in inst.lower(): func_inst = "Medição de Pressão de Água"
+                        elif "vazão ultrassônico" in inst.lower(): func_inst = "Medição de Vazão de Água"
                         
                         tag_especifica = get_specific_tags(inst, g.get('tags_lista', []), is_compressor_sys)
                         str_tag_ctx = f" [TAGs: {tag_especifica}]" if tag_especifica else ""
@@ -2557,9 +2517,8 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 df_p = df_completo[df_completo['Painel_Origem'] == p_nome]
                 subtotal_painel = df_p['Custo Total'].sum()
                 
-                if linha_atual > 6: linha_atual += 1 # Pula linha entre os painéis conforme imagem
+                if linha_atual > 6: linha_atual += 1
                     
-                # CABEÇALHO DO PAINEL
                 if len(paineis_ordenados) > 1:
                     ws1.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual, end_column=5)
                     c_tit = ws1.cell(row=linha_atual, column=1, value=f"QUADRO / LOCAL: {p_nome}".upper())
@@ -2571,14 +2530,12 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 for cat_nome, cat_lbl in [("Instrumentação de Campo", "INSTRUMENTAÇÃO DE CAMPO"), ("Hardware e Painéis", "HARDWARE E PAINÉIS"), ("Software de Supervisão", "SOFTWARE E SUPERVISÃO"), ("Serviços de Lógica", "SERVIÇOS E LÓGICA")]:
                     df_cat = df_p[df_p['Categoria'] == cat_nome]
                     if not df_cat.empty:
-                        # NOME DA CATEGORIA (VERDE FORTE)
                         ws1.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual, end_column=5)
                         c_cat = ws1.cell(row=linha_atual, column=1, value=cat_lbl)
                         c_cat.fill = fill_v_forte; c_cat.font = font_bold; c_cat.alignment = Alignment(horizontal="center")
                         for c in range(1, 6): ws1.cell(row=linha_atual, column=c).border = b_thin
                         linha_atual += 1
                         
-                        # CABEÇALHO DAS COLUNAS (TEAL) APENAS NA PRIMEIRA CATEGORIA DO PAINEL
                         if first_cat:
                             headers = ["Categoria", "Item", "Preço Unit.", "Qtd", "Custo Total"]
                             for c_i, h_v in enumerate(headers, start=1):
@@ -2587,7 +2544,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             linha_atual += 1
                             first_cat = False
                             
-                        # LINHAS DE DADOS
                         df_cat_g = df_cat.groupby(['Categoria', 'Item'], as_index=False).agg({'Preço Unit.': 'first', 'Qtd': 'sum', 'Custo Total': 'sum'})
                         for _, row_d in df_cat_g.iterrows():
                             ws1.cell(row=linha_atual, column=1, value=row_d['Categoria']).font = font_norm
@@ -2601,7 +2557,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             for c in range(1, 6): ws1.cell(row=linha_atual, column=c).border = b_thin
                             linha_atual += 1
                             
-                        # SUBTOTAL DA CATEGORIA (VERDE CLARO)
                         ws1.cell(row=linha_atual, column=1, value="SUBTOTAL")
                         ws1.cell(row=linha_atual, column=2, value=cat_lbl)
                         ws1.cell(row=linha_atual, column=3, value="-").alignment = Alignment(horizontal="right")
@@ -2614,7 +2569,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             ws1.cell(row=linha_atual, column=c).border = b_thin
                         linha_atual += 1
                         
-                # TOTAL DO BLOCO / QUADRO COM LINHA ROXA GROSSA
                 if len(paineis_ordenados) > 1:
                     ws1.cell(row=linha_atual, column=1, value="TOTAL")
                     ws1.cell(row=linha_atual, column=2, value=f"TOTAL DO BLOCO: {p_nome}")
@@ -2628,7 +2582,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                         ws1.cell(row=linha_atual, column=c).border = b_thick
                     linha_atual += 1
 
-            # TOTAL GERAL DO ORÇAMENTO (TEAL)
             linha_atual += 1
             ws1.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual, end_column=4)
             c_g_txt = ws1.cell(row=linha_atual, column=1, value="TOTAL GERAL DO ORÇAMENTO")
@@ -2637,7 +2590,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             c_g_val.fill = fill_teal; c_g_val.font = font_teal; c_g_val.alignment = Alignment(horizontal="right", vertical="center"); c_g_val.number_format = '"R$" #,##0.00'
             for c in range(1, 6): ws1.cell(row=linha_atual, column=c).border = b_thin
             
-            # DESCRIÇÃO TEXTUAL AO FUNDO
             linha_atual += 2
             num_linhas_texto = len(texto_descritivo_final.split('\n'))
             tamanho_caixa = max(10, num_linhas_texto + 2) 
@@ -2648,7 +2600,6 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
             for r in range(linha_atual, linha_atual+tamanho_caixa+1):
                 for c in range(1, 6): ws1.cell(row=r, column=c).border = b_thin
             
-            # AJUSTE DE COLUNAS
             for col in ws1.columns:
                 max_len = max(len(str(cell.value or '')) for cell in col if cell.row <= linha_atual - 2)
                 ws1.column_dimensions[get_column_letter(col[0].column)].width = max(max_len + 4, 12)
@@ -2792,7 +2743,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     templates.append({"Equipamento": eq, "Vias": vias, "Ligação": ligacao, "Grupo": "Kit Fixo", "Item Base": "Niple duplo Ferro maleável galvanizado", "Medida": "1/4\"", "Qtd": 2.0})
         return templates
 
-   # --- PONTES COM O GOOGLE SHEETS PARA OS TEMPLATES (BLINDAGEM MÁXIMA) ---
+    # --- PONTES COM O GOOGLE SHEETS PARA OS TEMPLATES (BLINDAGEM MÁXIMA) ---
     def carregar_templates_do_banco():
         try:
             sh = conectar_google_sheets()
@@ -2809,14 +2760,12 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.session_state.status_nuvem_templates = "ERRO"
             st.toast("⚠️ Falha de conexão. Usando receitas da memória local para evitar perda de dados.", icon="📶")
             
-        # Se a nuvem falhou, usa a memória para NUNCA resetar o seu trabalho
         if 'matriz_templates' in st.session_state and st.session_state.matriz_templates:
             return st.session_state.matriz_templates
             
         return gerar_templates_matriz() 
 
     def salvar_templates_no_banco(matriz):
-        # Proteção: Se a nuvem estava com erro, não deixa sobrescrever com lixo
         if st.session_state.get("status_nuvem_templates") == "ERRO":
             st.warning("⚠️ Nuvem offline. Padrão salvo apenas na memória local desta sessão.")
             return False
@@ -2861,18 +2810,16 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         medida_final = medida_final.replace("{b}", bitola_cavalete)
         return f"{item_base} - Ø {medida_final}"
 
-# ====================================================================
+    # ====================================================================
     # 🔄 SINCRONIZAÇÃO INTELIGENTE DA TABELA DE PREÇOS (v24 - MULTI-USER BLINDADA)
     # ====================================================================
     if st.session_state.get('versao_banco_hidro') != 'v24_MULTI_USER_BLINDADA':
         banco_geral = {}
         leitura_nuvem_sucesso = False
         
-        # 1. Tenta puxar do Google Sheets na nuvem (Lendo o valor matemático puro, sem formatação visual)
         try:
             sh_hidro = conectar_google_sheets()
             ws_h = sh_hidro.worksheet("Precos_Hidraulica_Itens")
-            # UNFORMATTED_VALUE é a chave: impede que o Google Sheets transforme 16.2 em 162 por causa do idioma!
             aba_h = ws_h.get_all_records(value_render_option='UNFORMATTED_VALUE')
             if len(aba_h) > 0:
                 for row in aba_h:
@@ -2880,7 +2827,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     if nome_orig and nome_orig.lower() not in ["nan", "none", ""]:
                         chave = normalizar_string_busca(nome_orig)
                         
-                        # Converte de forma direta e segura para float
                         val_bruto = row.get("Preço Unitário (R$)", 0.0)
                         try:
                             preco_limpo = float(val_bruto)
@@ -2898,7 +2844,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 leitura_nuvem_sucesso = True
         except Exception as e:
             pass
-        # 2. Se a nuvem falhou, puxa da memória local para não perder o que foi digitado
         if not leitura_nuvem_sucesso and 'banco_precos_hidraulica' in st.session_state and st.session_state.banco_precos_hidraulica:
             for row in st.session_state.banco_precos_hidraulica:
                 chave = normalizar_string_busca(row.get("Item / Componente", ""))
@@ -2907,14 +2852,12 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             st.toast("⚠️ Atraso na nuvem. Usando preços da memória local.", icon="⏳")
             leitura_nuvem_sucesso = True
 
-        # 3. Garante M.O. Base
         mo_m_key = normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)")
         if mo_m_key not in banco_geral: banco_geral[mo_m_key] = {"Item / Componente": "Mão de Obra de Montagem Hidráulica (Por Polegada)", "Preço Unitário (R$)": 120.0, "Unidade": "pol"}
         
         mo_i_key = normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)")
         if mo_i_key not in banco_geral: banco_geral[mo_i_key] = {"Item / Componente": "Mão de Obra de Isolamento Térmico (Por Polegada)", "Preço Unitário (R$)": 95.0, "Unidade": "pol"}
 
-        # 4. Varre as Receitas: Se o item for novo de verdade, adiciona zerado.
         houve_adicao_nova = False
         for template in st.session_state.matriz_templates:
             bitolas_alvo = bitolas_roscadas if template["Ligação"] == "Roscado" else bitolas_soldadas
@@ -2934,7 +2877,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         st.session_state.banco_precos_hidraulica = list(banco_geral.values())
         st.session_state.versao_banco_hidro = 'v24_MULTI_USER_BLINDADA'
         
-        # 5. Se houve adição de item novo, atualiza o Google Sheets com os números limpos
         if leitura_nuvem_sucesso and houve_adicao_nova:
             try:
                 df_bg = pd.DataFrame(st.session_state.banco_precos_hidraulica).fillna("")
@@ -2954,15 +2896,13 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 c_tg.write(f"TAG: `{cav.get('tag', 'S/ TAG')}`")
                 c_qt.write(f"Qtd: **{cav.get('quantidade', 1)} cjs**")
 
-                # --- DESENHO VISUAL DO CAVALETE (DINÂMICO E COMPLETO) ---
                 import graphviz
                 import re
                 
                 with st.expander("👁️ Ver Representação Visual Completa (P&ID)"):
                     dot = graphviz.Digraph(node_attr={'shape': 'box', 'style': 'rounded,filled', 'fillcolor': '#ffffff', 'color': '#1C8590', 'fontname': 'Arial', 'fontsize': '10'})
-                    dot.attr(rankdir='LR', splines='ortho') # Desenha da Esquerda para Direita com linhas retas
+                    dot.attr(rankdir='LR', splines='ortho')
                     
-                    # 1. Analisa a composição REAL da sua receita de cavalete
                     has_filtro, has_bal, has_retencao, valv_controle = None, None, None, None
                     juntas_exp = []
                     bloqueios = []
@@ -2971,11 +2911,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         nome, qtd = c["nome"], int(c["qtd"])
                         nome_low = nome.lower()
                         
-                        # Extrai a bitola real da peça (Ex: pega o 1.1/2" e ignora o resto)
                         match = re.search(r'Ø\s*([\d\./"]+)', nome)
                         b_str = f"Ø {match.group(1)}" if match else ""
                         
-                        # Filtra apenas os itens principais de linha
                         if "filtro" in nome_low: has_filtro = f"Filtro Y\n{b_str}"
                         elif "balanceadora" in nome_low: has_bal = f"Balanceadora\n{b_str}"
                         elif "retenção" in nome_low: has_retencao = f"Retenção\n{b_str}"
@@ -2988,7 +2926,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                             t = "Borboleta" if "borboleta" in nome_low else "Gaveta"
                             bloqueios.extend([f"{t}\n{b_str}"] * qtd)
 
-                    # 2. Monta a sequência da tubulação logicamente (Pipe)
                     seq = [('IN', 'Entrada Água', 'rarrow', '#e0f2f1')]
                     
                     if len(bloqueios) > 0: seq.append(('B1', bloqueios[0], 'box', '#f9f9f9'))
@@ -3005,17 +2942,14 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     
                     seq.append(('OUT', 'Retorno Água', 'rarrow', '#fce4e4'))
                     
-                    # 3. Desenha os Nós e as Linhas
                     for nid, lbl, shp, clr in seq: dot.node(nid, lbl, shape=shp, fillcolor=clr)
                     for i in range(len(seq) - 1): dot.edge(seq[i][0], seq[i+1][0])
                         
-                    # 4. Tratamento Especial: Adiciona Linha de By-pass se for 3 Vias
                     if valv_controle and "3" in valv_controle:
                         dot.node('BP', 'Linha de\nBy-pass', shape='parallelogram', fillcolor='#fff3cd')
                         no_saida_bp = 'FY' if has_filtro else ('B1' if len(bloqueios) > 0 else 'IN')
                         dot.edge(no_saida_bp, 'BP')
                         
-                        # Se existir uma 3ª válvula de bloqueio (fechamento do by-pass), desenha ela
                         if len(bloqueios) > 2:
                             dot.node('B3', bloqueios[2], shape='box', fillcolor='#f9f9f9')
                             dot.edge('BP', 'B3')
@@ -3025,17 +2959,15 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                             
                     st.graphviz_chart(dot)
                            
-                # ... (final do bloco do P&ID e do botão da lixeira individual)
                 if c_rm.button("🗑️", key=f"btn_del_cav_v23_{idx}_{cav.get('id', 'antigo')}"):
                     st.session_state.cavaletes_selecionados.pop(idx)
                     st.rerun()
                     
-            # O botão de excluir todos ganha uma chave única e fica alinhado com o "for" (fora da repetição)
             if st.button("🗑️ Excluir Todos", type="secondary", key="btn_excluir_todos_cav_v23"):
                 st.session_state.cavaletes_selecionados = []
                 st.rerun()
 
-# ====================================================================
+    # ====================================================================
     # FUNÇÃO DE DIMENSIONAMENTO HIDRÁULICO (ÁBACOS OFICIAIS: FECHADO E ABERTO)
     # ====================================================================
     def dimensionar_bitola_pelo_abaco(vazao_m3h, perda_mmca_m, tipo_sistema):
@@ -3044,26 +2976,15 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             
         import math
         
-        # 1. Vazão em m³/s
         q_m3s = vazao_m3h / 3600.0
-        
-        # 2. Parametrização conforme o Ábaco (Aberto vs Fechado)
         is_aberto = "Aberto" in str(tipo_sistema)
-        
-        # Coeficiente de rugosidade de Hazen-Williams (C)
-        # Fechado = 130 (Água Gelada/Quente sem aeração)
-        # Aberto = 100 (Torre de Condensação sujeita à incrustação e oxidação)
         c_rugosidade = 100.0 if is_aberto else 130.0
         
-        # Limite de velocidade máxima (m/s) segundo os critérios de ruído/erosão dos ábacos:
-        # Perda <= 40 mmCA/m (Escritório / Áreas Críticas) -> v_max = 1.2 m/s
-        # Perda > 40 mmCA/m (Indústria / Áreas Técnicas) -> v_max = 2.0 m/s (Aberto) ou 2.4 m/s (Fechado)
         if perda_mmca_m <= 40:
             v_max = 1.2
         else:
             v_max = 2.0 if is_aberto else 2.4
             
-        # 3. Tabela de Diâmetros Internos Reais (Tubo Aço Carbono SCH 40) em metros
         tabela_bitolas = [
             ("1/2\"", 0.0158),
             ("3/4\"", 0.0209),
@@ -3083,15 +3004,11 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         
         j_limite = float(perda_mmca_m)
         
-        # 4. Varre as bitolas em ordem crescente e escolhe a menor que atenda Perda e Velocidade
         for nome_bitola, d_m in tabela_bitolas:
             area_m2 = (math.pi * (d_m ** 2)) / 4.0
             vel_ms = q_m3s / area_m2
-            
-            # Perda de Carga em mmCA/m (Hazen-Williams)
             j_calculado = 1000.0 * (10.67 * (q_m3s ** 1.852)) / ((c_rugosidade ** 1.852) * (d_m ** 4.8704))
             
-            # A bitola é aprovada se respeitar a perda máxima E o limite acústico/velocidade
             if j_calculado <= j_limite and vel_ms <= v_max:
                 return nome_bitola
                 
@@ -3108,7 +3025,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         tipo_sistema = st.radio("Tipo de Sistema da Instalação:", ["Fechado (Água Gelada/Quente)", "Aberto (Água de Condensação/Torre)"], horizontal=True)
         st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
         
-        # 1. Seleção Principal de Equipamento (agora em 2 colunas para ficar mais limpo)
         col1, col2 = st.columns(2)
         tipo_equip = col1.selectbox("Tipo de Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"])
         if tipo_equip in ["Chiller", "Bomba"]: 
@@ -3116,7 +3032,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         else: 
             tipo_vias = col2.selectbox("Válvula:", ["2 Vias", "3 Vias"])
             
-        # 2. Configurações Específicas por Equipamento
         fancolete_tipo_montagem = "Fabricado na Obra (Tradicional)"
         kit_danfoss_final = ""
         is_danfoss = False
@@ -3133,13 +3048,12 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 cf1, cf2 = st.columns(2)
                 vazao_fanco = cf1.number_input("Vazão do Fancolete (m³/h):", min_value=0.01, step=0.05, value=0.10)
                 
-                # Seleção automática baseada nas faixas técnicas Danfoss
                 idx_sel = 0
                 if vazao_fanco <= 0.20: idx_sel = 0
                 elif vazao_fanco <= 0.70: idx_sel = 1
-                elif vazao_fanco <= 1.10: idx_sel = 3 # DN 20
-                elif vazao_fanco <= 1.20: idx_sel = 2 # DN 15 HF
-                else: idx_sel = 4 # DN 20 HF
+                elif vazao_fanco <= 1.10: idx_sel = 3
+                elif vazao_fanco <= 1.20: idx_sel = 2
+                else: idx_sel = 4
                 
                 opcoes_danfoss = [
                     'Kit Danfoss AB-QM 4.0 Flexo - DN 15 LF',
@@ -3164,7 +3078,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             chiller_tipo_valv = cc2.radio("Válvula de Controle Motorizada:", ["Proporcional", "ON/OFF", "Sem Válvula"], horizontal=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
-        # 3. Dimensionamento da Tubulação (Oculto se for Danfoss!)
         vazao_calculada = 0.0
         bitola_final = "1/2\""
         
@@ -3182,13 +3095,11 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 bitola_final = dimensionar_bitola_pelo_abaco(vazao_calculada, perda_carga, tipo_sistema)
                 st.info(f"📈 Bitola comercial recomendada pelo ábaco: **{bitola_final}**.")
         else:
-            # Se for Danfoss, o sistema amarra a bitola em segundo plano sem incomodar o usuário
             bitola_final = "1/2\"" if "DN 15" in kit_danfoss_final else "3/4\""
             vazao_calculada = vazao_fanco
 
         st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
         
-        # 4. Quantidade, Tag, Verbas e Adição
         col_q, col_t = st.columns([1, 2])
         qtd = col_q.number_input("Quantidade de conjuntos (Cavaletes):", min_value=1, step=1, value=1)
         tag_equip = col_t.text_input("TAG identificadora (Opcional):", placeholder="Ex: FC-01, UTA-01...")
@@ -3245,11 +3156,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         v_str = "Válvula de controle 2 vias, ON/OFF" if chiller_tipo_valv == "ON/OFF" else "Válvula 2 vias, motorizada com atuador proporcional"
                         composicao_kit.append({"nome": construir_nome_peca(v_str, "Variável {b}", bitola_final), "qtd": 1.0})
                 
-                # --- NOVAS REGRAS DE INJEÇÃO: CAMBOTAS E PARAFUSOS ---
-                # 1. Cambotas de Madeira Tratada (4 por cavalete base)
                 composicao_kit.append({"nome": f"Cambota de Madeira Tratada/Poliuretano - Ø {bitola_final}", "qtd": 4.0})
                 
-                # 2. Parafusos Inteligentes para Flanges
                 if ligacao == "Flangeado":
                     qtd_flanges = sum(c["qtd"] for c in composicao_kit if "flange" in c["nome"].lower())
                     if qtd_flanges > 0:
@@ -3259,11 +3167,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                             "10\"": "7/8\" x 4\"", "12\"": "7/8\" x 4\""
                         }
                         medida_parafuso = dict_parafusos.get(bitola_final, "5/8\" x 3\"")
-                        # 4 parafusos por par = 2 parafusos para cada unidade de flange na lista
                         qtd_parafusos = qtd_flanges * 2.0
                         composicao_kit.append({"nome": f"Parafuso Sextavado Aço c/ Porca e Arruelas - {medida_parafuso}", "qtd": qtd_parafusos})
             
-            # --- PRECIFICAÇÃO E GERAÇÃO DAS VERBAS FINANCEIRAS ---
             dict_precos_memoria = {}
             for row in st.session_state.banco_precos_hidraulica:
                 chave_n = normalizar_string_busca(row.get("Item / Componente", ""))
@@ -3273,7 +3179,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
 
             custo_material_total_kit = 0.0
             
-            # Varredura Inicial (Apenas Materiais Físicos)
             for comp in composicao_kit:
                 n_busca = normalizar_string_busca(comp["nome"])
                 if n_busca not in dict_precos_memoria:
@@ -3281,9 +3186,8 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     dict_precos_memoria[n_busca] = 0.0
                 custo_material_total_kit += dict_precos_memoria.get(n_busca, 0.0) * comp["qtd"]
                 
-            custo_base_materiais = custo_material_total_kit # Salva a base sem juros compostos
+            custo_base_materiais = custo_material_total_kit
             
-            # Aplicação das Verbas como Itens Virtuais (Garante que sairá na planilha do cliente)
             if pct_suporte > 0:
                 v_sup = custo_base_materiais * (pct_suporte / 100.0)
                 nome_verba_sup = f"Verba Dinâmica - Suportação Metálica ({pct_suporte}%)"
@@ -3322,7 +3226,7 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     qtd_tubos_linear = 0.0; qtd_conexoes = 0.0; qtd_valvulas = 0.0
                     for c in composicao_kit:
                         nome_low = c["nome"].lower()
-                        if "verba" in nome_low: continue # Ignora as verbas no cálculo do metro de isolamento
+                        if "verba" in nome_low: continue
                         if "tubo" in nome_low: qtd_tubos_linear += c["qtd"]
                         elif any(x in nome_low for x in ["curva", "conexão t", "redução", "cotovelo"]): qtd_conexoes += c["qtd"]
                         elif any(x in nome_low for x in ["válvula", "filtro", "danfoss"]): qtd_valvulas += c["qtd"]
@@ -3429,13 +3333,9 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 st.session_state.cavaletes_selecionados = []
                 st.rerun()
 
-        
-                
     with aba_padroes_hidro:
         st.header("⚙️ Central de Padrões e Receitas (Templates)")
         st.caption("Selecione o equipamento e a variação que deseja editar. Suas alterações serão gravadas na nuvem (Google Sheets).")
-        
-        f_eq, f_vi, f_li = st.columns(3)
         
         f_eq, f_vi, f_li = st.columns(3)
         sel_eq = f_eq.selectbox("1. Equipamento:", ["UTA", "Fancoil", "Fancolete", "Chiller", "Bomba"], key="tpl_eq")
@@ -3532,14 +3432,10 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                         st.toast(f"Receita clonada com sucesso para {clon_eq} | {clon_vi} | {clon_li}!", icon="📋")
                         st.rerun()
 
-        # ====================================================================
-        # FERRAMENTA DE SANEAMENTO: UNIFICADOR DE DUPLICATAS (DE-PARA)
-        # ====================================================================
         st.markdown("---")
         st.subheader("🔗 Unificador de Nomes (De-Para)")
         st.caption("Tem itens com nomes diferentes que são a mesma coisa? Selecione o nome que está na sua receita e o nome oficial. O sistema corrigirá todas as matrizes de uma só vez.")
         
-        # Puxa os itens que estão em uso nas receitas
         itens_em_uso = sorted(list(set(row["Item Base"] for row in st.session_state.matriz_templates)))
         
         col_de, col_para = st.columns(2)
@@ -3561,14 +3457,10 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             else:
                 st.warning("Selecione um nome de origem e um destino válido e diferente.")
 
-    
     with aba_precos_hidro:
         st.subheader("💲 Gestão de Tabela de Preços e Base Hidráulica")
         st.markdown("Você pode **editar os preços manualmente direto na tabela abaixo** ou usar as opções de **Upload/Download via Excel**.")
         
-        # ====================================================================
-        # MOTOR DE GRAVAÇÃO PT-BR (IMPEDE O GOOGLE DE MULTIPLICAR POR 10)
-        # ====================================================================
         def gravar_sheets_ptbr_definitivo(lista_banco):
             sh_p = conectar_google_sheets()
             try: ws_p = sh_p.worksheet("Precos_Hidraulica_Itens")
@@ -3581,18 +3473,14 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 pr_float = float(converter_preco_blindado(item.get("Preço Unitário (R$)", 0.0)))
                 un = str(item.get("Unidade", "pç")).strip()
                 
-                # TRANSFORMA O VALOR EM STRING COM VÍRGULA ("16,20") PARA O SHEETS PT-BR RESPEITAR O DECIMAL
                 pr_ptbr = f"{pr_float:.2f}".replace(".", ",")
                 matriz_gravar.append([nm, pr_ptbr, un])
                 
-            # O comando update com USER_ENTERED força o Sheets brasileiro a ler "16,20" como R$ 16,20 exatos
             ws_p.update(matriz_gravar, value_input_option='USER_ENTERED')
             
-            # Limpa o cache global de todos os usuários logados
             st.cache_data.clear()
             st.cache_resource.clear()
 
-        # 1. Tabela Executiva Direta na Tela
         df_exibicao_precos = pd.DataFrame(st.session_state.banco_precos_hidraulica)
         
         df_editado_precos = st.data_editor(
@@ -3643,7 +3531,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
         st.markdown("---")
         col_up1, col_up2 = st.columns(2)
         
-        # 2. Botão de Download do Modelo Excel
         with col_up1:
             st.markdown("#### 1️⃣ Baixar Modelo Atual")
             df_down = pd.DataFrame(st.session_state.banco_precos_hidraulica)
@@ -3663,7 +3550,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 use_container_width=True
             )
             
-        # 3. Upload e Atualização Blindada via Excel
         with col_up2:
             st.markdown("#### 2️⃣ Subir Planilha Atualizada")
             arquivo_excel_precos = st.file_uploader("Selecione o arquivo Excel atualizado:", type=["xlsx", "xls"], key="up_excel_precos_definitivo")
@@ -3678,7 +3564,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                             for _, linha in df_novo.iterrows():
                                 item_nm = str(linha.get("Item / Componente", "")).strip()
                                 if item_nm and item_nm.lower() not in ["nan", "none", ""]:
-                                    # LÊ O DECIMAL REAL DO EXCEL
                                     preco_limpo = converter_preco_blindado(linha.get("Preço Unitário (R$)", 0.0))
                                     unid_limpa = str(linha.get("Unidade", "pç")).strip()
                                     if not unid_limpa or unid_limpa.lower() == "nan": unid_limpa = "pç"
@@ -3721,7 +3606,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             preco_base_mont = dict_lookup_valores.get(normalizar_string_busca("Mão de Obra de Montagem Hidráulica (Por Polegada)"), 120.0)
             preco_base_isol = dict_lookup_valores.get(normalizar_string_busca("Mão de Obra de Isolamento Térmico (Por Polegada)"), 95.0)
             
-            # NOVA CURVA DE ESFORÇO: Acompanha a lógica do botão na hora de fechar a conta
             dict_fator_mo = {
                 "1/4\"": 1.4, "3/8\"": 1.5, "1/2\"": 1.6, "3/4\"": 1.8, 
                 "1\"": 2.0, "1.1/4\"": 2.2, "1.1/2\"": 2.4, "2\"": 2.6, 
@@ -3729,8 +3613,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 "6\"": 6.0, "8\"": 8.0, "10\"": 10.0, "12\"": 12.0
             }
             
-            for cav in st.session_state.cavaletes_selecionados:
-                pol_dec = dict_fator_mo.get(cav["bitola"], 1.0)
             for cav in st.session_state.cavaletes_selecionados:
                 pol_dec = dict_fator_mo.get(cav["bitola"], 1.0)
                 is_aberto = "Aberto" in cav.get("sistema", "")
@@ -3827,7 +3709,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                     n_busca = normalizar_string_busca(comp["nome"])
                     pr_u = dict_lookup_valores.get(n_busca, 0.0)
                     
-                    # --- A MÁSCARA COSMÉTICA PARA AS VERBAS ---
                     if "Verba Dinâmica" in comp["nome"]:
                         valor_total_verba = comp["qtd"] * qtd_conjuntos
                         lista_itens_cav.append({
@@ -3893,9 +3774,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
             df_bom_final = pd.DataFrame(lista_bom).sort_values(by=["Bitola", "Item / Componente"])
             st.dataframe(df_bom_final, use_container_width=True, hide_index=True)
             
-            # ====================================================================
-            # 📐 NOVA SEÇÃO: PRANCHAS TÉCNICAS DE CARIMBOS PARA AUTOCAD (3 COLUNAS)
-            # ====================================================================
             st.markdown("---")
             st.subheader("📐 Prancha Técnica de Carimbos para AutoCAD / Projetos")
             st.caption("Formato padrão de 3 colunas (ITEM | DESCRIÇÃO | QTD) pronto para inserção no desenho técnico do AutoCAD.")
@@ -3936,9 +3814,6 @@ elif st.session_state.menu_selecionado == "💧 Levantamento de Hidráulica":
                 st.dataframe(df_cad_visual, use_container_width=True, hide_index=True)
                 blocos_cad_export[titulo_carimbo] = df_cad_visual
 
-            # ====================================================================
-            # 📥 EXPORTAÇÕES EXCEL (COMERCIAL VS AUTOCAD)
-            # ====================================================================
             st.markdown("---")
             st.subheader("📥 Exportação dos Dados do Projeto")
             col_exp_com, col_exp_cad = st.columns(2)
