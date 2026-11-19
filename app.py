@@ -1427,7 +1427,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             st.rerun()
                 raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
 
-                    if "CAG" in p_data.get('tipo', ''):
+                if "CAG" in p_data.get('tipo', ''):
                     # =========================================================
                     # MÓDULO DEDICADO: CENTRAL DE ÁGUA GELADA (CAG)
                     # =========================================================
@@ -1509,7 +1509,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
 
                     p_data['grupos_equipamentos'] = grupos_cag
 
-                # --- NAVEGAÇÃO POR EQUIPAMENTO (CORREÇÃO DO BUG DE PULO DE ABA) ---
+            else:
                 if p_data['grupos_equipamentos']:
                     for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
                         nome_exib = g_data.get('nome_grupo', f'Equipamento {g_idx+1}')
