@@ -1537,10 +1537,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 st.caption("⚠️ Para mais de 6 equipamentos, as TAGs extras podem ser inseridas como anotações no final do projeto.")
 
                             tem_motor = any(mot in g_data['nome_grupo'].upper() for mot in ["UTA", "EXAUST", "VENT", "FANCOIL", "SPLIT", "BOMBA"])
-                            auto_mon_default = False if tem_motor else True
-                            if "SALA" in g_data['nome_grupo'].upper() or "MONITORAMENTO" in g_data['nome_grupo'].upper():
-                                auto_mon_default = True
-                                
+                                                           
                             tem_motor = any(mot in g_data['nome_grupo'].upper() for mot in ["UTA", "EXAUST", "VENT", "FANCOIL", "SPLIT", "BOMBA", "SPLITÃO"])
                             
                             is_monitoramento = st.checkbox(
@@ -1772,10 +1769,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     
                     tem_motor = any(mot in g_data['nome_grupo'].upper() for mot in ["UTA", "EXAUST", "VENT", "FANCOIL", "SPLIT", "BOMBA"])
                     is_mon = st.session_state.get(f"chk_mon_{p_data['id']}_{p_data['grupos_equipamentos'].index(g_data)}", False)
-                    if "SALA" in g_data['nome_grupo'].upper() or "MONITORAMENTO" in g_data['nome_grupo'].upper():
-                        auto_mon_default = True
-                    is_mon = st.session_state.get(f"chk_mon_{p_data['id']}_{p_data['grupos_equipamentos'].index(g_data)}", auto_mon_default)
-                    
+                                       
                     for inst, q in g_data['instrumentos'].items():
                         io_vals = REGRA_IO.get(inst, {"AI": 0, "AO": 0, "DI": 0, "DO": 0})
                         raw_ai_painel += q * io_vals["AI"] * qtd_atual_calc
@@ -2170,10 +2164,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 
                 tem_motor = any(mot in g['nome_grupo'].upper() for mot in ["UTA", "EXAUST", "VENT", "FANCOIL", "SPLIT", "BOMBA", "SPLITÃO"])
                 is_monitoramento = st.session_state.get(f"chk_mon_{p['id']}_{g_idx}", False)
-                if "SALA" in g['nome_grupo'].upper() or "MONITORAMENTO" in g['nome_grupo'].upper():
-                    auto_mon_default = True
-                    
-                is_monitoramento = st.session_state.get(f"chk_mon_{p['id']}_{g_idx}", auto_mon_default)
+               
                 
                 for inst, qtd in g['instrumentos'].items():
                     if qtd > 0:
