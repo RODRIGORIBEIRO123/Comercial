@@ -1510,20 +1510,20 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                     p_data['grupos_equipamentos'] = grupos_cag
 
                 else:
-                if p_data['grupos_equipamentos']:
-                    for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
-                        nome_exib = g_data.get('nome_grupo', f'Equipamento {g_idx+1}')
-                        with st.expander(f"📦 {nome_exib} (Qtd: {g_data.get('multiplicador', 1)})", expanded=True):
-                            
-                            qtd_key = f"m_g_{p_data['id']}_{g_idx}"
-                            qtd_atual = st.session_state.get(qtd_key, g_data.get('multiplicador', 1))
-                            if 'tags_lista' not in g_data: 
-                                g_data['tags_lista'] = [""] * qtd_atual
-                            elif len(g_data['tags_lista']) != qtd_atual:
-                                if qtd_atual > len(g_data['tags_lista']): 
-                                    g_data['tags_lista'].extend([""] * (qtd_atual - len(g_data['tags_lista'])))
-                                else: 
-                                    g_data['tags_lista'] = g_data['tags_lista'][:qtd_atual]
+                    if p_data['grupos_equipamentos']:
+                        for g_idx, g_data in enumerate(p_data['grupos_equipamentos']):
+                            nome_exib = g_data.get('nome_grupo', f'Equipamento {g_idx+1}')
+                            with st.expander(f"📦 {nome_exib} (Qtd: {g_data.get('multiplicador', 1)})", expanded=True):
+                                
+                                qtd_key = f"m_g_{p_data['id']}_{g_idx}"
+                                qtd_atual = st.session_state.get(qtd_key, g_data.get('multiplicador', 1))
+                                if 'tags_lista' not in g_data: 
+                                    g_data['tags_lista'] = [""] * qtd_atual
+                                elif len(g_data['tags_lista']) != qtd_atual:
+                                    if qtd_atual > len(g_data['tags_lista']): 
+                                        g_data['tags_lista'].extend([""] * (qtd_atual - len(g_data['tags_lista'])))
+                                    else: 
+                                        g_data['tags_lista'] = g_data['tags_lista'][:qtd_atual]
 
                             render_qtd = min(qtd_atual, 6) 
                             col_ratios = [3] + [1.5] * render_qtd + [1]
