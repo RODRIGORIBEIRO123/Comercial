@@ -49,19 +49,18 @@ def converter_preco_blindado(val):
 # --- CONFIGURAÇÃO DA TELA (DEVE SER O PRIMEIRO COMANDO STREAMLIT) ---
 st.set_page_config(page_title="App SIARCON - Propostas e Custos", layout="wide", page_icon="📄")
 
-# CSS Global para Interface Mais Moderna (Sugestão Visual Aplicada)
+# CSS Global Adaptável (Funciona no Modo Claro e no Modo Escuro)
 st.markdown("""
     <style>
     .block-container { padding-top: 2rem !important; }
     div[data-testid="stExpander"] {
-        border: 1px solid #E0E0E0;
+        border: 1px solid rgba(28, 133, 144, 0.35);
         border-radius: 8px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        background-color: #FAFAFA;
+        background-color: rgba(28, 133, 144, 0.04);
     }
     div[data-testid="stExpander"] > details > summary {
-        background-color: #F0F4F8;
-        border-radius: 8px;
+        background-color: rgba(28, 133, 144, 0.12);
+        border-radius: 6px;
     }
     </style>
 """, unsafe_allow_html=True)
