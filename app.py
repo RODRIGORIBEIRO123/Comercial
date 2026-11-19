@@ -2021,7 +2021,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                 st.info("Nenhuma alteração detectada para salvar.")
 
 
-with aba_resumo:
+    with aba_resumo:
         st.header("Consolidação Financeira do Orçamento")
         linhas_inst_campo = []
         linhas_hardware = []
