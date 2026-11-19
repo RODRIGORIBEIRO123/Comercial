@@ -1427,7 +1427,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             st.rerun()
                 raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
 
-                    with st.expander("⚙️ Editar Premissas do Quadro (Controlador, IHM, Supervisório, etc.)", expanded=False):
+                with st.expander("⚙️ Editar Premissas do Quadro (Controlador, IHM, Supervisório, etc.)", expanded=False):
                     ep1, ep2 = st.columns(2)
                     opcoes_arq = ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "S7-1500 (Siemens)", "MCP Parametrizável (Mercato - Linha mais econômica)"]
                     arq_atual = p_data.get('arquitetura', opcoes_arq[0])
