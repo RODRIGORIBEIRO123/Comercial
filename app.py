@@ -575,25 +575,31 @@ KITS_PADRAO = {
 def obter_cabo(inst_nome, is_output=False):
     i_up = inst_nome.upper()
     if is_output:
-        if "ON/OFF" in i_up or "ON / OFF" in i_up: 
+        if "ON/OFF" in i_up or "ON / OFF" in i_up or "BLOQUEIO" in i_up: 
             return "PP 4x1,00mm²"
+        if "FLUXO" in i_up or "(FS)" in i_up or "BOMBA" in i_up: 
+            return "2x1,00mm²"
         if "RAQ" in i_up or "RESISTÊNCIA" in i_up: 
             return "2x1,00mm²"
-        if "VÁLVULA" in i_up or "TCV" in i_up or "INVERSOR" in i_up or "VAZÃO" in i_up: 
+        if "VÁLVULA" in i_up or "TCV" in i_up or "INVERSOR" in i_up or "VAZÃO" in i_up or "BY PASS" in i_up: 
             return "3x0,75mm² + Shield"
-        if "CHAVE" in i_up or "BOMBA" in i_up: 
+        if "SELETORA" in i_up or "AUTO/MANUAL" in i_up: 
             return "5x1,00mm²"
         if "EXAUSTOR" in i_up or "VENTILADOR" in i_up or "COMPRESSOR" in i_up: 
             return "2x1,00mm²"
         return "2x1,00mm²"
     else:
-        if "CHAVE" in i_up or "BOMBA" in i_up: 
+        if "BOMBA" in i_up: 
+            return ""
+        if "FLUXO" in i_up or "(FS)" in i_up or "(FS/CF)" in i_up: 
+            return "2x1,00mm²"
+        if "SELETORA" in i_up or "AUTO/MANUAL" in i_up: 
             return "5x1,00mm²"
         if "(TT/MT)" in i_up or "TIT/MIT" in i_up: 
             return "5x0,75mm² + Shield"
-        if "(PDT)" in i_up or "(PDIT)" in i_up or "(TT)" in i_up or "(PIT)" in i_up or "(FIT)" in i_up or "(TIT)" in i_up or "(TCV)" in i_up or "VÁLVULA" in i_up or "INVERSOR" in i_up or "VAZÃO" in i_up: 
+        if "(PDT)" in i_up or "(PDIT)" in i_up or "(TT)" in i_up or "(PIT)" in i_up or "(FIT)" in i_up or "(TIT)" in i_up or "(TCV)" in i_up or "VÁLVULA" in i_up or "INVERSOR" in i_up or "VAZÃO" in i_up or "TEMPERATURA" in i_up: 
             return "3x0,75mm² + Shield"
-        if "(PSH)" in i_up or "(TC)" in i_up or "(TSH)" in i_up or "RAQ" in i_up or "RESISTÊNCIA" in i_up or "EXAUSTOR" in i_up or "VENTILADOR" in i_up or "COMPRESSOR" in i_up or "FLUXO" in i_up or "FS" in i_up or "CF" in i_up: 
+        if "(PSH)" in i_up or "(TC)" in i_up or "(TSH)" in i_up or "RAQ" in i_up or "RESISTÊNCIA" in i_up or "EXAUSTOR" in i_up or "VENTILADOR" in i_up or "COMPRESSOR" in i_up: 
             return "2x1,00mm²"
     return ""
 
@@ -1423,6 +1429,88 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                                 p_data['grupos_equipamentos'].append({"nome_grupo": f"{n_limpo}", "multiplicador": 1, "instrumentos": novos_inst.copy(), "tags_lista": [""]})
                             st.rerun()
                 raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
+
+                if "CAG" in p_data.get('tipo', ''):
+                    # =========================================================
+                    # MÓDULO DEDICADO: CENTRAL DE ÁGUA GELADA (CAG)
+                    # =========================================================
+                    if 'cag_config' not in p_data:
+                        p_data['cag_config'] = {
+                            'qtd_chillers': 1, 'tags_chillers': ['CH-01'],
+                            'qtd_bp': 1, 'tags_bp': ['BP-01'],
+                            'qtd_bs': 1, 'tags_bs': ['BS-01'],
+                            'flag_fs': True, 'flag_rede': False, 'flag_vag': True,
+                            'qtd_tt': 1, 'qtd_fit': 1, 'qtd_pit': 1, 'qtd_bypass': 1
+                        }
+                    cfg = p_data['cag_config']
+                    pid = p_data['id']
+
+                    st.markdown("#### 1. Quantidade de Equipamentos da CAG (Base de Multiplicação)")
+                    cq1, cq2, cq3 = st.columns(3)
+                    cfg['qtd_chillers'] = cq1.number_input("❄️ Qtd. Chillers", min_value=0, step=1, value=cfg['qtd_chillers'], key=f"cag_qch_{pid}")
+                    cfg['qtd_bp'] = cq2.number_input("⚙️ Qtd. Bombas Primárias", min_value=0, step=1, value=cfg['qtd_bp'], key=f"cag_qbp_{pid}")
+                    cfg['qtd_bs'] = cq3.number_input("⚙️ Qtd. Bombas Secundárias", min_value=0, step=1, value=cfg['qtd_bs'], key=f"cag_qbs_{pid}")
+
+                    # Ajuste dinâmico das caixinhas de TAGs
+                    def render_tags_cag(titulo, lista_atual, qtd_alvo, prefixo, chave_base):
+                        while len(lista_atual) < qtd_alvo:
+                            lista_atual.append(f"{prefixo}-{len(lista_atual)+1:02d}")
+                        lista_atual = lista_atual[:qtd_alvo]
+                        if qtd_alvo > 0:
+                            st.caption(f"**{titulo}**")
+                            cols_t = st.columns(min(qtd_alvo, 6))
+                            for i in range(min(qtd_alvo, 6)):
+                                lista_atual[i] = cols_t[i].text_input(f"TAG {i+1}", value=lista_atual[i], key=f"{chave_base}_{i}")
+                        return lista_atual
+
+                    cfg['tags_chillers'] = render_tags_cag("TAGs dos Chillers:", cfg['tags_chillers'], cfg['qtd_chillers'], "CH", f"cag_tch_{pid}")
+                    cfg['tags_bp'] = render_tags_cag("TAGs das Bombas Primárias:", cfg['tags_bp'], cfg['qtd_bp'], "BP", f"cag_tbp_{pid}")
+                    cfg['tags_bs'] = render_tags_cag("TAGs das Bombas Secundárias:", cfg['tags_bs'], cfg['qtd_bs'], "BS", f"cag_tbs_{pid}")
+
+                    st.markdown("---")
+                    st.markdown("#### 2. Itens Automáticos dos Chillers (Multiplica pela Qtd. de Chillers)")
+                    cf1, cf2, cf3 = st.columns(3)
+                    cfg['flag_fs'] = cf1.checkbox("Chave de Fluxo (FS)", value=cfg['flag_fs'], key=f"cag_fs_{pid}")
+                    cfg['flag_rede'] = cf2.checkbox("Integração via Rede", value=cfg['flag_rede'], key=f"cag_rede_{pid}")
+                    cfg['flag_vag'] = cf3.checkbox("VAG ON/OFF Bloqueio do Chiller", value=cfg['flag_vag'], key=f"cag_vag_{pid}")
+                    st.caption("ℹ️ *Bombas Primárias e Secundárias não possuem instrumentação de campo; seus I/Os são multiplicados automaticamente pelas quantidades acima.*")
+
+                    st.markdown("---")
+                    st.markdown("#### 3. Instrumentação Geral da CAG (Quantitativo Manual)")
+                    ci1, ci2 = st.columns(2)
+                    cfg['qtd_tt'] = ci1.number_input("Transmissores de temperatura (Avanço e Retorno)", min_value=0, step=1, value=cfg['qtd_tt'], key=f"cag_tt_{pid}")
+                    cfg['qtd_fit'] = ci2.number_input("Transmissor de vazão ultrassônico (FIT)", min_value=0, step=1, value=cfg['qtd_fit'], key=f"cag_fit_{pid}")
+                    cfg['qtd_pit'] = ci1.number_input("Transmissor de pressão para água (PIT)", min_value=0, step=1, value=cfg['qtd_pit'], key=f"cag_pit_{pid}")
+                    cfg['qtd_bypass'] = ci2.number_input("Válvula de by pass proporcional Até 2.1/2\"", min_value=0, step=1, value=cfg['qtd_bypass'], key=f"cag_byp_{pid}")
+
+                    # Sincroniza os grupos para alimentar o cálculo de I/O e o Orçamento Final automaticamente
+                    grupos_cag = []
+                    if cfg['qtd_chillers'] > 0 and (cfg['flag_fs'] or cfg['flag_rede'] or cfg['flag_vag']):
+                        inst_ch = {k: 0 for k in REGRA_IO.keys()}
+                        if cfg['flag_fs']: inst_ch["Chave de fluxo para chiller (FS)"] = 1
+                        if cfg['flag_rede']: inst_ch["Integração de chiller (via rede)"] = 1
+                        if cfg['flag_vag']: inst_ch["VAG ON/OFF Bloqueio do chiller"] = 1
+                        grupos_cag.append({"nome_grupo": "Chillers CAG", "multiplicador": cfg['qtd_chillers'], "instrumentos": inst_ch, "tags_lista": cfg['tags_chillers']})
+
+                    if cfg['qtd_bp'] > 0:
+                        inst_bp = {k: 0 for k in REGRA_IO.keys()}
+                        inst_bp["Bomba Primária CAG (I/O)"] = 1
+                        grupos_cag.append({"nome_grupo": "Bombas Primárias CAG", "multiplicador": cfg['qtd_bp'], "instrumentos": inst_bp, "tags_lista": cfg['tags_bp']})
+
+                    if cfg['qtd_bs'] > 0:
+                        inst_bs = {k: 0 for k in REGRA_IO.keys()}
+                        inst_bs["Bomba Secundária CAG (I/O)"] = 1
+                        grupos_cag.append({"nome_grupo": "Bombas Secundárias CAG", "multiplicador": cfg['qtd_bs'], "instrumentos": inst_bs, "tags_lista": cfg['tags_bs']})
+
+                    if cfg['qtd_tt'] > 0 or cfg['qtd_fit'] > 0 or cfg['qtd_pit'] > 0 or cfg['qtd_bypass'] > 0:
+                        inst_geral = {k: 0 for k in REGRA_IO.keys()}
+                        inst_geral["Transmissores de temperatura (Avanço e Retorno)"] = cfg['qtd_tt']
+                        inst_geral["Transmissor de vazão ultrassônico (FIT)"] = cfg['qtd_fit']
+                        inst_geral["Transmissor de pressão para água (PIT)"] = cfg['qtd_pit']
+                        inst_geral["Válvula de by pass proporcional Até 2.1/2\""] = cfg['qtd_bypass']
+                        grupos_cag.append({"nome_grupo": "Instrumentação Geral CAG", "multiplicador": 1, "instrumentos": inst_geral, "tags_lista": ["CAG"]})
+
+                    p_data['grupos_equipamentos'] = grupos_cag
 
                 # --- NAVEGAÇÃO POR EQUIPAMENTO (CORREÇÃO DO BUG DE PULO DE ABA) ---
                 if p_data['grupos_equipamentos']:
