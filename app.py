@@ -522,14 +522,11 @@ GRUPOS_INSTRUMENTOS = {
         "Integração de chiller (via rede)",
         "Chave de fluxo para chiller (FS)",
         "VAG ON/OFF Bloqueio do chiller",
-        "Bomba Primária CAG (I/O)",
-        "Bomba Secundária CAG (I/O)",
         "Transmissor de pressão para água (PIT)",
         "Transmissor de vazão ultrassônico (FIT)",
         "Válvula de by pass proporcional Até 2.1/2\"",
         "Transmissores de temperatura (Avanço e Retorno)",
-        "Bomba de água gelada - Partida direta",
-        "Bomba de água gelada - Inversor de frequência"
+        
     ]
 }
 
@@ -1539,7 +1536,7 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             if qtd_atual > 6: 
                                 st.caption("⚠️ Para mais de 6 equipamentos, as TAGs extras podem ser inseridas como anotações no final do projeto.")
 
-                            tem_motor = any(mot in g_data['nome_grupo'].upper() for mot in ["UTA", "EXAUST", "VENT", "FANCOIL", "SPLIT", "BOMBA", "SPLITÃO"])
+                            tem_motor = any(mot in g_data['nome_grupo'].upper() for mot in ["UTA", "EXAUST", "VENT", "FANCOIL", "SPLIT", "BOMBA"])
                             auto_mon_default = False if tem_motor else True
                             if "SALA" in g_data['nome_grupo'].upper() or "MONITORAMENTO" in g_data['nome_grupo'].upper():
                                 auto_mon_default = True
