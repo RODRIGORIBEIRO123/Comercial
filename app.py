@@ -1427,17 +1427,58 @@ elif st.session_state.menu_selecionado == "🔌 Levantamento de Automação":
                             st.rerun()
                 raw_ai_painel = raw_ao_painel = raw_di_painel = raw_do_painel = 0
 
+                    with st.expander("⚙️ Editar Premissas do Quadro (Controlador, IHM, Supervisório, etc.)", expanded=False):
+                    ep1, ep2 = st.columns(2)
+                    opcoes_arq = ["SpaceLogic (Schneider)", "S7-1200 (Siemens)", "S7-1500 (Siemens)", "MCP Parametrizável (Mercato - Linha mais econômica)"]
+                    arq_atual = p_data.get('arquitetura', opcoes_arq[0])
+                    p_data['arquitetura'] = ep1.selectbox("Arquitetura do Hardware:", opcoes_arq, index=opcoes_arq.index(arq_atual) if arq_atual in opcoes_arq else 0, key=f"ed_arq_{p_data['id']}")
+
+                    is_merc_ed = "Mercato" in p_data['arquitetura']
+                    is_siem_ed = "Siemens" in p_data['arquitetura']
+
+                    opcoes_ihm_ed = ["Sem Interface (Cego)", "Mercato - IHM Básica 4.3\""] if is_merc_ed else ["Sem Interface (Cego)", "IHM Padrão 7\"", "IHM Premium 10\""]
+                    ihm_atual = p_data.get('ihm', "Sem Interface (Cego)")
+                    p_data['ihm'] = ep2.selectbox("IHM Local:", opcoes_ihm_ed, index=opcoes_ihm_ed.index(ihm_atual) if ihm_atual in opcoes_ihm_ed else 0, key=f"ed_ihm_{p_data['id']}")
+
+                    ep3, ep4 = st.columns(2)
+                    if is_merc_ed:
+                        p_data['supervisorio'] = "Sem Supervisório"
+                        p_data['tipo_cfr'] = "Não Aplicável"
+                        ep3.info("ℹ️ Arquitetura Mercato não utiliza supervisório nativo.")
+                    else:
+                        opcoes_sup_ed = ["Sem Supervisório", "Sistema supervisório SEM certificação CFR-21", "Sistema supervisório COM certificação CFR-21"]
+                        if not is_siem_ed:
+                            opcoes_sup_ed.append("Sistema de monitoramento Schneider EBO")
+                        sup_atual = p_data.get('supervisorio', "Sem Supervisório")
+                        p_data['supervisorio'] = ep3.selectbox("Sistema de Supervisório:", opcoes_sup_ed, index=opcoes_sup_ed.index(sup_atual) if sup_atual in opcoes_sup_ed else 0, key=f"ed_sup_{p_data['id']}")
+
+                        if "COM certificação" in p_data['supervisorio']:
+                            opcoes_cfr_ed = ["CFR21 Part 11 - Qualificável", "CFR21 Part 11 - Qualificado"]
+                            cfr_atual = p_data.get('tipo_cfr', opcoes_cfr_ed[0])
+                            p_data['tipo_cfr'] = ep4.selectbox("Modalidade CFR-21:", opcoes_cfr_ed, index=opcoes_cfr_ed.index(cfr_atual) if cfr_atual in opcoes_cfr_ed else 0, key=f"ed_cfr_{p_data['id']}")
+                        else:
+                            p_data['tipo_cfr'] = "Não Aplicável"
+
+                    ep5, ep6 = st.columns(2)
+                    p_data['calibracao'] = ep5.radio("Instrumentos Calibrados?", ["Não", "Sim"], index=1 if p_data.get('calibracao') == "Sim" else 0, horizontal=True, key=f"ed_cal_{p_data['id']}")
+                    p_data['sobra_20'] = ep6.radio("Reserva Técnica 20% I/O?", ["Não", "Sim"], index=1 if p_data.get('sobra_20') == "Sim" else 0, horizontal=True, key=f"ed_sob_{p_data['id']}")
+
+                # Atualiza as variáveis de controle imediatamente após qualquer edição
+                is_mercato_quadro = ('Mercato' in p_data.get('arquitetura', ''))
+                is_schneider_quadro = ('Schneider' in p_data.get('arquitetura', ''))
+                tem_sobra_20 = (p_data.get('sobra_20', 'Não') == 'Sim')
+
                 if "CAG" in p_data.get('tipo', ''):
                     # =========================================================
                     # MÓDULO DEDICADO: CENTRAL DE ÁGUA GELADA (CAG)
                     # =========================================================
                     if 'cag_config' not in p_data:
                         p_data['cag_config'] = {
-                            'qtd_chillers': 1, 'tags_chillers': ['CH-01'],
-                            'qtd_bp': 1, 'tags_bp': ['BP-01'],
-                            'qtd_bs': 1, 'tags_bs': ['BS-01'],
-                            'flag_fs': True, 'flag_rede': False, 'flag_vag': True,
-                            'qtd_tt': 1, 'qtd_fit': 1, 'qtd_pit': 1, 'qtd_bypass': 1
+                            'qtd_chillers': 0, 'tags_chillers': [],
+                            'qtd_bp': 0, 'tags_bp': [],
+                            'qtd_bs': 0, 'tags_bs': [],
+                            'flag_fs': False, 'flag_rede': False, 'flag_vag': False,
+                            'qtd_tt': 0, 'qtd_fit': 0, 'qtd_pit': 0, 'qtd_bypass': 0
                         }
                     cfg = p_data['cag_config']
                     pid = p_data['id']
